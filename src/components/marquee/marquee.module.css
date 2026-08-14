@@ -1,0 +1,53 @@
+.root {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  z-index: var(--z-marquee);
+  /* 좌우 끝을 페이드 아웃 — 시안에서 텍스트가 화면 밖으로 잘려 나가는 인상 */
+  mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+  pointer-events: none;
+  user-select: none;
+}
+
+.track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.set {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  /* Figma 2:411 — Marcellus Regular 108px, tracking 2.16px(+2%) */
+  font-family: var(--font-marcellus-stack);
+  font-size: var(--fs-display-108);
+  font-weight: var(--weight-regular);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--color-white);
+}
+
+.sep {
+  padding-inline: 0.35em;
+  opacity: 0.7;
+}
+
+/* 시안의 속 빈 아웃라인 변형 */
+.outline .item {
+  color: transparent;
+  -webkit-text-stroke: 1px currentColor;
+  /* -webkit-text-stroke 는 color 를 무시하므로 stroke 색을 따로 준다 */
+  -webkit-text-stroke-color: rgba(255, 255, 255, 0.55);
+}
+
+@media (max-width: 768px) {
+  .item {
+    font-size: var(--fs-42);
+  }
+}

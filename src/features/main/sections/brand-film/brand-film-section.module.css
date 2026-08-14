@@ -1,0 +1,20 @@
+/* Figma 2:994 — 1920×1080. 시안에서 유일하게 920 이 아닌 프레임(16:9 풀블리드). */
+.section {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--primary-900);
+}
+
+.video {
+  position: absolute;
+  inset: 0;
+}
+
+@media (max-width: 768px) {
+  .section {
+    min-height: 60vh;
+  }
+}

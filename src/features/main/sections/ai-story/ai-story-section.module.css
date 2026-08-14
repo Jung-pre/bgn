@@ -1,0 +1,224 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-lg);
+  padding-block: var(--gap-section);
+  background: #e4eefb;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 100%;
+  padding-inline: var(--content-side-pad);
+}
+
+.tab {
+  position: relative;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-white);
+  color: var(--color-text-body);
+  font-size: var(--fs-20);
+  white-space: nowrap;
+  transition: color 0.25s ease;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 3px;
+}
+
+.tabActive {
+  color: var(--color-white);
+  font-weight: var(--weight-semibold);
+}
+
+/* 활성 표시 알약 — Motion layoutId 로 탭 사이를 이동한다 */
+.tabIndicator {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--radius-full);
+  background: var(--gradient-cta);
+}
+
+.tabLabel {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+  스테이지 = 카드가 놓이는 고정 크기 무대.
+  `AnimatePresence mode="wait"` 는 나갈 카드가 완전히 사라진 뒤 다음 카드를
+  넣기 때문에, 카드가 레이아웃을 차지하면 그 사이 섹션 높이가 무너진다.
+  무대가 크기를 잡고 카드는 absolute 로 떠 있게 한다.
+*/
+.stage {
+  position: relative;
+  width: min(53.75rem, calc(100% - 2 * var(--content-side-pad))); /* 시안 860 */
+  aspect-ratio: 16 / 9;
+}
+
+.card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: var(--gap-lg);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  color: var(--color-white);
+}
+
+.cardBg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* 탭마다 톤을 다르게 — 크로스페이드가 '교체'로 읽히려면 색이 달라야 한다.
+   전부 토큰 조합이다(primary 계열 + sub). */
+.toneA {
+  background:
+    radial-gradient(50% 60% at 78% 75%, var(--primary-700) 0%, transparent 70%),
+    radial-gradient(40% 50% at 20% 20%, var(--primary-300) 0%, transparent 70%),
+    linear-gradient(140deg, var(--primary-900) 0%, var(--primary-700) 100%);
+}
+
+.toneB {
+  background:
+    radial-gradient(52% 62% at 72% 70%, var(--primary-500) 0%, transparent 72%),
+    radial-gradient(42% 52% at 22% 24%, var(--primary-200) 0%, transparent 70%),
+    linear-gradient(140deg, var(--primary-900) 0%, var(--primary-800) 100%);
+}
+
+.toneC {
+  background:
+    radial-gradient(50% 60% at 74% 72%, var(--primary-sub-500) 0%, transparent 72%),
+    radial-gradient(40% 50% at 24% 22%, var(--primary-300) 0%, transparent 70%),
+    linear-gradient(140deg, var(--primary-800) 0%, var(--primary-700) 100%);
+}
+
+.cardTag,
+.cardEyebrow,
+.cardTitle,
+.play {
+  position: relative;
+  z-index: 1;
+}
+
+/* 카드에도 현재 주제를 남겨야 크로스페이드가 정보를 전달한다 */
+.cardTag {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--whitebg-30);
+  border-radius: var(--radius-full);
+  background: var(--whitebg-10);
+  backdrop-filter: blur(6px);
+  font-size: var(--fs-14);
+  color: var(--whitebg-90);
+}
+
+.cardEyebrow {
+  margin: 0;
+  font-size: var(--fs-26);
+  color: var(--whitebg-80);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--fs-42);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  white-space: pre-line;
+}
+
+.play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: grid;
+  place-items: center;
+  width: 5rem;
+  height: 5rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--whitebg-30);
+  background: var(--whitebg-20);
+  backdrop-filter: blur(8px);
+  color: var(--color-white);
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.play svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.play:hover {
+  transform: scale(1.06);
+  background: var(--whitebg-30);
+}
+
+.play:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 4px;
+}
+
+@media (max-width: 1440px) {
+  .tabs {
+    padding-inline: clamp(40px, 7.3vw, 140px);
+  }
+  .stage {
+    width: min(53.75rem, calc(100% - 2 * clamp(40px, 7.3vw, 140px)));
+  }
+}
+
+@media (max-width: 768px) {
+  .tabs {
+    align-self: stretch;
+    padding-inline: var(--mobile-gutter);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tab {
+    font-size: var(--fs-16);
+  }
+  .stage {
+    width: calc(100% - 2 * var(--mobile-gutter));
+  }
+  .card {
+    padding: var(--gap-md);
+  }
+  .cardTitle {
+    font-size: var(--fs-24);
+  }
+  .cardEyebrow {
+    font-size: var(--fs-16);
+  }
+  .play {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+  .play svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .play {
+    transition: none;
+  }
+}

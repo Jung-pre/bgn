@@ -1,0 +1,195 @@
+/**
+ * 히어로 지도 구체의 파티클 좌표 생성.
+ *
+ * three 를 import 하지 않는다 — 순수 계산만 있어야 3D 청크 밖에서도(테스트 등)
+ * 돌릴 수 있고, 무엇보다 `hero-assets.ts` 와 같은 이유로 의존성을 안 늘린다.
+ *
+ * 좌표계
+ * ------
+ *   +Y = 북극,  +Z = 카메라 방향(경도 0°),  경도는 +X 쪽으로 증가
+ * 이 규약 때문에 `lon = atan2(x, z)` 다. (일반적인 `atan2(z, x)` 가 아니다)
+ */
+import { LAND_MASK_BASE64, LAND_MASK_HEIGHT, LAND_MASK_WIDTH } from "./land-mask.generated";
+
+/**
+ * 구체 반지름(월드 단위).
+ *
+ * 카메라 z=6 / fov 38 → 화면 높이의 절반이 월드 2.066 이다.
+ * 시안(`2:416`)에서 구체 지름은 프레임 높이(920)의 약 82% 를 차지하므로
+ *   R = 0.82 × (2 × 2.066) / 2 = 1.69
+ * 카메라·fov 를 건드리면 이 값도 같이 다시 잡아야 한다.
+ */
+export const GLOBE_RADIUS = 1.69;
+
+/**
+ * 정면에 오는 경도·위도. 서울(127.0E, 37.5N).
+ *
+ * 카피가 "세계를 향한 BGN의 도약" 이라 한반도가 정면에서 빛나는 구도가 맞다.
+ * 다른 지점을 정면에 두고 싶으면 여기만 바꾸면 된다 — 회전 오프셋과 코어 글로우
+ * 위치가 전부 이 값에서 파생된다.
+ */
+export const FOCUS_LON = 127.0;
+export const FOCUS_LAT = 37.5;
+
+const DEG = Math.PI / 180;
+
+/** 시드 기반 결정론적 PRNG (mulberry32). 같은 시드 → 항상 같은 분포. */
+export function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * 1비트 마스크 해제. 모듈 로드 시 딱 한 번.
+ *
+ * `atob` 이 없는 환경(서버)에서는 빈 마스크를 돌려준다 — 이 모듈은
+ * `ssr: false` 인 3D 청크에서만 쓰이므로 실제로 걸릴 일은 없지만,
+ * 여기서 던지면 원인 찾기 어려운 하이드레이션 오류로 번진다.
+ */
+const LAND_MASK: Uint8Array = (() => {
+  if (typeof atob !== "function") return new Uint8Array(0);
+  const bin = atob(LAND_MASK_BASE64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+  return out;
+})();
+
+/** 단위 방향벡터가 육지인가 */
+function isLand(x: number, y: number, z: number): boolean {
+  if (LAND_MASK.length === 0) return true; // 마스크가 없으면 균일 분포로 폴백
+  const lat = Math.asin(y < -1 ? -1 : y > 1 ? 1 : y) / DEG;
+  const lon = Math.atan2(x, z) / DEG;
+  let col = ((lon + 180) / 360) * LAND_MASK_WIDTH;
+  let row = ((90 - lat) / 180) * LAND_MASK_HEIGHT;
+  col = col < 0 ? 0 : col >= LAND_MASK_WIDTH ? LAND_MASK_WIDTH - 1 : Math.floor(col);
+  row = row < 0 ? 0 : row >= LAND_MASK_HEIGHT ? LAND_MASK_HEIGHT - 1 : Math.floor(row);
+  const i = row * LAND_MASK_WIDTH + col;
+  return (((LAND_MASK[i >> 3] ?? 0) >> (i & 7)) & 1) === 1;
+}
+
+/**
+ * 구 표면 균일 분포 1점.
+ *
+ * `acos(2v - 1)` 을 쓰는 이유: 위도를 그냥 균등 난수로 뽑으면 극에 몰린다.
+ * (구면의 면적 요소가 sin φ 라서)
+ */
+function randomDirection(rand: () => number, out: [number, number, number]) {
+  const theta = 2 * Math.PI * rand();
+  const phi = Math.acos(2 * rand() - 1);
+  const s = Math.sin(phi);
+  out[0] = s * Math.cos(theta);
+  out[1] = Math.cos(phi);
+  out[2] = s * Math.sin(theta);
+}
+
+export interface PointCloud {
+  positions: Float32Array;
+  /** 파티클별 밝기 배수(0~1). 균일하면 프린트한 것처럼 납작해 보인다. */
+  scales: Float32Array;
+}
+
+/**
+ * 육지 레이어 — 대륙 위에만 밀집.
+ *
+ * 기각 표집(rejection sampling)이다. 육지는 구면의 약 29% 라 평균 3.4회면
+ * 1점이 통과한다. 2만 점이면 약 7만 회 — 1ms 대다.
+ * `maxTries` 는 마스크가 깨졌을 때 무한루프로 탭을 얼리지 않기 위한 안전장치.
+ */
+export function makeLandPoints(count: number, seed: number): PointCloud {
+  const rand = mulberry32(seed);
+  const positions = new Float32Array(count * 3);
+  const scales = new Float32Array(count);
+  const dir: [number, number, number] = [0, 0, 0];
+
+  let written = 0;
+  let tries = 0;
+  const maxTries = count * 40;
+
+  while (written < count && tries < maxTries) {
+    tries += 1;
+    randomDirection(rand, dir);
+    if (!isLand(dir[0], dir[1], dir[2])) continue;
+
+    // 껍질에 두께를 준다. 완전히 같은 반지름이면 실루엣 가장자리가 칼같이 잘려
+    // 시안의 "흩어지는" 느낌이 안 난다.
+    const r = GLOBE_RADIUS * (1 + (rand() - 0.35) * 0.018);
+    positions[written * 3] = dir[0] * r;
+    positions[written * 3 + 1] = dir[1] * r;
+    positions[written * 3 + 2] = dir[2] * r;
+    scales[written] = 0.55 + rand() * 0.45;
+    written += 1;
+  }
+
+  return { positions: positions.subarray(0, written * 3), scales: scales.subarray(0, written) };
+}
+
+/**
+ * 베이스 레이어 — 바다까지 포함한 옅은 구면.
+ *
+ * 이게 없으면 대륙만 공중에 떠 있어 "구"로 안 읽힌다. 시안에서도 원반 전체가
+ * 옅게 차 있고 그 위에 대륙이 밝게 얹혀 있다.
+ */
+export function makeShellPoints(count: number, seed: number): PointCloud {
+  const rand = mulberry32(seed);
+  const positions = new Float32Array(count * 3);
+  const scales = new Float32Array(count);
+  const dir: [number, number, number] = [0, 0, 0];
+
+  for (let i = 0; i < count; i += 1) {
+    randomDirection(rand, dir);
+    const r = GLOBE_RADIUS * (1 + (rand() - 0.5) * 0.012);
+    positions[i * 3] = dir[0] * r;
+    positions[i * 3 + 1] = dir[1] * r;
+    positions[i * 3 + 2] = dir[2] * r;
+    scales[i] = 0.25 + rand() * 0.35;
+  }
+  return { positions, scales };
+}
+
+/**
+ * 헤일로 — 구 바깥으로 흩날리는 입자.
+ *
+ * 시안 구체는 경계가 딱 떨어지지 않고 바깥으로 번진다.
+ * 반지름을 `1 + u³ × 0.3` 로 뽑아 안쪽에 몰리고 바깥으로 갈수록 성기게 만든다.
+ */
+export function makeHaloPoints(count: number, seed: number): PointCloud {
+  const rand = mulberry32(seed);
+  const positions = new Float32Array(count * 3);
+  const scales = new Float32Array(count);
+  const dir: [number, number, number] = [0, 0, 0];
+
+  for (let i = 0; i < count; i += 1) {
+    randomDirection(rand, dir);
+    const u = rand();
+    const t = u * u * u;
+    const r = GLOBE_RADIUS * (1 + t * 0.16);
+    positions[i * 3] = dir[0] * r;
+    positions[i * 3 + 1] = dir[1] * r;
+    positions[i * 3 + 2] = dir[2] * r;
+    // 바깥으로 갈수록 어두워진다
+    scales[i] = (1 - t) * (0.3 + rand() * 0.5);
+  }
+  return { positions, scales };
+}
+
+/** 경위도 → 단위 방향벡터 (위 좌표계 규약) */
+export function lonLatToVector(lon: number, lat: number): [number, number, number] {
+  const la = lat * DEG;
+  const lo = lon * DEG;
+  const c = Math.cos(la);
+  return [c * Math.sin(lo), Math.sin(la), c * Math.cos(lo)];
+}
+
+/**
+ * `FOCUS_LON` 을 카메라 정면(+Z)으로 가져오는 Y축 회전량(라디안).
+ *
+ * three 의 R_y(θ) 는 `atan2(x, z)` 를 θ 만큼 **더한다**. 정면은 각 0 이므로
+ * 경도 φ 를 정면에 두려면 −φ 를 걸어야 한다.
+ */
+export const FOCUS_ROTATION_Y = -FOCUS_LON * DEG;

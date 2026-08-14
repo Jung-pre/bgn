@@ -1,0 +1,26 @@
+.section {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  /* 시안: 우상단 스카이블루 → 좌하단 더스티핑크/라벤더 대각 그라데이션 */
+  background:
+    radial-gradient(80% 70% at 85% 10%, #7fa3c9 0%, transparent 65%),
+    radial-gradient(80% 70% at 10% 90%, #c4a7a5 0%, transparent 65%),
+    linear-gradient(150deg, #a8b6cc 0%, #b9a9b4 100%);
+}
+
+.canvasHost {
+  position: absolute;
+  inset: 0;
+}
+
+.canvasHost :global(canvas) {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .section {
+    min-height: 60vh;
+  }
+}

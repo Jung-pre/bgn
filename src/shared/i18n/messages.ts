@@ -1,0 +1,470 @@
+import type { Locale } from "@/shared/config/i18n";
+
+/**
+ * 섹션별 messages 인터페이스 + 사전.
+ *
+ * 문구는 시안(docs/design/2026_BGN 잠실.pdf)에서 추출한 실제 카피다.
+ * 시안 PDF 는 한글이 Type3(아웃라인)로 익스포트돼 있어 텍스트 복사가 안 되므로,
+ * 렌더 이미지를 읽어 옮겨 적었다. **오탈자 검수 필요.**
+ *
+ * 규칙:
+ *  - `src/features/**` 만 이 타입을 import 한다. `src/components/**` 는 금지.
+ *  - 모바일 전용 카피는 `xxxMobile?` 옵셔널로 두고 `?? xxx` 폴백.
+ *  - en/ja/zh 는 아직 원문이 없다. ko 를 복제해 두고 번역이 오면 교체할 것.
+ */
+
+/* ── 공통 ───────────────────────────────────────────────────────────────── */
+
+export interface SectionHeaderMessages {
+  /** 영문 아이브로우 — 시안 전 섹션 공통 3단 구조의 1단 */
+  eyebrow: string;
+  /** 국문 헤드라인 */
+  title: string;
+  /** 헤드라인 중 형광 마커로 감쌀 어절 (있는 섹션만) */
+  titleMarker?: string;
+  /** 본문 2행 */
+  description?: string;
+}
+
+/* ── 히어로 ─────────────────────────────────────────────────────────────── */
+
+export interface HeroSlideMessages {
+  /** 상단 작은 카피 */
+  eyebrow: string;
+  /** 메인 헤드라인 — `brandToken` 부분만 로고타입 강조 */
+  title: string;
+  brandToken?: string;
+}
+
+export interface HeroSectionMessages {
+  slides: HeroSlideMessages[];
+  /** 하단 무한 마퀴 문구 */
+  marquee: string;
+  scrollLabel: string;
+}
+
+/* ── 의료진 ─────────────────────────────────────────────────────────────── */
+
+export interface DoctorMessages {
+  name: string;
+  title: string;
+}
+
+export interface MedicalTeamSectionMessages extends SectionHeaderMessages {
+  cta: string;
+  doctors: DoctorMessages[];
+}
+
+/* ── AI 정밀 검사 시스템 ─────────────────────────────────────────────────── */
+
+export interface AiStepMessages {
+  step: string;
+  title: string;
+  description: string;
+  /** 카드 안 데이터 비주얼 라벨 */
+  dataLabel?: string;
+}
+
+export interface AiSystemSectionMessages extends SectionHeaderMessages {
+  steps: AiStepMessages[];
+  marquee: string;
+}
+
+/* ── AI 상담 신청 ───────────────────────────────────────────────────────── */
+
+export interface AiConsultSectionMessages extends SectionHeaderMessages {
+  namePlaceholder: string;
+  phonePlaceholder: string;
+  agreement: string;
+  agreementLink: string;
+  submit: string;
+}
+
+/* ── AI 브랜드 스토리(영상 탭) ───────────────────────────────────────────── */
+
+export interface AiStorySectionMessages {
+  tabs: string[];
+  videoEyebrow: string;
+  videoTitle: string;
+  playLabel: string;
+}
+
+/* ── 진료 센터 ──────────────────────────────────────────────────────────── */
+
+export interface CenterMessages {
+  /** 아코디언 축소 상태의 세로쓰기 라벨 */
+  shortName: string;
+  name: string;
+  nameEn: string;
+  description: string;
+  href: string;
+}
+
+export interface CentersSectionMessages extends SectionHeaderMessages {
+  centers: CenterMessages[];
+}
+
+/* ── 히스토리 타임라인 ──────────────────────────────────────────────────── */
+
+export interface HistoryEraMessages {
+  period: string;
+  title: string;
+  quote: string;
+  quoteAuthor: string;
+  points: string[];
+}
+
+export interface HistorySectionMessages {
+  introTitle: string;
+  introTitleMarker: string;
+  eras: HistoryEraMessages[];
+}
+
+/* ── Web blog ───────────────────────────────────────────────────────────── */
+
+export interface BlogPostMessages {
+  tags: string[];
+  title: string;
+  href: string;
+}
+
+export interface BlogSectionMessages {
+  title: string;
+  posts: BlogPostMessages[];
+}
+
+/* ── 이벤트 ─────────────────────────────────────────────────────────────── */
+
+export interface EventItemMessages {
+  title: string;
+  subtitle: string;
+  href: string;
+}
+
+export interface EventSectionMessages extends SectionHeaderMessages {
+  cta: string;
+  events: EventItemMessages[];
+}
+
+/* ── 푸터 ───────────────────────────────────────────────────────────────── */
+
+export interface BranchMessages {
+  id: string;
+  label: string;
+  address: string;
+  hours: { label: string; value: string }[];
+}
+
+export interface FooterMessages {
+  /** 기획안 p30 — 지점 소개 카피 2단락 */
+  intro: string[];
+  tel: string;
+  closedNotice: string;
+  hoursNote: string;
+  branches: BranchMessages[];
+  policyLinks: { label: string; href: string; strong?: boolean }[];
+  business: { label: string; value: string }[];
+  copyright: string;
+}
+
+/* ── GNB ────────────────────────────────────────────────────────────────── */
+
+export interface GnbMessages {
+  login: string;
+  signup: string;
+  menuOpen: string;
+  menuClose: string;
+  languageLabel: string;
+  quickActions: { id: string; label: string }[];
+  chatbotBubble: string;
+}
+
+/* ── 사전 ───────────────────────────────────────────────────────────────── */
+
+export interface Dictionary {
+  gnb: GnbMessages;
+  heroSection: HeroSectionMessages;
+  medicalTeamSection: MedicalTeamSectionMessages;
+  aiSystemSection: AiSystemSectionMessages;
+  aiConsultSection: AiConsultSectionMessages;
+  aiStorySection: AiStorySectionMessages;
+  centersSection: CentersSectionMessages;
+  historySection: HistorySectionMessages;
+  blogSection: BlogSectionMessages;
+  eventSection: EventSectionMessages;
+  footer: FooterMessages;
+}
+
+const ko: Dictionary = {
+  gnb: {
+    login: "로그인",
+    signup: "회원가입",
+    menuOpen: "전체 메뉴 열기",
+    menuClose: "전체 메뉴 닫기",
+    languageLabel: "언어 선택",
+    quickActions: [
+      { id: "naver", label: "네이버예약" },
+      { id: "event", label: "이벤트" },
+      { id: "kakao", label: "카톡상담" },
+      { id: "map", label: "오시는 길" },
+    ],
+    chatbotBubble: "무엇이든 물어보세요!",
+  },
+
+  heroSection: {
+    slides: [
+      { eyebrow: "세계를 향한", title: "BGN의 도약", brandToken: "BGN" },
+      { eyebrow: "세상을 선명하게", title: "BGN 밝은눈안과", brandToken: "BGN" },
+    ],
+    marquee: "BGN Eyeclinic Jamsil",
+    scrollLabel: "Scroll",
+  },
+
+  medicalTeamSection: {
+    eyebrow: "BGN Medical Team",
+    title: "BGN 의료진",
+    cta: "의료진소개 보러가기",
+    // 시안 도트 인디케이터가 8개 → 의료진 8인
+    doctors: [
+      { name: "박세광", title: "대표원장" },
+      { name: "", title: "" },
+      { name: "", title: "" },
+      { name: "", title: "" },
+      { name: "", title: "" },
+      { name: "", title: "" },
+      { name: "", title: "" },
+      { name: "", title: "" },
+    ],
+  },
+
+  aiSystemSection: {
+    eyebrow: "AI Precision System",
+    title: "BGN AI 정밀 검사 시스템",
+    steps: [
+      { step: "1", title: "데이터 수집", description: "", dataLabel: "OPTICAL MAPPING" },
+      {
+        step: "2",
+        title: "AI 빅데이터 분석",
+        description: "",
+        dataLabel: "760,000+ CLINICAL CASES",
+      },
+      { step: "3", title: "AI 시뮬레이션", description: "", dataLabel: "ACCURACY 99.2%" },
+      { step: "4", title: "맞춤형 제안", description: "", dataLabel: "SMILE PRO / ICL / LASIK" },
+    ],
+    marquee: "AI Precision System",
+  },
+
+  aiConsultSection: {
+    eyebrow: "AI Consultation",
+    title: "BGN AI 정밀 검사 상담 신청",
+    titleMarker: "상담 신청",
+    description:
+      "25년 안과 노하우와 AI 시스템으로 가장 안전하고 정확한 시력교정을 제안해 드립니다.",
+    namePlaceholder: "이름을 입력해주세요",
+    phonePlaceholder: "연락처를 입력해주세요",
+    agreement: "개인정보 처리방침 동의",
+    agreementLink: "약관보기",
+    submit: "AI 검사 신청하기",
+  },
+
+  aiStorySection: {
+    tabs: ["밝은눈안과 AI 히스토리", "AI 기반 맞춤형 진단 시스템", "AI 기술 미래 전망"],
+    videoEyebrow: "정밀성, 안전성, 맞춤형 치료의 새로운 지평",
+    videoTitle: "AI 혁신이 이끄는\n시력교정의 새로운 미래",
+    playLabel: "영상 재생",
+  },
+
+  centersSection: {
+    eyebrow: "BGN Center",
+    title: "진료 센터",
+    // ⚠️ 시안에서 명칭 표기가 섞여 있었다(스마일센터 / 스마일라식센터).
+    //    개발 전 용어 통일 필요 — 일단 GNB 메뉴 표기를 기준으로 맞춰 둔다.
+    centers: [
+      {
+        shortName: "스마일센터",
+        name: "스마일라식센터",
+        nameEn: "Smart Lasik Center",
+        description: "",
+        href: "/center/smile",
+      },
+      {
+        shortName: "시력교정센터",
+        name: "시력교정센터",
+        nameEn: "Vision Correction Center",
+        description: "",
+        href: "/center/vision-correction",
+      },
+      {
+        shortName: "백내장센터",
+        name: "백내장센터",
+        nameEn: "Cataract Center",
+        description: "",
+        href: "/center/cataract",
+      },
+      {
+        shortName: "드림렌즈센터",
+        name: "드림렌즈센터",
+        nameEn: "Dream Lens Center",
+        description: "",
+        href: "/center/dream-lens",
+      },
+      {
+        shortName: "건성안센터",
+        name: "건성안센터",
+        nameEn: "Dry Eye Center",
+        description: "",
+        href: "/center/dry-eye",
+      },
+      {
+        shortName: "안종합검진센터",
+        name: "안종합검진센터",
+        nameEn: "Comprehensive Eye Examination Center",
+        description: "",
+        href: "/center/examination",
+      },
+    ],
+  },
+
+  historySection: {
+    introTitle: "소중한 눈을 위한 단 한 번의 선택,\nBGN의 발자취가 곧 신뢰의 기준입니다.",
+    introTitleMarker: "단 한 번의 선택,",
+    eras: [
+      {
+        period: "2009 ~ 2010",
+        title: "도전과 혁신의 첫걸음",
+        quote: "우수한 장비가 뒷받침될 때, 정밀한 진료가 가능합니다.",
+        quoteAuthor: "박세광 대표원장",
+        points: [
+          "독일 ZEISS 사의 스마일라식 선제적 도입",
+          "스마일라식 EXPERIENCED SURGEON 선정 안과",
+          "자체 기술력을 바탕으로 한 'AI 라식/라섹 정밀 검사 프로그램' 도입",
+        ],
+      },
+      {
+        period: "2011 ~ 2013",
+        title: "세계로 확장된 BGN, 눈부신 성장",
+        quote: "눈 건강을 지키는 의료 기술에는 국경이 없습니다.",
+        quoteAuthor: "박세광 대표원장",
+        points: [
+          "글로벌 네트워크 안과병원(아이얼안과) 협력 및 공동 라식 센터 설립",
+          "독일 ZEISS 사와 스마일라식 장비(VISUMAX) 공동 연구 진행",
+          "ZEISS 공식 인증 '스마일 라식 센터' 선정 및 코리아 스마일 포럼 참석",
+        ],
+      },
+      {
+        period: "2014 ~ 2023",
+        title: "끊임없는 연구, 맞춤형 의료 솔루션",
+        quote: "환자를 위한 아낌없는 투자와 기술 혁신은 계속됩니다.",
+        quoteAuthor: "박세광 대표원장",
+        points: [
+          "글로벌 학회(WOC TOKYO) 비쥬맥스 라식 부문 수상",
+          "빅데이터 기반 자체 특화 프로그램 개발 (트리플 / 콰트로 / 펜타 자이스스마일)",
+          "진보된 시력교정 장비 '스마일 프로' 도입 및 ZEISS 사의 핵심 장비 다수 보유",
+        ],
+      },
+      {
+        period: "2024 ~ 2026",
+        title: "안과 의료계의 새로운 지평",
+        quote: "끊임없는 학술 교류가 더 나은 의료 서비스를 만듭니다.",
+        // 기획안에 이 인용만 발화자 표기가 없다. 확인 필요.
+        quoteAuthor: "박세광 대표원장",
+        points: [
+          "세계적인 안과학회(ESCRS 바르셀로나, ZEISS APAC 등) 지속적 참여 및 연구 발표",
+          "EVO ICL 렌즈삽입술 영닥터 심포지움 참여",
+          "대한민국 국가대표 선수협회 및 한국야구위원회(KBO) 공식 의료 제휴 안과 선정",
+        ],
+      },
+    ],
+  },
+
+  blogSection: {
+    title: "BGN Web blog",
+    posts: [
+      {
+        tags: ["Doctor's Story", "히포크라테스의 생각"],
+        title: "백내장 명의? 증세의 정도를 확인하는 판단력이 필요합니다.",
+        href: "/blog/1",
+      },
+      {
+        tags: ["Doctor's Story"],
+        title: "스마일라식, 후기로는 알 수 없는 이야기",
+        href: "/blog/2",
+      },
+      {
+        tags: ["서선의 기술", "안(眼)목 있는 이야기"],
+        title: "부드러운 햇살에 속지 마세요, 눈 건강에 더 위험한 이유",
+        href: "/blog/3",
+      },
+    ],
+  },
+
+  eventSection: {
+    eyebrow: "BGN EVENT",
+    title: "BGN밝은눈안과 EVENT",
+    description: "더 밝은 세상을 향한\nBGN의 특별한 혜택을 만나보세요",
+    cta: "이벤트 보러가기",
+    events: [
+      {
+        title: "SUMMER EVENT 뜨거운 8월",
+        subtitle: "8월 한정 시력교정술 특별혜택",
+        href: "/event/1",
+      },
+      { title: "여름준비, 시력부터", subtitle: "혜택이 왔썸머", href: "/event/2" },
+      { title: "노안·백내장 수술 최대혜택 이벤트", subtitle: "", href: "/event/3" },
+    ],
+  },
+
+  footer: {
+    intro: [
+      "BGN밝은눈안과 잠실점은\n잠실역 롯데타워 11층에 위치해있습니다\n첨단 시설에서 숙련된 의료진이 제공하는\n검사와 수술을 만나보실 수 있습니다",
+      "BGN밝은눈안과 잠실점은\n9세부터 80세까지 당신의 평생의 눈 건강을\n믿고 맡길 수 있는 곳이 되도록 노력하겠습니다",
+    ],
+    tel: "1600-5770",
+    closedNotice: "일요일 휴진 | 공휴일 정상 진료(본원 사정에 따라 변동)",
+    hoursNote: "* 일요일은 정기 휴진입니다.",
+    branches: [
+      {
+        id: "jamsil",
+        label: "BGN밝은눈안과의원 잠실",
+        address: "서울특별시 송파구 올림픽로 300 롯데월드타워 11층",
+        hours: [
+          { label: "평일(월~금)", value: "09:30 - 18:00" },
+          { label: "토요일", value: "09:30 - 17:00" },
+          { label: "점심시간", value: "13:00 - 14:00" },
+        ],
+      },
+      {
+        id: "busan",
+        label: "BGN밝은눈안과병원 부산",
+        address: "",
+        hours: [],
+      },
+    ],
+    policyLinks: [
+      { label: "개인정보처리방침", href: "/policy/privacy", strong: true },
+      { label: "이용약관", href: "/policy/terms" },
+      { label: "환자권리장전", href: "/policy/patient-rights" },
+      { label: "비급여자료고지", href: "/policy/non-covered" },
+    ],
+    business: [
+      { label: "상호명", value: "밝은눈안과의원" },
+      { label: "대표자", value: "박세경" },
+      { label: "사업자 등록번호", value: "110-99-05290" },
+      { label: "주소", value: "서울특별시 송파구 올림픽로 300 롯데월드타워 11층" },
+      { label: "대표번호", value: "1600-5770" },
+      { label: "개인정보보호책임자", value: "허서윤" },
+    ],
+    copyright: "Copyright © BGN Eye Clinic. All rights reserved.",
+  },
+};
+
+/**
+ * en/ja/zh 는 아직 원문이 없다. 번역이 오기 전까지 ko 를 그대로 노출한다
+ * (빈 화면보다 낫고, 타입이 강제되므로 누락 시 컴파일 에러로 잡힌다).
+ */
+export const dictionaries: Record<Locale, Dictionary> = {
+  ko,
+  en: ko,
+  ja: ko,
+  zh: ko,
+};

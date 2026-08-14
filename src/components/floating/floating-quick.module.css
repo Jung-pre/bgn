@@ -1,0 +1,178 @@
+/* ==========================================================================
+   PC — 우하단 팬아웃
+   ========================================================================== */
+.fanRoot {
+  position: fixed;
+  right: 2.5rem;
+  bottom: 2.5rem;
+  z-index: var(--z-quickfab);
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.bubble {
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  background: var(--brand-primary);
+  color: var(--color-white);
+  font-size: var(--fs-16);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  box-shadow: var(--shadow-pill);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.bubbleHidden {
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
+.fanList {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: 3.75rem;
+  height: 3.75rem;
+}
+
+.fanItem {
+  position: absolute;
+  inset: 0;
+  /* 닫힘 상태: 토글 버튼 뒤에 겹쳐 숨어 있다 */
+  transform: rotate(0deg) translateX(0) rotate(0deg) scale(0.4);
+  opacity: 0;
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.4, 0.64, 1),
+    opacity 0.28s ease;
+  transition-delay: calc((3 - var(--i)) * 40ms);
+}
+
+/* 열림: 각도만큼 회전한 뒤 반지름만큼 밀고, 다시 역회전해 아이콘을 세운다 */
+.fanListOpen .fanItem {
+  transform: rotate(var(--angle)) translateX(-7.5rem) rotate(calc(-1 * var(--angle))) scale(1);
+  opacity: 1;
+  transition-delay: calc(var(--i) * 55ms);
+}
+
+.fanButton {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-white);
+  box-shadow: var(--shadow-card);
+  font-size: var(--fs-13);
+  font-weight: var(--weight-semibold);
+  color: var(--brand-navy);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.fanLabel {
+  padding: 0 0.25rem;
+  word-break: keep-all;
+}
+
+.fanToggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: var(--radius-full);
+  background: var(--gradient-cta);
+  color: var(--color-white);
+  font-family: var(--font-display-stack);
+  font-size: var(--fs-16);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.fanToggle[aria-expanded="true"] {
+  transform: rotate(90deg);
+}
+
+/* ==========================================================================
+   모바일 — 하단 고정 바 (시안 실측: 높이 72, 좌우 20, 하단 15)
+   ========================================================================== */
+.bottomBar {
+  position: fixed;
+  left: var(--mobile-gutter);
+  right: var(--mobile-gutter);
+  /* 홈 인디케이터 회피 — 시안의 하단 15px 여백이 이 용도 */
+  bottom: calc(15px + env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-bottombar);
+  height: var(--mobile-bottombar-height);
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.bottomList {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bottomItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.bottomIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--gray-100);
+}
+
+.bottomLabel {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.bottomCenter {
+  display: grid;
+  place-items: center;
+}
+
+/* 중앙 챗봇 FAB — 바 위로 돌출 (시안 지름 62) */
+.chatFab {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin-top: -28px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-cta);
+  color: var(--color-white);
+  font-family: var(--font-display-stack);
+  font-size: 13px;
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-card);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fanItem,
+  .fanToggle,
+  .bubble {
+    transition: none;
+  }
+}

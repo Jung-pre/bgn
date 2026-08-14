@@ -1,0 +1,145 @@
+.section {
+  position: relative;
+  padding-block: var(--gap-section);
+  /* 이 사이트에서 유일한 중간톤 블록 — 폼에 시선을 고정시키는 장치.
+     밝히지 말 것. */
+  background: var(--bg-slate);
+  color: var(--color-white);
+  overflow: hidden;
+}
+
+.inner {
+  display: grid;
+  grid-template-columns: 40% 1fr;
+  align-items: center;
+  gap: var(--gap-xl);
+  width: 100%;
+  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
+  margin-inline: auto;
+  padding-inline: var(--content-side-pad);
+}
+
+.eyebrow {
+  margin: 0 0 0.4em;
+  font-family: var(--font-display-stack);
+  font-size: var(--fs-26);
+  letter-spacing: var(--tracking-wide);
+  color: #cfe0ff;
+}
+
+.title {
+  margin: 0 0 var(--gap-sm);
+  font-size: var(--fs-42);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-default);
+  color: var(--color-white);
+}
+
+.title :global(.marker) {
+  background-image: linear-gradient(var(--brand-primary), var(--brand-primary));
+  background-size: 100% 0.45em;
+  color: var(--color-white);
+}
+
+.desc {
+  margin: 0 0 var(--gap-lg);
+  font-size: var(--fs-24);
+  line-height: var(--leading-relaxed);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  max-width: 37.5rem; /* 시안 600 */
+}
+
+.field input {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-sm);
+  background: var(--color-white);
+  color: var(--color-text-primary);
+  font-size: var(--fs-18);
+}
+
+.field input::placeholder {
+  color: var(--gray-500);
+}
+
+.agree {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--fs-18);
+}
+
+.agreeLink {
+  text-decoration: underline;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.submit {
+  align-self: flex-start;
+  margin-top: var(--gap-sm);
+  padding: 1rem 2rem;
+  border-radius: var(--radius-full);
+  background: var(--gradient-cta);
+  color: var(--color-white);
+  font-size: var(--fs-20);
+  font-weight: var(--weight-semibold);
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submit:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+
+/* Figma 2:1242 — 762×762 정사각 영상 슬롯 */
+.canvasHost {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  max-width: 47.625rem; /* 762 */
+  margin-inline: auto;
+}
+
+.objectVideo {
+  border-radius: var(--radius-lg);
+}
+
+@media (max-width: 1440px) {
+  .inner {
+    padding-inline: clamp(40px, 7.3vw, 140px);
+  }
+}
+
+@media (max-width: 768px) {
+  .inner {
+    grid-template-columns: 1fr;
+    padding-inline: var(--mobile-gutter);
+  }
+  .title {
+    font-size: var(--fs-32);
+  }
+  /* 모바일은 폼이 먼저, 3D 는 아래 (시안 p4_07) */
+  .canvasHost {
+    order: 2;
+    aspect-ratio: 4 / 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submit {
+    transition: none;
+  }
+}

@@ -1,0 +1,210 @@
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-megamenu);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.rootOpen {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 32, 72, 0.35);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  cursor: default;
+}
+
+.rootOpen .backdrop {
+  opacity: 1;
+}
+
+/* 패널은 우측에서 슬라이드 인 (시안 p1_02) */
+.panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 25% 1fr;
+  background: var(--color-white);
+  transform: translateX(100%);
+  transition: transform 0.45s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.rootOpen .panel {
+  transform: translateX(0);
+}
+
+/* --- 좌측 브랜드 패널 -------------------------------------------------------- */
+.brandPanel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4rem 3rem;
+  /* 시안은 롯데월드타워 실사 위 블루 오버레이. 이미지는 나중에 교체. */
+  background: var(--gradient-dark-section);
+  color: var(--color-white);
+  overflow: hidden;
+}
+
+.brandMark {
+  margin: 0;
+  font-family: var(--font-display-stack);
+  font-size: var(--fs-display-120);
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.18);
+}
+
+.brandContact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+}
+
+.brandTel {
+  font-family: var(--font-display-stack);
+  font-size: var(--fs-42);
+  font-weight: var(--weight-semibold);
+}
+
+.brandAddress {
+  margin: 0;
+  font-size: var(--fs-16);
+  line-height: var(--leading-relaxed);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.snsList {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.snsItem {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.15);
+  font-size: var(--fs-16);
+}
+
+/* --- 우측 메뉴 패널 ---------------------------------------------------------- */
+.menuPanel {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 7rem clamp(2rem, 5vw, 6rem) 4rem;
+}
+
+.menuList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menuRow {
+  display: grid;
+  grid-template-columns: minmax(14rem, 22%) 1fr;
+  gap: var(--gap-lg);
+  align-items: start;
+  padding-block: 1.75rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.depth1 {
+  font-size: var(--fs-42);
+  font-weight: var(--weight-bold);
+  color: var(--brand-navy);
+  transition: color 0.2s ease;
+}
+
+.depth1:hover,
+.depth1:focus-visible {
+  color: var(--brand-primary);
+}
+
+.depth2List {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem var(--gap-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.depth2 {
+  font-size: var(--fs-24);
+  color: var(--color-text-muted);
+}
+
+.depth2:hover,
+.depth2:focus-visible {
+  color: var(--brand-primary);
+}
+
+/* --- 모바일 (≤768) ---------------------------------------------------------
+   시안 p4_04: 패널이 좌측 20px 만 남기고 덮는다. 좌 1뎁스 / 우 2뎁스 2칼럼. */
+@media (max-width: 768px) {
+  .panel {
+    left: var(--mobile-gutter);
+    grid-template-columns: 1fr;
+  }
+
+  .brandPanel {
+    display: none;
+  }
+
+  .menuPanel {
+    padding: 6rem 0 2rem;
+  }
+
+  .menuRow {
+    grid-template-columns: 40% 1fr;
+    gap: 0;
+    padding-block: 0;
+    border-bottom: none;
+  }
+
+  .depth1 {
+    display: block;
+    padding: 1rem var(--mobile-gutter);
+    font-size: var(--fs-20);
+  }
+
+  /* 활성 1뎁스는 블루→퍼플 그라데이션 풀블리드 바 (시안 실측) */
+  .depth1[aria-current="page"] {
+    background: var(--gradient-cta);
+    color: var(--color-white);
+  }
+
+  .depth2List {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding-inline: var(--mobile-gutter);
+  }
+
+  .depth2 {
+    display: block;
+    padding-block: 0.85rem;
+    font-size: var(--fs-18);
+    border-bottom: 1px solid var(--color-line);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .backdrop,
+  .depth1,
+  .depth2 {
+    transition: none;
+  }
+}

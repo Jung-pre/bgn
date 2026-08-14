@@ -1,0 +1,309 @@
+/* ==========================================================================
+   히어로 — 구체 → 타워 스크롤 전환
+   높이는 JS 가 인라인 style 로 준다 (200vh).
+   ========================================================================== */
+
+.section {
+  position: relative;
+  width: 100%;
+}
+
+/* 핀은 GSAP ScrollTrigger — CSS sticky 미사용.
+   sticky 는 조상 overflow:hidden 에 죽는다. */
+.pinShell {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* --- 배경 레이어 -------------------------------------------------------------
+   opacity / transform 은 JS 가 매 프레임 인라인으로 쓴다.
+   여기에 transition 을 걸면 scrub 과 싸우므로 넣지 않는다. */
+.sphereLayer,
+.towerLayer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-canvas-bg);
+  will-change: opacity, transform;
+}
+
+.towerLayer {
+  opacity: 0;
+}
+
+/* 구체 배경 — 시안 파스텔 그라데이션.
+   시안(2:416)은 배경까지 포함된 한 장의 렌더 이미지라 CSS 로 근사해야 한다.
+   ⚠️ 여기를 더 밝게 만들면 안 된다 — 구체가 가산 블렌딩이라 배경이 흰색에
+   가까워질수록 파티클이 그대로 사라진다. 실제로 처음엔 너무 옅어서 안 보였다. */
+.sphereBg {
+  position: absolute;
+  inset: 0;
+  background:
+    /* 좌하단의 살구빛 웜 톤 — 시안에서 아주 옅게 한 번만 깔린다 */
+    radial-gradient(52% 44% at 0% 80%, rgba(236, 208, 205, 0.72) 0%, rgba(236, 208, 205, 0) 70%),
+    /* 우측의 짙은 블루 */
+    radial-gradient(100% 90% at 90% 40%, #a8c6e8 0%, rgba(168, 198, 232, 0) 70%),
+    linear-gradient(150deg, #dbe6f6 0%, #c9daf0 55%, #bcd2ec 100%);
+}
+
+.canvasHost {
+  position: absolute;
+  inset: 0;
+}
+
+/* R3F 가 canvas 에 인라인 크기를 넣으므로 :global 로 덮어쓴다 */
+.canvasHost :global(canvas) {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 타워 배경 — Figma 2:3008 실측 그라데이션 */
+.towerSky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgb(121, 179, 246) 18.699%,
+    rgb(208, 204, 194) 66.929%,
+    rgb(165, 175, 188) 100%
+  );
+}
+
+.towerImg {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  translate: -30% 0;
+  height: 110%;
+  width: auto;
+  opacity: 0.65; /* Figma 실측 */
+  object-fit: contain;
+}
+
+.towerTexture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: soft-light;
+  opacity: 0.5; /* Figma 실측 */
+}
+
+/* 에셋 도착 전 자리표 */
+.towerPlaceholder {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(45% 70% at 62% 60%, rgba(255, 255, 255, 0.55) 0%, transparent 65%),
+    radial-gradient(80% 50% at 20% 85%, rgba(255, 255, 255, 0.5) 0%, transparent 70%);
+}
+
+/* --- 카피 -------------------------------------------------------------------
+   두 장면이 같은 자리에 겹쳐 있고 opacity 로 교차한다. */
+.inner {
+  position: relative;
+  z-index: var(--z-content);
+  width: 100%;
+  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
+  margin-inline: auto;
+  padding-inline: var(--content-side-pad);
+  min-height: 100vh;
+  display: grid;
+}
+
+.copy {
+  grid-area: 1 / 1;
+  align-self: center;
+  will-change: opacity;
+}
+
+.copyTower {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 장면 1 — Figma 2:475/2:476/2:478
+   "세계를 향한" ExtraBold 96 / "BGN" 120 / "의 도약" 96, tracking -1.92px(-2%) */
+.line1,
+.line2 {
+  margin: 0;
+  font-weight: 800; /* Pretendard ExtraBold */
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--color-white);
+  /* Figma 실측 text-shadow — 파스텔 배경 위 흰 텍스트 대비 확보 */
+  text-shadow:
+    0 0 12px rgba(0, 0, 0, 0.28),
+    2px 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.line1 {
+  font-size: var(--fs-display-92);
+}
+
+.line2 {
+  font-size: var(--fs-display-92);
+}
+
+/* inline-block 이어야 transform 이 먹는다 (inline 요소는 y 이동 무시) */
+.char {
+  display: inline-block;
+  white-space: pre;
+  will-change: opacity, transform;
+}
+
+/* Figma 2:478 — BGN 만 120px + radial gradient(#8d79ff → #102c87) */
+.brandSphere {
+  font-size: var(--fs-display-120);
+  /* Figma 2:478 실측 radial gradient. 양 끝은 토큰과 정확히 일치한다
+     (#8d79ff = primary/sub/500, #102c87 = primary/primary/800).
+     중간 스톱은 Figma 가 보간해 넣은 값이라 토큰이 없다. */
+  background-image: radial-gradient(
+    circle at 0% 0%,
+    var(--primary-sub-500) 20%,
+    #6e66e1 40%,
+    #4f53c3 60%,
+    #303fa5 80%,
+    var(--primary-800) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+}
+
+/* 장면 2 — Figma 2:3069 : "세상을 선명하게" 40 / BGN 160 / 밝은눈안과 138 */
+.towerEyebrow {
+  margin: 0 0 0.25em;
+  font-size: var(--fs-42);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-default);
+  color: var(--primary-900);
+}
+
+.towerTitle {
+  margin: 0;
+  font-size: var(--fs-display-120);
+  font-weight: var(--weight-bold);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--primary-900);
+}
+
+/* 실버/화이트 메탈 그라데이션 */
+.brandTower {
+  font-family: var(--font-display-stack);
+  background: linear-gradient(120deg, #ffffff 0%, #c8d4e6 45%, #ffffff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --- 마퀴 — Figma 2:410 : top 583 (920 기준 63.4%) ------------------------- */
+.marquee {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 63.4%;
+  z-index: var(--z-marquee);
+}
+
+/* --- 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 --------- */
+.scrollHint {
+  position: absolute;
+  left: var(--content-side-pad);
+  top: 82.6%;
+  z-index: var(--z-content);
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.scrollBar {
+  position: relative;
+  display: block;
+  width: 2px;
+  height: 128px;
+  background: var(--whitebg-30);
+  backdrop-filter: blur(2px);
+}
+
+/* 40px 흰 채움이 아래로 흐른다 */
+.scrollBarFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 40px;
+  background: var(--color-white);
+  animation: scrollDrop 2.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+@keyframes scrollDrop {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(88px);
+    opacity: 0;
+  }
+}
+
+.scrollLabel {
+  writing-mode: vertical-rl;
+  font-family: var(--font-display-stack);
+  font-size: 16px;
+  letter-spacing: var(--tracking-eng);
+  color: var(--color-white);
+}
+
+/* --- 반응형 ------------------------------------------------------------------ */
+@media (max-width: 768px) {
+  .inner {
+    padding-inline: var(--mobile-gutter);
+  }
+
+  .line1,
+  .line2 {
+    font-size: var(--fs-32);
+  }
+
+  .brandSphere {
+    font-size: var(--fs-42);
+  }
+
+  .towerEyebrow {
+    font-size: var(--fs-20);
+  }
+
+  .towerTitle {
+    font-size: var(--fs-32);
+  }
+
+  .marquee {
+    top: 58%;
+  }
+
+  /* 하단 고정 퀵바가 있어서 스크롤 힌트를 뺀다 */
+  .scrollHint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrollBarFill {
+    animation: none;
+    height: 128px;
+  }
+}

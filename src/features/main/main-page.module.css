@@ -1,0 +1,7 @@
+.root {
+  position: relative;
+  width: 100%;
+  /* z-index 스태킹 컨텍스트 격리 — 섹션마다 fixed/absolute 레이어가 많아
+     이게 없으면 GNB(z 20000)와 섹션 내부 레이어가 예측 못 하게 섞인다. */
+  isolation: isolate;
+}

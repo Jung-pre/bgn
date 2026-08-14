@@ -1,0 +1,251 @@
+.section {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--gap-xl);
+  /* 배경은 영상이다. 아래 .bgVideo / .colorBlur / .maskStage 가 담당한다.
+     영상이 아직 없을 때를 대비해 폴백 색만 깐다. */
+  background: var(--brand-navy);
+  color: var(--color-white);
+  /* pin 되는 요소 **자신**의 overflow 라 pin-spacer 에는 영향이 없다.
+     트랙이 좌우로 삐져나가 페이지에 가로 스크롤바가 생기는 걸 막는다. */
+  overflow: hidden;
+}
+
+/* ① Figma 2:2400 — 풀블리드 배경 영상 */
+.bgVideo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* ② Figma 2:2401 — "색상블러". blur 75px + 블루 0.2 오버레이 */
+.colorBlur {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  backdrop-filter: blur(75px);
+  -webkit-backdrop-filter: blur(75px);
+  background: rgba(0, 114, 236, 0.2);
+  pointer-events: none;
+}
+
+/* ③ Figma 2:2571 — 글자 모양으로 뚫린 덮개판.
+   opacity/scale 은 GSAP 이 스크롤에 물려 쓴다. CSS transition 을 걸면 scrub 과 싸운다. */
+.maskStage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.maskSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 덮개 자체. 이 판이 남는 부분은 어두워지고, 글자 구멍으로는 ①②가 그대로 비친다 */
+.maskPlate {
+  fill: var(--brand-navy);
+  opacity: 0.72;
+}
+
+/* 인라인 SVG 라서 문서의 웹폰트(Belleza)를 그대로 쓴다.
+   CSS mask-image 로 외부 SVG 를 불렀다면 이 폰트가 적용되지 않는다. */
+.maskText {
+  font-family: var(--font-display-stack);
+  font-size: 132px;
+  letter-spacing: var(--tracking-eng);
+}
+
+/* ④ 가로 트랙 — GSAP 이 x 를 트윈한다. CSS transition 을 걸면 scrub 과 싸운다.
+   ⚠️ data-lenis-prevent 를 여기 고정으로 달지 않는다. 평상시 이 요소는
+   스크롤 컨테이너가 아니라 transform 으로 밀리는 판이라, prevent 를 달면
+   Lenis 가 pin 구간의 wheel 을 전부 네이티브로 흘려보낸다.
+   reduced-motion 분기에서 진짜 overflow 스크롤이 될 때만 JS 가 붙인다. */
+.track {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: max-content;
+  will-change: transform;
+}
+
+/* --- 다크 브랜드 타일 -------------------------------------------------------- */
+.tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: 30rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gap-xl) var(--gap-lg);
+}
+
+.tileTop,
+.tileBrand {
+  font-family: var(--font-display-stack);
+  letter-spacing: var(--tracking-wide);
+  color: var(--whitebg-80);
+}
+
+.tileTop {
+  font-size: var(--fs-24);
+}
+
+.tileBrand {
+  font-size: var(--fs-42);
+}
+
+/* 심볼 4종 — 시안에서 타일마다 다른 그래픽이 들어간다.
+   **인덱스로 고정 배정**한다(랜덤 금지: 렌더마다 달라지면 디자인 리뷰 비교가 안 된다).
+   실제 SVG 에셋이 도착하면 background-image 로 교체하면 된다. */
+.tileSymbol {
+  width: 8rem;
+  height: 8rem;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+/* 0 — 스파클(4각 별) */
+.symbol0 {
+  background: var(--whitebg-80);
+  clip-path: polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0% 50%, 42% 42%);
+}
+
+/* 1 — 클로버(원 4개) */
+.symbol1 {
+  background:
+    radial-gradient(circle at 30% 30%, var(--whitebg-70) 0 22%, transparent 23%),
+    radial-gradient(circle at 70% 30%, var(--whitebg-70) 0 22%, transparent 23%),
+    radial-gradient(circle at 30% 70%, var(--whitebg-70) 0 22%, transparent 23%),
+    radial-gradient(circle at 70% 70%, var(--whitebg-70) 0 22%, transparent 23%);
+}
+
+/* 2 — 4각(45° 다이아 아웃라인) */
+.symbol2 {
+  border-radius: 12%;
+  box-shadow: inset 0 0 0 1.5px var(--whitebg-70);
+  rotate: 45deg;
+}
+
+/* 3 — 플라워(방사형 꽃잎) */
+.symbol3 {
+  border-radius: var(--radius-full);
+  background: repeating-conic-gradient(var(--whitebg-70) 0deg 10deg, transparent 10deg 45deg);
+}
+
+/* --- 블로그 카드 -------------------------------------------------------------- */
+.card {
+  flex: 0 0 auto;
+  width: 34rem;
+  padding: var(--gap-lg);
+  background: var(--color-white);
+  color: var(--color-text-body);
+}
+
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  height: 100%;
+}
+
+.thumb {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-md);
+  background: var(--gray-100);
+  overflow: hidden;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  background: var(--brand-tint);
+  color: var(--brand-primary);
+  font-size: var(--fs-16);
+}
+
+.tag:nth-child(n + 2) {
+  background: var(--gray-100);
+  color: var(--color-text-muted);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--fs-32);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+  color: var(--color-text-primary);
+}
+
+/* --- 모바일 — 세로 스택. 카드 1장 = 1화면, 타일이 디바이더 ------------------ */
+@media (max-width: 768px) {
+  .section {
+    min-height: 0;
+    padding-block: 0 var(--gap-section);
+    gap: 0;
+  }
+
+  /* pin 이 없으므로 덮개를 섹션 전체에 깔면 글자가 문서 한가운데로 내려간다.
+     흐름 안의 인트로 밴드로 바꿔 첫 화면에서 타이틀 역할을 하게 한다. */
+  .maskStage {
+    position: relative;
+    inset: auto;
+    height: 60svh;
+    margin-bottom: var(--gap-lg);
+  }
+
+  .track {
+    flex-direction: column;
+    width: 100%;
+    transform: none !important; /* GSAP 이 남긴 x 를 무력화 */
+  }
+
+  .tile,
+  .card {
+    width: 100%;
+  }
+
+  /* 시안 p4_14~19 — 카드 1장이 화면 하나를 채운다 */
+  .card {
+    min-height: 100svh;
+    justify-content: center;
+    padding: var(--gap-lg) var(--mobile-gutter);
+  }
+
+  .tile {
+    gap: var(--gap-md);
+    padding-block: var(--gap-xl);
+  }
+
+  .cardTitle {
+    font-size: var(--fs-24);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* reduced-motion 에서는 트랙이 진짜 가로 스크롤 컨테이너가 된다(JS 가 설정).
+     스크롤바가 카드를 가리지 않게 여유만 준다. */
+  .track {
+    padding-bottom: var(--gap-sm);
+  }
+}

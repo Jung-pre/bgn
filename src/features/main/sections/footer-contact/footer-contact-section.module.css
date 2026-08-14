@@ -1,0 +1,211 @@
+.footer {
+  position: relative;
+  padding-block: var(--gap-section);
+  /* 클로징 스피어와 이어지는 라벤더그레이 톤 */
+  background: var(--bg-footer);
+  color: var(--color-white);
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-md);
+  width: 100%;
+  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
+  margin-inline: auto;
+  padding-inline: var(--content-side-pad);
+  text-align: center;
+}
+
+/* 기획안 p30 카피 — 줄바꿈이 원문에 있으므로 pre-line 으로 그대로 살린다 */
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+  margin-bottom: var(--gap-xl);
+  text-align: center;
+}
+
+.introText {
+  margin: 0;
+  font-size: var(--fs-20);
+  line-height: var(--leading-relaxed);
+  letter-spacing: var(--tracking-default);
+  color: var(--color-white);
+  white-space: pre-line;
+}
+
+@media (max-width: 768px) {
+  .introText {
+    font-size: var(--fs-18);
+  }
+}
+
+.snsList {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.snsItem {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.2);
+  font-size: var(--fs-16);
+}
+
+.tel {
+  font-size: var(--fs-display-92);
+  font-weight: var(--weight-regular);
+  line-height: 1;
+  letter-spacing: var(--tracking-default);
+  color: #253045;
+}
+
+.closedNotice {
+  margin: 0;
+  font-size: var(--fs-20);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.branchTabs {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: var(--gap-sm);
+}
+
+.branchTab {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-full);
+  font-size: var(--fs-18);
+  color: var(--color-white);
+}
+
+.branchTabActive {
+  border-color: transparent;
+  background: var(--gradient-cta);
+  font-weight: var(--weight-semibold);
+}
+
+/* 라벨 우정렬 / 값 좌정렬의 2열 정의형 리스트 (시안 실측) */
+.hours {
+  display: grid;
+  gap: 0.35rem;
+  margin: var(--gap-sm) 0 0;
+}
+
+.hoursRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap-sm);
+  font-size: var(--fs-24);
+}
+
+.hoursRow dt {
+  text-align: right;
+  font-weight: var(--weight-bold);
+}
+
+.hoursRow dd {
+  margin: 0;
+  text-align: left;
+}
+
+.hoursNote,
+.address {
+  margin: 0;
+  font-size: var(--fs-18);
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.policyNav {
+  margin-top: var(--gap-lg);
+}
+
+.policyList {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--gap-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.policyLink {
+  font-size: var(--fs-18);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.policyStrong {
+  font-weight: var(--weight-bold);
+  color: var(--color-white);
+}
+
+.business {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem var(--gap-sm);
+  margin: 0;
+  font-size: var(--fs-16);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.businessRow {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.businessRow dt::after {
+  content: " :";
+}
+
+.businessRow dd {
+  margin: 0;
+}
+
+.copyright {
+  margin: var(--gap-sm) 0 0;
+  font-size: var(--fs-16);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 1440px) {
+  .inner {
+    padding-inline: clamp(40px, 7.3vw, 140px);
+  }
+}
+
+@media (max-width: 768px) {
+  .inner {
+    padding-inline: var(--mobile-gutter);
+  }
+
+  .tel {
+    font-size: var(--fs-42);
+  }
+
+  /* 지점 버튼은 세로 스택 (시안 p4_20) */
+  .branchTabs {
+    flex-direction: column;
+    align-self: stretch;
+  }
+
+  .hoursRow {
+    font-size: var(--fs-18);
+  }
+
+  /* 하단 고정 퀵바에 가리지 않게 여백 확보 */
+  .footer {
+    padding-bottom: calc(var(--gap-section) + var(--mobile-bottombar-height));
+  }
+}

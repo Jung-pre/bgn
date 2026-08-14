@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+build
+.env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+_to_delete/
+docs/design/2026_BGN*.pdf

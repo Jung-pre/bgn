@@ -1,0 +1,267 @@
+.section {
+  position: relative;
+  padding-block: var(--gap-section);
+  background: #f4f8fd;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  width: 100%;
+  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
+  margin: 0 auto var(--gap-xl);
+  padding-inline: var(--content-side-pad);
+}
+
+/* 좌→우 wipe 대상.
+   초기 clip-path 는 **JS 에서** 건다. CSS 로 걸어 두면 JS 실패 시 헤드라인이
+   영영 안 보인다(프로젝트 공통 규칙: 숨김 초기값은 항상 GSAP 이 만든다). */
+.wipeLine {
+  will-change: clip-path;
+}
+
+/* 주석 "함께 꾸밈요소 배치" — 헤드라인과 같은 좌→우 방향으로 자라는 장식 */
+.deco {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-top: var(--gap-xs);
+}
+
+.decoRule {
+  display: block;
+  flex: 1;
+  max-width: 22rem;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-cta);
+}
+
+.decoTicks {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.decoTick {
+  display: block;
+  width: 1.5rem;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--primary-200);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2.5rem;
+  width: 100%;
+  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
+  margin-inline: auto;
+  padding-inline: var(--content-side-pad);
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: var(--gap-lg);
+  border-radius: var(--radius-lg);
+  background: var(--color-white);
+  box-shadow: var(--shadow-card);
+}
+
+.step {
+  margin: 0;
+  font-family: var(--font-display-stack);
+  font-size: var(--fs-32);
+  color: var(--brand-primary);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--fs-32);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-primary);
+}
+
+.cardDesc {
+  margin: 0;
+  font-size: var(--fs-20);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-muted);
+}
+
+.visual {
+  position: relative;
+  margin-top: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background:
+    radial-gradient(60% 60% at 50% 45%, rgba(124, 185, 255, 0.28) 0%, transparent 70%),
+    var(--brand-tint);
+}
+
+.viz {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* ── 1. OPTICAL MAPPING ─────────────────────────────────────────────────── */
+
+.vizGrid line {
+  stroke: var(--primary-300);
+  stroke-width: 1;
+  opacity: 0.35;
+}
+
+.vizRing {
+  fill: none;
+  stroke: var(--primary-500);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.vizCore {
+  fill: var(--primary-500);
+}
+
+.vizScanLine {
+  stroke: var(--primary-sub-500);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.vizScanGlow {
+  fill: var(--primary-300);
+  opacity: 0.28;
+}
+
+/* ── 2. CLINICAL CASES 격자 ─────────────────────────────────────────────── */
+
+.vizDot {
+  fill: var(--primary-300);
+}
+
+.vizDotStrong {
+  fill: var(--primary-500);
+}
+
+/* ── 3. ACCURACY 게이지 + 추이선 ────────────────────────────────────────── */
+
+.vizGaugeTrack {
+  fill: none;
+  stroke: var(--color-white);
+  stroke-width: 10;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.vizGaugeValue {
+  fill: none;
+  stroke: var(--primary-500);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.vizTrend {
+  fill: none;
+  stroke: var(--primary-sub-500);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── 4. 추천 적합도 바 ──────────────────────────────────────────────────── */
+
+.vizBarName,
+.vizBarScore {
+  font-family: var(--font-display-stack);
+  font-size: 13px;
+  letter-spacing: var(--tracking-eng);
+}
+
+.vizBarName {
+  fill: var(--primary-900);
+}
+
+.vizBarScore {
+  fill: var(--primary-500);
+}
+
+.vizBarTrack {
+  fill: var(--color-white);
+  opacity: 0.85;
+}
+
+.vizBarValue {
+  fill: var(--primary-500);
+}
+
+.dataLabel {
+  margin: 0;
+  font-family: var(--font-display-stack);
+  font-size: var(--fs-16);
+  letter-spacing: var(--tracking-wide);
+  color: var(--brand-primary);
+}
+
+/* 카운트업 중 숫자 폭이 변하면 라벨이 덜컹거린다 → 탭룰러 + 최소 폭 확보 */
+.dataValue {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.marquee {
+  margin-top: var(--gap-xl);
+}
+
+.marquee :global(*) {
+  color: rgba(10, 32, 72, 0.12);
+  -webkit-text-stroke-color: rgba(10, 32, 72, 0.25);
+}
+
+@media (max-width: 1440px) {
+  .header,
+  .grid {
+    padding-inline: clamp(40px, 7.3vw, 140px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 모바일 — 가로 스와이프, 우측 카드가 peek 되게 (시안 p4_06) */
+@media (max-width: 768px) {
+  .header {
+    padding-inline: var(--mobile-gutter);
+  }
+
+  .grid {
+    display: flex;
+    gap: 1rem;
+    padding-inline: var(--mobile-gutter);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+  }
+
+  .card {
+    flex: 0 0 78%;
+    scroll-snap-align: start;
+  }
+
+  .decoRule {
+    max-width: none;
+  }
+}

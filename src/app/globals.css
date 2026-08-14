@@ -1,0 +1,402 @@
+/* =============================================================================
+   BGN 잠실 — 전역 토큰 & 리셋
+
+   ★ 이 파일의 값은 Figma 변수에서 직접 가져온 것이다. 추정값이 아니다.
+     파일: 2xzudppVSWEHbxVdzofgn3 / 노드 2:405 (260812_밝은눈안과_잠실)
+     매핑표: docs/plan/06-css-variables-proposal.md
+
+   전역 CSS 는 이 파일 하나. 나머지는 전부 *.module.css.
+   ========================================================================== */
+
+:root {
+  /* ── Primary (Figma: primary/primary/*) ──────────────────────────────── */
+  --primary-50: #f2f8ff;
+  --primary-100: #e2effe; /* 형광 마커 배경 */
+  --primary-200: #b7d8fd;
+  --primary-300: #7cb9ff;
+  --primary-500: #0072ec; /* ★ 브랜드 기본 — CTA·활성·링크 */
+  --primary-700: #0c3ca2;
+  --primary-800: #102c87;
+  --primary-900: #0a2048; /* 헤드라인 최농도 */
+
+  /* Figma: primary/sub/500 — 그라데이션의 보라 끝 */
+  --primary-sub-500: #8d79ff;
+
+  /* 별칭 (의미 기반). 컴포넌트는 가급적 이쪽을 쓴다. */
+  --brand-primary: var(--primary-500);
+  --brand-navy: var(--primary-900);
+  --brand-tint: var(--primary-100);
+
+  /* ── Grayscale (Figma: grayscale/neutral gray/*) ─────────────────────── */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --gray-50: #f9f9f9;
+  --gray-100: #f2f2f2;
+  --gray-200: #e4e4e4;
+  --gray-300: #d9d9d9;
+  --gray-400: #a3a3a3;
+  --gray-500: #737373;
+  --gray-600: #525252;
+  --gray-700: #3d3d3d;
+  --gray-800: #242424;
+  --gray-900: #171717;
+
+  /* Figma: back_1 */
+  --back-1: #f7f7f7;
+
+  /* ── 알파 배경 (Figma: grayscale/background/*) ────────────────────────
+     GNB 가 whitebg-90 + backdrop-blur 로 되어 있다. 불투명 흰색이 아니다. */
+  --whitebg-10: #ffffff1a;
+  --whitebg-20: #ffffff33;
+  --whitebg-30: #ffffff4d;
+  --whitebg-50: #ffffff80;
+  --whitebg-70: #ffffffb2;
+  --whitebg-80: #ffffffcc;
+  --whitebg-90: #ffffffe5;
+  --blackbg-20: #00000033;
+  --blackbg-30: #0000004d;
+  --blackbg-50: #00000080;
+
+  /* ── 그라데이션 ───────────────────────────────────────────────────────
+     Figma 에 `gradiant 1/2/3` 변수가 있으나 MCP 로 값이 해석되지 않는다.
+     아래는 실제 노드에서 추출한 값. 변수 원본과 대조 필요.
+       · center-card : 2:5400 에서 추출 (확정)
+       · cta / dark  : PDF 렌더 실측 (근사)  ← 디자이너 확인 권장 */
+  --gradient-center-card: linear-gradient(180deg, #9c96b9 0%, var(--primary-300) 100%);
+  --gradient-cta: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-sub-500) 100%);
+  --gradient-dark-section: linear-gradient(135deg, #002040 0%, #003870 60%, #002850 100%);
+
+  /* ── 시맨틱 ──────────────────────────────────────────────────────────── */
+  --color-text-primary: var(--gray-800); /* 네비·본문 제목 (헤더 실측) */
+  --color-text-strong: var(--primary-900);
+  --color-text-body: var(--gray-700);
+  --color-text-muted: var(--gray-500);
+  --color-text-invert: var(--color-white);
+  --color-line: var(--gray-200);
+  --background: var(--color-white);
+
+  /* 섹션 배경 (PDF 렌더 실측 — Figma 변수로 관리되지 않는 값들) */
+  --bg-ice: #eef3fb;
+  --bg-lavender: #ece8f7;
+  --bg-slate: #8a93a8; /* AI 상담폼 — 유일한 중간톤 */
+  --bg-footer: #7f8aa4;
+
+  /* ── 폰트 ────────────────────────────────────────────────────────────
+     Figma 변수에서 확정: 본문 Pretendard / 영문 포인트 Belleza */
+  --font-pretendard-stack:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display-stack: var(--font-belleza), "Belleza", Georgia, serif;
+  /* ⚠️ 디스플레이 폰트가 두 개다.
+     · Belleza  — Figma 텍스트 스타일 `eng - point 1/2` (섹션 아이브로우 등)
+     · Marcellus — 마퀴 전용. Figma 2:411 이 `Marcellus:Regular 108px` 다.
+     둘을 섞지 말 것. 마퀴만 marcellus 를 쓴다. */
+  --font-marcellus-stack: var(--font-marcellus), "Marcellus", Georgia, serif;
+
+  /* ── 타이포 스케일 (Figma 텍스트 스타일 1:1) ───────────────────────────
+     Figma letterSpacing 은 % 단위다: -3 → -0.03em (20px 기준 -0.6px 확인).
+     사이즈는 PC 기준 고정 px. 반응형은 아래 --fs-* 로 clamp 한 값을 쓴다. */
+
+  /* headline — lineHeight 1.25 */
+  --t-headline-1: 700 42px/1.25 var(--font-pretendard-stack);
+  --t-headline-2: 700 32px/1.25 var(--font-pretendard-stack);
+  --t-headline-4: 600 20px/1.25 var(--font-pretendard-stack);
+  /* title — lineHeight 1.5 */
+  --t-title-1: 700 42px/1.5 var(--font-pretendard-stack);
+  --t-title-2: 700 32px/1.5 var(--font-pretendard-stack);
+  --t-title-3: 600 26px/1.5 var(--font-pretendard-stack);
+  --t-title-4: 600 20px/1.5 var(--font-pretendard-stack);
+  /* body — lineHeight 1.5 */
+  --t-body-0: 400 20px/1.5 var(--font-pretendard-stack);
+  --t-body-1: 400 18px/1.5 var(--font-pretendard-stack);
+  --t-body-2: 400 16px/1.5 var(--font-pretendard-stack);
+  --t-body-3: 400 14px/1.5 var(--font-pretendard-stack);
+  /* caption */
+  --t-caption-1: 400 13px/1.25 var(--font-pretendard-stack);
+  /* eng point — Belleza, letterSpacing +1% */
+  --t-eng-1: 400 32px/1.1 var(--font-display-stack);
+  --t-eng-2: 400 24px/1.25 var(--font-display-stack);
+
+  --tracking-default: -0.03em; /* Figma -3 : 거의 모든 스타일 공통 */
+  --tracking-caption2: -0.05em; /* caption 2 - M 만 -5 */
+  --tracking-eng: 0.01em; /* eng-point +1 */
+  --tracking-wide: 0.08em; /* 대문자 라벨용 — Figma 변수 밖 */
+
+  /* 반응형 폰트 크기 — PC 스타일 → 모바일 스타일로 수렴시킨 clamp.
+     min 값은 Figma 의 mo/* 스타일 실값이다(임의 축소가 아님).
+       pc headline1 42 → mo headline1 32
+       pc title3    26 → mo title3    20
+       pc body0     20 → mo body0     18
+       pc body2     16 → mo body1     16 (동일)  */
+  --fs-42: clamp(32px, 2.1875vw, 42px);
+  --fs-32: clamp(24px, 1.6667vw, 32px);
+  --fs-26: clamp(20px, 1.3542vw, 26px);
+  --fs-20: clamp(18px, 1.0417vw, 20px);
+  --fs-18: clamp(16px, 0.9375vw, 18px);
+  --fs-16: clamp(15px, 0.8333vw, 16px);
+  --fs-14: clamp(14px, 0.7292vw, 14px);
+  --fs-13: 13px;
+  --fs-eng-32: clamp(20px, 1.6667vw, 32px); /* mo eng-point 2 = 20 */
+  --fs-eng-24: clamp(20px, 1.25vw, 24px);
+  /* 국문 24px 자리 — Figma 본문 스케일에는 없지만 시안에서 자주 쓰인다.
+     모바일은 body 0(18)로 수렴시킨다. */
+  --fs-24: clamp(18px, 1.25vw, 24px);
+
+  /* 디스플레이 크기 — 히어로 등에서 쓰는 **변수 밖** 커스텀 사이즈.
+     Figma 텍스트 스타일 체계는 42px 이 최대다. 그보다 큰 건 전부
+     개별 지정이므로 여기에 따로 모아둔다. (히어로 B/G/N 글자 높이 144 → ≈120px) */
+  --fs-display-120: clamp(48px, 6.25vw, 120px);
+  --fs-display-108: clamp(44px, 5.625vw, 108px); /* 마퀴 — Figma 2:411 */
+  --fs-display-92: clamp(40px, 4.7917vw, 92px);
+  --fs-display-80: clamp(38px, 4.1667vw, 80px);
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-tight: 1.25; /* Figma headline / caption */
+  --leading-snug: 1.35;
+  --leading-normal: 1.5; /* Figma title / body */
+  --leading-relaxed: 1.7;
+
+  /* ── 레이아웃 (Figma 실측) ───────────────────────────────────────────── */
+  --page-width: 1920px;
+  --content-width: 1760px; /* ★ Container 실측. 좌우 여백 80 */
+  --content-side-pad: 80px;
+  --mobile-gutter: 20px; /* 375 - 335 = 40, 좌우 20 */
+
+  /* GNB — 화면 상단에 붙지 않는 플로팅 바 */
+  --gnb-width: 1840px;
+  --gnb-height: 80px;
+  --gnb-top: 24px;
+  --gnb-inset: 40px;
+  --gnb-radius: 16px;
+  --gnb-blur: 25px;
+  --gnb-shadow: 1px 2px 8px 0 rgba(16, 106, 170, 0.12);
+
+  /* 모바일 GNB / 하단바 */
+  --gnb-height-mo: 50px;
+  --gnb-top-mo: 25px;
+  --mobile-bottombar-height: 72px;
+
+  /* 진료센터 아코디언 (Figma 실측 — 산술이 정확히 맞는다)
+       기본 240 × 6 + 갭 32 × 5 = 1600
+       확장 1120 + 축소 64 × 5 + 갭 32 × 5 = 1600  */
+  --center-card-default: 240px;
+  --center-card-collapsed: 64px;
+  --center-card-expanded: 1120px;
+  --center-card-gap: 32px;
+  --center-card-height: 600px;
+  --center-card-radius: 24px;
+
+  --gap-xs: 0.5rem;
+  --gap-sm: 1rem;
+  --gap-md: 1.5rem;
+  --gap-lg: 2.5rem;
+  --gap-xl: 4rem;
+  --gap-section: 7.5rem;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 1rem; /* = 16px, GNB 와 동일 */
+  --radius-lg: 1.5rem; /* = 24px, 센터 카드와 동일 */
+  --radius-xl: 2rem;
+  --radius-full: 999px;
+
+  --shadow-pill: var(--gnb-shadow);
+  --shadow-card: 0 12px 40px rgba(10, 32, 72, 0.1);
+
+  /* ── z-index 레이어 (전부 여기서만 정의) ─────────────────────────────── */
+  --z-canvas-bg: 0;
+  --z-marquee: 5;
+  --z-content: 10;
+  --z-bottombar: 14000;
+  --z-quickfab: 15000;
+  --z-gnb: 20000;
+  --z-megamenu: 25000;
+  --z-modal: 30000;
+}
+
+/* =============================================================================
+   rem 기준
+   -----------------------------------------------------------------------------
+   시안이 1920 기준이라 데스크톱은 root font-size 를 뷰포트에 비례시켜
+   레이아웃 전체를 스케일링한다 (1920 → 16px, 1200 → 10px).
+   1024px 이하는 375 시안을 별도 설계했으므로 16px 로 고정한다.
+
+   ⚠️ 폰트 크기는 rem 이 아니라 위의 --fs-* (clamp px) 를 쓴다.
+      rem 스케일링과 clamp 가 겹치면 이중 축소가 된다.
+   ========================================================================== */
+html {
+  height: 100%;
+  scrollbar-gutter: stable;
+  font-size: clamp(10px, 0.8333vw, 16px);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 브레이크포인트는 src/shared/config/breakpoints.ts 와 반드시 일치
+   (sm 480 / md 768 / lg 1024 / xl 1440 / xxl 1920) */
+@media (max-width: 1024px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  /* overflow-x: hidden|clip 은 종종 overflow-y 를 auto 로 바꿔 조상이
+     스크롤 컨테이너가 되고, 그러면 GSAP pin 이 깨진다.
+     pin 섹션이 3개(브랜드필름/히스토리/웹블로그)라 특히 치명적. */
+  overflow-x: visible;
+  overflow-y: visible;
+  word-break: keep-all; /* 한국어 줄바꿈 */
+}
+
+body {
+  background: var(--background);
+  color: var(--color-text-body);
+  font-family: var(--font-pretendard-stack);
+  font-size: var(--fs-18);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  -webkit-font-smoothing: antialiased;
+}
+
+img,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* --- 로케일별 타이포 분기 -----------------------------------------------------
+   ko 문서 안에서도 lang="en" 요소만 Belleza 로 전환된다. */
+.locale-root[data-locale] {
+  font-family: var(--font-pretendard-stack);
+}
+.locale-root[data-locale="ko"] [lang|="en"] {
+  font-family: var(--font-display-stack);
+  letter-spacing: var(--tracking-eng);
+}
+
+/* --- 공통 컨테이너 -----------------------------------------------------------
+   PC 1760 고정폭 (좌우 80), 모바일 거터 20. 전부 Figma 실측. */
+.container {
+  width: 100%;
+  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
+  margin-inline: auto;
+  padding-inline: var(--content-side-pad);
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding-inline: var(--mobile-gutter);
+  }
+}
+
+/* --- 섹션 헤더 공식 -----------------------------------------------------------
+   시안 전 섹션이 예외 없이 이 3단이다.
+   개별 섹션에서 다시 정의하지 말고 이 클래스를 쓸 것. */
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-display-stack);
+  font-size: var(--fs-eng-32);
+  font-weight: var(--weight-regular);
+  line-height: 1.1;
+  letter-spacing: var(--tracking-eng);
+  color: var(--primary-500);
+}
+
+.section-title {
+  margin: 0;
+  font-size: var(--fs-42);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-default);
+  color: var(--color-text-strong);
+}
+
+.section-desc {
+  margin: 0;
+  font-size: var(--fs-20);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  color: var(--color-text-muted);
+}
+
+/* 시안의 형광 마커 — 헤드라인 일부 어절을 감싼다.
+   등장 시 좌→우 wipe 하려면 background-size 를 GSAP 으로 0%→100% 트윈. */
+.marker {
+  background: linear-gradient(var(--brand-tint), var(--brand-tint));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 0.45em;
+  padding-inline: 0.1em;
+}
+
+/* --- 반응형 줄바꿈 유틸 ------------------------------------------------------- */
+.pc-only {
+  display: inline;
+}
+.mo-only {
+  display: none;
+}
+@media (max-width: 768px) {
+  .pc-only {
+    display: none;
+  }
+  .mo-only {
+    display: inline;
+  }
+}
+
+/* --- 스크린리더 전용 ---------------------------------------------------------
+   히어로 타이틀이 B / G / N 개별 텍스트 노드로 쪼개져 있어(Figma 2:3072)
+   글자 단위 애니메이션을 하게 된다. 원문은 반드시 이 클래스로 함께 노출할 것. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- 동작 줄이기 -------------------------------------------------------------
+   JS 애니메이션은 각 훅에서 따로 가드한다(settleReducedMotion). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

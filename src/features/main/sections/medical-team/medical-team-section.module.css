@@ -1,0 +1,242 @@
+/* ==========================================================================
+   의료진 교차 스와이퍼
+
+   Figma 주석 2:1016 : "8명 의료진 배치, 스와이퍼 교차하며 카드 이동"
+   Figma 실측 2:3143 : 840×200 안에 카드 140×200, x간격 100 → 40px 겹침(부채꼴)
+
+   겹침을 px 로 박지 않고 **비율**로 둔다.
+     --card-step = --card-w × 100/140   (= 카드 폭의 71.4%, 겹침 28.6%)
+   카드 폭이 뷰포트에 따라 바뀌어도 시안의 겹침 비율이 유지된다.
+   ========================================================================== */
+
+.section {
+  position: relative;
+  padding-block: var(--gap-section);
+  overflow: hidden;
+  background: linear-gradient(120deg, var(--bg-lavender) 0%, var(--primary-50) 100%);
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--gap-lg);
+  width: 100%;
+  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
+  margin: 0 auto var(--gap-xl);
+  padding-inline: var(--content-side-pad);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-xs);
+  padding: 0.9rem 1.75rem;
+  border-radius: var(--radius-full);
+  background: var(--gradient-cta);
+  color: var(--color-white);
+  font-size: var(--fs-18);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  transition: transform 0.25s ease;
+}
+
+.cta:hover {
+  transform: translateY(-2px);
+}
+
+.viewport {
+  /* 카드 기하 — 시안 2:3143 비율 */
+  --card-w: 20rem;
+  --card-step: calc(var(--card-w) * 100 / 140);
+  /* 홀/짝 레인의 y 진폭. 이게 "교차"의 실제 크기다. */
+  --lane-y: 1.75rem;
+  /* 활성 카드만 살짝 떠오른다 */
+  --active-lift: 1.25rem;
+}
+
+/**
+ * 드래그 전용 레이어.
+ *
+ * · `touch-action: pan-y` — 세로 스크롤은 브라우저/Lenis 에 넘기고 가로만 가져온다.
+ *   여기에 `data-lenis-prevent` 를 걸면 안 된다(스크롤 컨테이너가 아니라서
+ *   그 위에서 시작한 세로 스와이프가 통째로 죽는다).
+ * · 드래그 중에는 transition 을 끈다 — 손가락보다 늦게 따라오면 고무줄처럼 보인다.
+ *   `--drag-x` 는 JS 가 rAF 로 쓰는 값이고, 리렌더는 발생하지 않는다.
+ */
+.stage {
+  position: relative;
+  height: calc(var(--card-w) * 200 / 140 + 4.5rem);
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  transform: translate3d(var(--drag-x, 0px), 0, 0);
+  transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.stage[data-dragging] {
+  cursor: grabbing;
+  transition: none;
+}
+
+.deck {
+  position: relative;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/**
+ * 카드 배치는 전부 CSS 변수로 들어온다(`crossLayout()` in use-cross-carousel.ts).
+ *   --offset  덱 중심 기준 몇 칸       → x
+ *   --lane    홀/짝 레인 × 거리 계수   → y (교차)
+ *   --lift    활성만 1                 → y (부양)
+ *   --tilt    부채꼴 각도(deg)
+ *   --scale / --opacity                → 깊이감
+ * 값이 바뀌는 시점은 활성 인덱스가 바뀔 때뿐이라 transition 이 그대로 모션이 된다.
+ */
+.card {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--card-w);
+  margin-left: calc(var(--card-w) / -2);
+  transform: translate3d(
+      calc(var(--offset, 0) * var(--card-step)),
+      calc(var(--lane, 0) * var(--lane-y) - var(--lift, 0) * var(--active-lift)),
+      0
+    )
+    rotate(calc(var(--tilt, 0) * 1deg)) scale(var(--scale, 1));
+  opacity: var(--opacity, 1);
+  transition:
+    transform 0.62s cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 0.45s ease;
+  will-change: transform;
+}
+
+/* 투명해진 카드(루프 이음매)는 클릭도 받지 않는다 */
+.card[aria-hidden] {
+  pointer-events: none;
+}
+
+.cardButton {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+}
+
+.portrait {
+  width: 100%;
+  /* 시안 2:3143 카드 비율 140 × 200 */
+  aspect-ratio: 140 / 200;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--primary-100) 0%, var(--primary-200) 100%);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.45s ease;
+}
+
+.cardActive .portrait {
+  box-shadow: 0 24px 60px rgba(10, 32, 72, 0.22);
+}
+
+.name {
+  display: block;
+  margin-top: var(--gap-sm);
+  font-size: var(--fs-24);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-default);
+  color: var(--color-text-primary);
+}
+
+.role {
+  display: block;
+  font-size: var(--fs-18);
+  font-weight: var(--weight-regular);
+  color: var(--color-text-muted);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-md);
+  margin-top: var(--gap-xl);
+}
+
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-full);
+  background: var(--color-white);
+  box-shadow: var(--shadow-pill);
+  font-size: var(--fs-20);
+  color: var(--brand-navy);
+  transition: transform 0.25s ease;
+}
+
+.arrow:hover {
+  transform: translateY(-2px);
+}
+
+.dots {
+  display: flex;
+  gap: var(--gap-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--gray-300);
+  transition:
+    width 0.3s ease,
+    background-color 0.3s ease;
+}
+
+.dotActive {
+  width: 1.75rem;
+  background: var(--brand-primary);
+}
+
+@media (max-width: 1440px) {
+  .header {
+    padding-inline: clamp(40px, 7.3vw, 140px);
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-inline: var(--mobile-gutter);
+  }
+
+  /* 375 폭에서 카드 3장이 겹쳐 들어오도록 축소. 겹침 비율(--card-step)은 그대로. */
+  .viewport {
+    --card-w: 13rem;
+    --lane-y: 1rem;
+    --active-lift: 0.75rem;
+  }
+}
+
+/* 전역 reduce 규칙이 transition 을 끈다. 여기서는 최종 상태만 남으므로
+   카드가 사라지거나 겹쳐 보이는 문제는 없다(레이아웃이 transform 이 아닌
+   left/width 가 아니라 항상 계산된 최종값이다). */
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .card,
+  .portrait,
+  .dot,
+  .arrow,
+  .cta {
+    transition: none;
+  }
+}
