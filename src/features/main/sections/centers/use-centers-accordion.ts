@@ -7,10 +7,10 @@ import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
  * 진료센터 아코디언의 상태 기계.
  *
  * 컴포넌트에서 분리한 이유는 규칙이 세 갈래로 얽혀 있어서다:
- *   ① 활성 인덱스(클릭·화살표·프로그레스 칸)
- *   ② `≡` 그룹 펼침(선택 센터 + 이후 3개)
- *   ③ 모바일 스와이퍼에서 활성 카드를 가운데로 스크롤
- * JSX 안에 두면 ②의 창(window) 계산과 ③의 레이아웃 타이밍 보정이 마크업에 섞인다.
+ *   ① 활성 인덱스(클릭·화살표·도트)
+ *   ② 트랙에 실제로 노출되는 창(window) — 시안은 6장을 다 보여주지 않는다
+ *   ③ `≡` 그룹 펼침(선택 센터 + 이후 3개)
+ * JSX 안에 두면 ②③의 창 계산과 모바일 스크롤 보정이 마크업에 섞인다.
  */
 
 /**
@@ -20,6 +20,15 @@ import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 export const GROUP_REVEAL_AFTER = 3;
 export const GROUP_SPAN = 1 + GROUP_REVEAL_AFTER;
 
+/**
+ * 기본 모드에서 트랙에 동시에 보이는 카드 수.
+ *
+ * Figma `2:1952` 실측이 근거다: 240 + 1120 + 240 + `≡`64 + gap 32×3 = 1760.
+ * 즉 시안은 6장을 전부 늘어놓지 않고 **[이전 · 선택 · 다음] 3장 + `≡`** 만
+ * 보여주는 캐러셀(cynx.io)이다. 나머지는 폭 0 으로 접힌다.
+ */
+export const WINDOW_SPAN = 3;
+
 export interface CentersAccordionResult {
   activeIndex: number;
   groupOpen: boolean;
@@ -27,6 +36,8 @@ export interface CentersAccordionResult {
   trackRef: RefObject<HTMLUListElement | null>;
   /** i 번째가 "펼친 상태"인가. 그룹 모드에서는 4장이 동시에 참이다. */
   isExpanded: (index: number) => boolean;
+  /** i 번째가 트랙 창 안에 있는가. 창 밖은 폭 0 으로 접힌다. */
+  isVisible: (index: number) => boolean;
   select: (index: number) => void;
   /** 좌우 화살표 — 활성 인덱스 ±1 */
   step: (direction: -1 | 1) => void;
@@ -49,7 +60,7 @@ export function useCentersAccordion(count: number): CentersAccordionResult {
   );
 
   /**
-   * 끝에서 순환시킨다. 프로그레스 6칸이 "여기까지 왔다"는 위치 표시일 뿐
+   * 끝에서 순환시킨다. 도트 6칸이 "여기까지 왔다"는 위치 표시일 뿐
    * 진행률(끝점이 있는 값)이 아니라서, 마지막 칸에서 화살표가 죽어 있는 것보다
    * 첫 칸으로 도는 쪽이 캐러셀(cynx.io) 성격에 맞는다.
    */
@@ -63,22 +74,29 @@ export function useCentersAccordion(count: number): CentersAccordionResult {
   const toggleGroup = useCallback(() => setGroupOpen((v) => !v), []);
 
   /**
-   * 그룹 창의 시작점.
+   * 창의 시작점. 순환(wrap)으로 처리하면 펼친 카드가 트랙 좌우로 쪼개져 보여
+   * 아코디언이 깨지므로, 창을 트랙 안쪽으로 밀어 넣는다(clamp).
    *
-   * "이후 3개"를 그대로 쓰면 활성이 뒤쪽일 때 인덱스가 배열 밖으로 나간다.
-   * 순환(wrap)으로 처리하면 펼친 카드가 트랙 좌우로 쪼개져 보여 아코디언이
-   * 깨지므로, 창을 트랙 안쪽으로 밀어 넣는다(clamp). 활성 카드는 언제나
-   * 창 안에 남는다: start ≤ active ≤ start + 3.
+   *   기본 모드: [활성-1, 활성, 활성+1]   — 시안 2:1952 구성
+   *   그룹 모드: [활성 … 활성+3]          — Figma 주석 2:1961
+   *
+   * 어느 쪽이든 활성 카드는 항상 창 안에 남는다.
    */
-  const groupStart = useMemo(
-    () => Math.max(0, Math.min(activeIndex, count - GROUP_SPAN)),
-    [activeIndex, count],
+  const span = groupOpen ? GROUP_SPAN : WINDOW_SPAN;
+  const windowStart = useMemo(() => {
+    const desired = groupOpen ? activeIndex : activeIndex - 1;
+    return Math.max(0, Math.min(desired, count - span));
+  }, [groupOpen, activeIndex, count, span]);
+
+  const isVisible = useCallback(
+    (index: number) => index >= windowStart && index < windowStart + span,
+    [windowStart, span],
   );
 
   const isExpanded = useCallback(
     (index: number) =>
-      groupOpen ? index >= groupStart && index < groupStart + GROUP_SPAN : index === activeIndex,
-    [groupOpen, groupStart, activeIndex],
+      groupOpen ? index >= windowStart && index < windowStart + GROUP_SPAN : index === activeIndex,
+    [groupOpen, windowStart, activeIndex],
   );
 
   /**
@@ -112,5 +130,5 @@ export function useCentersAccordion(count: number): CentersAccordionResult {
     return () => item.removeEventListener("transitionend", settle);
   }, [activeIndex]);
 
-  return { activeIndex, groupOpen, trackRef, isExpanded, select, step, toggleGroup };
+  return { activeIndex, groupOpen, trackRef, isExpanded, isVisible, select, step, toggleGroup };
 }

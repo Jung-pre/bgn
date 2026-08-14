@@ -345,6 +345,11 @@ button {
   line-height: var(--leading-normal);
   letter-spacing: var(--tracking-default);
   color: var(--color-text-muted);
+  /* 시안 설명문은 대부분 디자이너가 **의도적으로 끊은 2줄**이다.
+     사전(i18n)에 그 줄바꿈이 `\n` 으로 들어 있는데 pre-line 이 없으면
+     공백으로 접혀 한 줄로 흐른다. 좁은 화면에서는 자동 줄바꿈이 추가로 일어나므로
+     `pre-wrap` 이 아니라 `pre-line` 이어야 한다(연속 공백은 접히는 게 맞다). */
+  white-space: pre-line;
 }
 
 /* 시안의 형광 마커 — 헤드라인 일부 어절을 감싼다.

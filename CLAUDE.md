@@ -207,3 +207,13 @@ PDF 에는 없고 Figma 주석에만 있던 내용이라, 이걸 안 보고 만�
 4. 4개국어를 실제로 운영하는가
 5. 푸터에 지도를 넣는가 (시안에는 주소 텍스트만)
 6. AI 섹션 4개 데이터 비주얼의 3D 여부 (전부 3D 는 프레임 예산 초과)
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

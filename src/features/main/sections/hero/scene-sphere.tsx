@@ -91,9 +91,32 @@ export interface SphereSceneProps {
   active: boolean;
   /** 히어로 스크롤 진행도(0~1). state 가 아니라 ref 로 받는다 */
   progressRef?: RefObject<number>;
+  /**
+   * 파티클 밝기 배수. 클로징 섹션(`2:2893`)은 같은 구체를 **배경 요소**로 다시
+   * 쓰는데, 시안에서 그쪽은 대륙이 거의 안 읽히는 안개 덩어리다.
+   * CSS `opacity` 로 눌러도 되지만 그러면 캔버스 전체가 반투명해져 뒤 배경이
+   * 비쳐 색이 탁해진다. 셰이더 단계에서 줄이는 게 맞다.
+   */
+  intensity?: number;
+  /**
+   * 한반도 파란 코어 글로우. 클로징에서는 시안에 없다.
+   * 브랜드 포커스를 두 번 반복하면 히어로의 의미가 희석된다.
+   */
+  showCore?: boolean;
+  /**
+   * 포인터 추종 회전 + 커서 반발.
+   * 클로징은 스쳐 지나가는 전환 씬이라 조작 어포던스를 주지 않는다.
+   */
+  interactive?: boolean;
 }
 
-export function SphereScene({ active, progressRef }: SphereSceneProps) {
+export function SphereScene({
+  active,
+  progressRef,
+  intensity = 1,
+  showCore = true,
+  interactive = true,
+}: SphereSceneProps) {
   const reduced = usePrefersReducedMotion();
 
   return (
@@ -106,12 +129,30 @@ export function SphereScene({ active, progressRef }: SphereSceneProps) {
       camera={{ position: [0, 0, 6], fov: 38 }}
       style={{ width: "100%", height: "100%" }}
     >
-      <Globe progressRef={progressRef} reduced={reduced} />
+      <Globe
+        progressRef={progressRef}
+        reduced={reduced}
+        intensity={intensity}
+        showCore={showCore}
+        interactive={interactive}
+      />
     </CanvasShell>
   );
 }
 
-function Globe({ progressRef, reduced }: { progressRef?: RefObject<number>; reduced: boolean }) {
+function Globe({
+  progressRef,
+  reduced,
+  intensity,
+  showCore,
+  interactive,
+}: {
+  progressRef?: RefObject<number>;
+  reduced: boolean;
+  intensity: number;
+  showCore: boolean;
+  interactive: boolean;
+}) {
   const isMobile = useIsMobileLayout();
   const counts = isMobile ? COUNTS.mobile : COUNTS.desktop;
 
@@ -199,19 +240,22 @@ function Globe({ progressRef, reduced }: { progressRef?: RefObject<number>; redu
     if (reduced) {
       // 정지 구도 — 기울기만 유지하고 애니메이션은 전부 건너뛴다.
       g.rotation.set(0, FOCUS_ROTATION_Y, AXIAL_TILT);
-      updateCore(coreRef.current, g, camera, 1);
+      if (showCore) updateCore(coreRef.current, g, camera, 1);
       return;
     }
 
     // 뷰포트 좌표 → NDC. rect 읽기는 프레임당 한 번뿐이다.
+    // 비인터랙티브(클로징)면 rect 읽기 자체를 건너뛴다 — 어차피 안 쓴다.
     let nx = 0;
     let ny = 0;
     let inside = false;
-    const rect = gl.domElement.getBoundingClientRect();
-    if (client.current.has && rect.width > 0 && rect.height > 0) {
-      nx = ((client.current.x - rect.left) / rect.width) * 2 - 1;
-      ny = -(((client.current.y - rect.top) / rect.height) * 2 - 1);
-      inside = nx >= -1 && nx <= 1 && ny >= -1 && ny <= 1;
+    if (interactive) {
+      const rect = gl.domElement.getBoundingClientRect();
+      if (client.current.has && rect.width > 0 && rect.height > 0) {
+        nx = ((client.current.x - rect.left) / rect.width) * 2 - 1;
+        ny = -(((client.current.y - rect.top) / rect.height) * 2 - 1);
+        inside = nx >= -1 && nx <= 1 && ny >= -1 && ny <= 1;
+      }
     }
 
     // 프레임레이트 독립 지수감쇠
@@ -241,12 +285,12 @@ function Globe({ progressRef, reduced }: { progressRef?: RefObject<number>; redu
       FOCUS_ROTATION_Y +
       (1 - introEase) * 0.55 + // 등장하며 살짝 돌기
       scroll * 0.9 + // 스크롤에 따라 추가 회전
-      eased.current.x * 0.3; // 포인터 추종
+      eased.current.x * 0.3; // 포인터 추종 (비인터랙티브면 eased 가 0 에 머문다)
     // 지축 기울기를 고정으로 주고 그 위에 포인터 반응을 얹는다
     g.rotation.z = AXIAL_TILT;
     g.rotation.x = eased.current.y * 0.16;
 
-    updateCore(coreRef.current, g, camera, introEase);
+    if (showCore) updateCore(coreRef.current, g, camera, introEase);
   });
 
   return (
@@ -255,38 +299,41 @@ function Globe({ progressRef, reduced }: { progressRef?: RefObject<number>; redu
         cloud={halo}
         color="#ffffff"
         size={0.03}
-        opacity={0.45}
+        opacity={0.45 * intensity}
         instant={reduced}
         pointerRef={push}
-        pushScale={1.2}
+        pushScale={interactive ? 1.2 : 0}
       />
       <PointLayer
         cloud={shell}
         color="#eef4ff"
         size={0.024}
-        opacity={0.75}
+        opacity={0.75 * intensity}
         instant={reduced}
         pointerRef={push}
-        pushScale={1}
+        pushScale={interactive ? 1 : 0}
       />
       <PointLayer
         cloud={land}
         color="#ffffff"
         size={0.03}
-        opacity={0.95}
+        opacity={0.95 * intensity}
         instant={reduced}
         pointerRef={push}
-        pushScale={0.85}
+        pushScale={interactive ? 0.85 : 0}
       />
 
       {/* 코어 글로우 — 매 프레임 카메라를 향하도록 돌린다(빌보드).
           drei `<Billboard>` 를 쓰지 않은 이유: 이건 회전 그룹의 자식이라
-          Billboard 가 부모 회전을 상쇄하는 과정에서 quaternion 이 한 프레임 늦는다. */}
-      <mesh ref={coreRef} position={corePosition} renderOrder={-1}>
-        {/* 시안에서 파란 코어는 구체 지름의 40% 정도다. falloff 여유까지 1.2R. */}
-        <planeGeometry args={[GLOBE_RADIUS * 1.2, GLOBE_RADIUS * 1.2]} />
-        <CoreGlowMaterial />
-      </mesh>
+          Billboard 가 부모 회전을 상쇄하는 과정에서 quaternion 이 한 프레임 늦는다.
+          클로징에서는 시안에 없으므로 아예 렌더하지 않는다(투명하게 두면 드로우콜만 남는다). */}
+      {showCore ? (
+        <mesh ref={coreRef} position={corePosition} renderOrder={-1}>
+          {/* 시안에서 파란 코어는 구체 지름의 40% 정도다. falloff 여유까지 1.2R. */}
+          <planeGeometry args={[GLOBE_RADIUS * 1.2, GLOBE_RADIUS * 1.2]} />
+          <CoreGlowMaterial />
+        </mesh>
+      ) : null}
     </group>
   );
 }

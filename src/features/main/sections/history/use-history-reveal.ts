@@ -18,11 +18,25 @@ import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
  * ## 담당 범위
  *  ① 인트로 헤드라인 — 좌→우 clip-path 와이프 (Figma 주석 `2:1990`)
  *  ② 시대 세트 — opacity 0→1 + 살짝 위로 (세트마다 개별 트리거)
- *  ③ 중앙 타임라인 축 — 스크롤에 따라 아래로 그려짐 (scrub)
+ *  ③ 이미지 카드 기울기 — 화면을 지나가는 동안 8° → 2° 로 정돈 (scrub)
+ *  ④ 중앙 타임라인 축 — 스크롤에 따라 아래로 그려짐 (scrub)
  *
- * 축의 진행은 scrub 트윈이 CSS transform 을 직접 쓴다. 매 프레임 값이므로
+ * ## ③ 은 "엇갈림"이 아니다
+ * 기획안은 이미지와 텍스트가 **다른 속도로 흐르는 것**을 금지한다.
+ * 회전은 세로 위치를 바꾸지 않고, 카드가 텍스트와 같은 `li` 안에 있으므로
+ * 두 요소의 이동 속도는 여전히 동일하다. Figma 주석 `2:2000` 이 지목한
+ * skazy.ai 의 카드 거동이 정확히 이 "지나가며 각도가 정돈되는" 회전이고,
+ * 시안에서도 같은 카드가 프레임마다 다른 각도로 그려져 있다.
+ *
+ * scrub 트윈이 CSS transform 을 직접 쓴다. 매 프레임 값이므로
  * state 로 올리지 않는다(리렌더 금지 규칙).
  */
+
+/** 화면 중앙에서의 정지 각도(deg) — 시안 실측 ≈ 4° */
+const TILT_REST = 4;
+/** 하단 진입 시점에 정지 각도보다 이만큼 더 벌어져 있다(deg) */
+const TILT_ENTER_DELTA = 5;
+
 export function useHistoryReveal<T extends HTMLElement>() {
   const sectionRef = useRef<T>(null);
 
@@ -33,10 +47,14 @@ export function useHistoryReveal<T extends HTMLElement>() {
 
       const headline = section.querySelector<HTMLElement>("[data-history-headline]");
       const marker = section.querySelector<HTMLElement>("[data-history-marker]");
-      const deco = section.querySelector<HTMLElement>("[data-history-deco]");
       const axisFill = section.querySelector<HTMLElement>("[data-history-axis-fill]");
       const axisHost = section.querySelector<HTMLElement>("[data-history-axis-host]");
       const sets = gsap.utils.toArray<HTMLElement>("[data-history-set]", section);
+      const photos = gsap.utils.toArray<HTMLElement>("[data-history-photo]", section);
+
+      /** 정지 각도의 단일 출처는 CSS 의 `--tilt-rest` 다 (인트로 카드만 9°) */
+      const restOf = (el: HTMLElement) =>
+        Number.parseFloat(getComputedStyle(el).getPropertyValue("--tilt-rest")) || TILT_REST;
 
       /**
        * 동작 줄이기: early-return 하면 아래 `fromTo` 가 걸어둔 시작값
@@ -46,9 +64,10 @@ export function useHistoryReveal<T extends HTMLElement>() {
       if (prefersReducedMotionSync()) {
         if (headline) gsap.set(headline, { autoAlpha: 1, clearProps: "clipPath,opacity" });
         if (marker) gsap.set(marker, { "--marker-wipe": "100%" });
-        if (deco) gsap.set(deco, { scaleX: 1, clearProps: "transform" });
         if (axisFill) gsap.set(axisFill, { scaleY: 1 });
         settleReducedMotion(sets);
+        // 회전은 CSS 가 이미 정지 각도를 갖고 있다 — 인라인 값만 지운다
+        photos.forEach((el) => gsap.set(el, { clearProps: "rotate,transform" }));
         // 타임라인 노드는 전부 활성 상태로 확정 (CSS 가 이 속성을 본다)
         gsap.set(sets, { attr: { "data-visible": "true" } });
         return;
@@ -71,9 +90,6 @@ export function useHistoryReveal<T extends HTMLElement>() {
           0,
         );
 
-        // 꾸밈요소 — 헤드라인과 같은 방향으로 뻗는다
-        if (deco) intro.fromTo(deco, { scaleX: 0 }, { scaleX: 1, duration: 0.8 }, 0.12);
-
         // 형광 마커도 좌→우 wipe. globals.css 가 권장하는 방식대로
         // background-size 를 CSS 변수로 트윈한다(전역 파일은 건드리지 않는다).
         if (marker) {
@@ -81,7 +97,7 @@ export function useHistoryReveal<T extends HTMLElement>() {
             marker,
             { "--marker-wipe": "0%" },
             { "--marker-wipe": "100%", duration: 0.45, ease: "power2.out" },
-            0.8,
+            0.7,
           );
         }
       }
@@ -100,7 +116,7 @@ export function useHistoryReveal<T extends HTMLElement>() {
               y: 0,
               duration: SCROLL_ENTRANCE.duration,
               ease: SCROLL_ENTRANCE.ease,
-              // 인라인 transform 이 남으면 카드의 CSS 기울임과 싸운다.
+              // 인라인 transform 이 남으면 카드 회전(③)과 싸운다.
               clearProps: "opacity,visibility,transform",
             },
           )
@@ -109,7 +125,27 @@ export function useHistoryReveal<T extends HTMLElement>() {
           .set(el, { attr: { "data-visible": "true" } }, 0.2);
       });
 
-      // ── ③ 중앙 축이 스크롤을 따라 그려진다 ────────────────────────────
+      // ── ③ 이미지 카드가 화면을 지나가며 각도를 정돈한다 ───────────────
+      photos.forEach((el) => {
+        const rest = restOf(el);
+        gsap.fromTo(
+          el,
+          { rotate: rest + TILT_ENTER_DELTA },
+          {
+            rotate: rest,
+            ease: "none",
+            scrollTrigger: {
+              trigger: el,
+              start: "top bottom",
+              end: "center center",
+              scrub: 0.8,
+              invalidateOnRefresh: true,
+            },
+          },
+        );
+      });
+
+      // ── ④ 중앙 축이 스크롤을 따라 그려진다 ────────────────────────────
       if (axisFill && axisHost) {
         gsap.fromTo(
           axisFill,

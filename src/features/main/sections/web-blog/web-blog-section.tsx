@@ -2,7 +2,6 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
 import { VideoSlot } from "@/components/video-slot/video-slot";
@@ -11,7 +10,7 @@ import styles from "./web-blog-section.module.css";
 
 /**
  * Web blog — 진입 fade in-out → pinned 가로 스크롤 트랙.
- * 시안 p1_16 ~ p1_20 (5프레임이 전부 이 한 섹션).
+ * 시안 `2:2399` ~ `2:2739` (5프레임이 전부 이 한 섹션).
  *
  * ## Figma 주석 원문 (`docs/plan/07-interactions.md`)
  *   2:2401  `해당 영역 진입시 fade in-out 후 하단 고정 가로 스크롤 영역으로 진입`
@@ -24,6 +23,12 @@ import styles from "./web-blog-section.module.css";
  *   ② `.colorBlur`  2:2401 — backdrop-blur 75px + rgba(0,114,236,0.2) "색상블러"
  *   ③ `.maskStage`  2:2571 — **글자 모양으로 뚫린 덮개판**
  *   ④ `.track`               다크 타일 ↔ 화이트 카드 교차
+ *
+ * ## 트랙 구성 — 시안 실측
+ * 타일과 카드는 **각 960px(= 화면 절반)** 이고 이렇게 이어진다.
+ *   타일 → 브랜드 컷(2:2457) → 타일 → 글1 → 타일 → 글2 → 타일 → 글3
+ * 타일 칸에는 배경을 칠하지 않는다. 시안에서 이 칸은 **배경 영상이 그대로
+ * 비치는 창**이라 트랙이 밀릴 때마다 영상의 다른 부분이 보인다.
  *
  * ## 왜 `background-clip: text` 가 아니라 마스크인가
  * `background-clip: text` 는 "글자 **안쪽에** 배경을 칠하는" 기능이다.
@@ -54,24 +59,25 @@ export interface WebBlogSectionProps {
 /** 주석 `2:2561` — 최신 3건만 노출한다 */
 const MAX_POSTS = 3;
 
-/** 다크 타일 심볼 종류 수. 랜덤이 아니라 인덱스로 고정 배정한다 */
-const SYMBOL_COUNT = 4;
-
 /** pin 구간 중 인트로(타이틀 fade out)가 가져가는 비율 */
 const INTRO_RATIO = 0.22;
-
-/** 인트로가 끝난 뒤 남기는 덮개 농도 — 가로 트랙의 배경 요소로 계속 존재한다 */
-const STAGE_BG_ALPHA = 0.4;
 
 /** 한 페이지에 이 섹션은 하나뿐이다. useId 의 특수문자를 url(#…) 에 넣지 않는다 */
 const MASK_ID = "web-blog-letter-hole";
 
-/** 인라인 SVG 좌표계. slice 로 덮으므로 글자는 가운데 안전영역에만 둔다 */
-const VB_W = 1200;
-const VB_H = 900;
+/** 인라인 SVG 좌표계 = 시안 PC 프레임(1920×920). 1920 뷰포트에서 1:1 로 떨어진다 */
+const VB_W = 1920;
+const VB_H = 920;
+
+/** 카드 하단 대형 워터마크. 시안 문구는 섹션 타이틀과 다르다(2:2457) */
+const WATERMARK = "BGN AI Web blog";
+
+/** 태그 색 팔레트 개수(`.tone0`~`.tone3`) */
+const TONE_COUNT = 4;
 
 type TrackItem =
   | { kind: "tile"; key: string; symbol: number }
+  | { kind: "brand"; key: string }
   | { kind: "post"; key: string; post: BlogPostMessages };
 
 export function WebBlogSection({ messages }: WebBlogSectionProps) {
@@ -141,11 +147,20 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
         },
       });
 
-      tl.to(
-        stage,
-        { autoAlpha: STAGE_BG_ALPHA, scale: 0.9, ease: "none", duration: INTRO_RATIO },
-        0,
-      ).to(track, { x: () => -distance(), ease: "none", duration: 1 - INTRO_RATIO }, INTRO_RATIO);
+      /* 주석 원문이 "fade in-**out**" 이고, 시안 2:2457 이후 프레임에는 이 글자가
+         전혀 남아 있지 않다. 예전 구현처럼 0.4 로 남겨 두면 가로 트랙 위에
+         시안에 없는 덮개가 계속 깔린다 → 완전히 걷어낸다. */
+      tl.to(stage, { autoAlpha: 0, scale: 0.9, ease: "none", duration: INTRO_RATIO }, 0)
+        /* 시안 2:2399 는 **화면 전체가 배경 영상 + 타이틀뿐**이다. 트랙을 x=0 에
+           두면 인트로 내내 오른쪽 절반이 흰 카드로 덮여 시안과 달라진다.
+           → 트랙은 화면 밖(오른쪽)에서 대기하다가 타이틀이 사라지는 동안 들어온다. */
+        .fromTo(
+          track,
+          { x: () => window.innerWidth },
+          { x: 0, ease: "none", duration: INTRO_RATIO },
+          0,
+        )
+        .to(track, { x: () => -distance(), ease: "none", duration: 1 - INTRO_RATIO }, INTRO_RATIO);
 
       return () => {
         fadeIn.scrollTrigger?.kill();
@@ -162,18 +177,28 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
 
   const posts = messages.posts.slice(0, MAX_POSTS);
 
-  /** 카드 사이에 브랜드 타일을 끼우고, 마지막에도 타일로 닫는다(심볼 4종 전부 노출) */
+  /*
+    시안은 카테고리마다 태그 색이 다른데(블루·핑크·올리브·민트) messages 에는
+    색 정보가 없다. **처음 나온 순서**로 팔레트를 배정하면 시안 2:2550/2:2739 의
+    색 순서와 그대로 맞고, 같은 태그는 항상 같은 색이 된다.
+    (`Math.random()` 금지 — React Compiler 가 불순 함수로 잡는다)
+  */
+  const tagTone = new Map<string, number>();
+  for (const post of posts) {
+    for (const tag of post.tags) {
+      if (!tagTone.has(tag)) tagTone.set(tag, tagTone.size % TONE_COUNT);
+    }
+  }
+
+  /* 시안 순서: 타일 → 브랜드 컷 → (타일 → 글) × 3 */
   const items: TrackItem[] = [
+    { kind: "tile", key: "tile-0", symbol: 0 },
+    { kind: "brand", key: "brand" },
     ...posts.flatMap((post, i): TrackItem[] => [
-      { kind: "tile", key: `tile-${i}`, symbol: i % SYMBOL_COUNT },
+      { kind: "tile", key: `tile-${i + 1}`, symbol: (i + 1) % SYMBOLS.length },
       { kind: "post", key: post.href, post },
     ]),
-    { kind: "tile", key: `tile-${posts.length}`, symbol: posts.length % SYMBOL_COUNT },
   ];
-
-  /** "BGN Web blog" → ["BGN", "Web blog"] 2줄. 폭이 좁아도 잘리지 않는다 */
-  const [firstWord = messages.title, ...restWords] = messages.title.split(" ");
-  const lines = restWords.length > 0 ? [firstWord, restWords.join(" ")] : [firstWord];
 
   return (
     <section ref={sectionRef} className={styles.section} aria-labelledby="blog-title">
@@ -181,6 +206,8 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
       <VideoSlot decorative className={styles.bgVideo} rootMargin="400px 0px" />
       {/* ② Figma 2:2401 — 색상블러. blur 75 + 블루 0.2 오버레이 */}
       <div className={styles.colorBlur} aria-hidden />
+      {/* ②-b 영상 도착 전 임시 톤 보정 (CSS 주석 참고) */}
+      <div className={styles.bgTone} aria-hidden />
 
       {/* ③ Figma 2:2571 — 글자 모양으로 뚫린 덮개. 구멍 사이로 ①②가 비친다 */}
       <div ref={stageRef} className={styles.maskStage} aria-hidden>
@@ -195,19 +222,16 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
             <mask id={MASK_ID} maskUnits="userSpaceOnUse" x="0" y="0" width={VB_W} height={VB_H}>
               {/* 흰색 = 덮개가 남는 영역 */}
               <rect x="0" y="0" width={VB_W} height={VB_H} fill="#fff" />
-              {/* 검은색 = 뚫리는 영역(글자) */}
-              {lines.map((line, i) => (
-                <text
-                  key={line}
-                  className={styles.maskText}
-                  x={VB_W / 2}
-                  y={VB_H / 2 - 60 + i * 150}
-                  textAnchor="middle"
-                  fill="#000"
-                >
-                  {line}
-                </text>
-              ))}
+              {/* 검은색 = 뚫리는 영역(글자). 시안은 한 줄이다 */}
+              <text
+                className={styles.maskText}
+                x={VB_W / 2}
+                y={VB_H / 2 + 40}
+                textAnchor="middle"
+                fill="#000"
+              >
+                {messages.title}
+              </text>
             </mask>
           </defs>
           <rect
@@ -218,6 +242,21 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
             className={styles.maskPlate}
             mask={`url(#${MASK_ID})`}
           />
+          {/*
+            시안 2:2399 의 글자는 **밝은 흰색**이다. 구멍만 뚫어 두면 배경 영상이
+            어두운 구간에서 글자가 거의 안 보인다(지금 자리표 영상이 그렇다).
+            같은 좌표에 옅은 흰 글자를 한 장 더 얹어 밝기를 확보한다 —
+            반투명이라 구멍 아래 영상의 움직임은 그대로 비친다.
+            실제 영상이 들어오면 이 값을 낮춰도 된다.
+          */}
+          <text
+            className={`${styles.maskText} ${styles.maskShine}`}
+            x={VB_W / 2}
+            y={VB_H / 2 + 40}
+            textAnchor="middle"
+          >
+            {messages.title}
+          </text>
         </svg>
       </div>
 
@@ -228,35 +267,101 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
 
       {/* ④ 가로 트랙 — GSAP 이 x 를 트윈한다 */}
       <div ref={trackRef} className={styles.track}>
-        {items.map((item) =>
-          item.kind === "tile" ? (
-            <div key={item.key} className={styles.tile} aria-hidden>
-              <span className={styles.tileTop} lang="en">
-                Eye Clinic Jamsil
-              </span>
-              {/* 심볼은 인덱스로 지정된 에셋. 랜덤 금지 — 시안에서 순서가 정해져 있다. */}
-              <span className={clsx(styles.tileSymbol, styles[`symbol${item.symbol}`])} />
-              <span className={styles.tileBrand} lang="en">
-                BGN
-              </span>
-            </div>
-          ) : (
+        {items.map((item) => {
+          if (item.kind === "tile") {
+            return (
+              <div key={item.key} className={styles.tile} aria-hidden>
+                <span className={styles.tileTop} lang="en">
+                  BGN
+                </span>
+                {/* 장식은 인덱스로 지정된 도형. 랜덤 금지 — 시안에서 순서가 정해져 있다 */}
+                <span className={styles.tileSymbol}>{SYMBOLS[item.symbol]}</span>
+                <span className={styles.tileBrand} lang="en">
+                  Eye Clinic Jamsil
+                </span>
+              </div>
+            );
+          }
+
+          if (item.kind === "brand") {
+            /* 시안 2:2457 — 태그도 제목도 없는 브랜드 컷 */
+            return (
+              <div key={item.key} className={`${styles.card} ${styles.brandCard}`} aria-hidden>
+                <div className={styles.thumb} />
+                <p className={styles.watermark} lang="en">
+                  {WATERMARK}
+                </p>
+              </div>
+            );
+          }
+
+          return (
             <article key={item.key} className={styles.card}>
               <Link href={item.post.href} className={styles.cardLink}>
                 <div className={styles.thumb} aria-hidden />
                 <ul className={styles.tags}>
                   {item.post.tags.map((t) => (
-                    <li key={t} className={styles.tag}>
+                    <li key={t} className={`${styles.tag} ${styles[`tone${tagTone.get(t) ?? 0}`]}`}>
                       {t}
                     </li>
                   ))}
                 </ul>
                 <h3 className={styles.cardTitle}>{item.post.title}</h3>
               </Link>
+              <p className={styles.watermark} lang="en" aria-hidden>
+                {WATERMARK}
+              </p>
             </article>
-          ),
-        )}
+          );
+        })}
       </div>
     </section>
   );
 }
+
+/* --- 타일 장식 4종 -------------------------------------------------------------
+   시안 2:2457 / 2:2550 / 2:2634 / 2:2739 순서. 전부 가는 흰 선의 아웃라인이다.
+   회전 각도는 상수 배열로 미리 계산한다(렌더마다 같은 값이어야 한다). */
+const BURST_RAYS = Array.from({ length: 16 }, (_, i) => {
+  const angle = (i * Math.PI) / 8;
+  const inner = i % 2 === 0 ? 6 : 10;
+  const outer = i % 2 === 0 ? 48 : 34;
+  return {
+    x1: 50 + Math.cos(angle) * inner,
+    y1: 50 + Math.sin(angle) * inner,
+    x2: 50 + Math.cos(angle) * outer,
+    y2: 50 + Math.sin(angle) * outer,
+  };
+});
+
+const PETALS = Array.from({ length: 6 }, (_, i) => {
+  const angle = (i * Math.PI) / 3;
+  return { cx: 50 + Math.cos(angle) * 17, cy: 50 + Math.sin(angle) * 17 };
+});
+
+const SYMBOLS = [
+  // ① 가는 빛살 별 (2:2457)
+  <svg key="burst" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.9">
+    {BURST_RAYS.map((r) => (
+      <line key={`${r.x1}-${r.y1}`} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />
+    ))}
+  </svg>,
+  // ② 겹친 꽃잎 (2:2550)
+  <svg key="flower" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.9">
+    {PETALS.map((p) => (
+      <circle key={`${p.cx}-${p.cy}`} cx={p.cx} cy={p.cy} r="20" />
+    ))}
+  </svg>,
+  // ③ 4각 스파클 (2:2634)
+  <svg key="sparkle" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.9">
+    <path d="M50 2C52 32 68 48 98 50C68 52 52 68 50 98C48 68 32 52 2 50C32 48 48 32 50 2Z" />
+    <path d="M20 20 80 80M80 20 20 80" strokeWidth="0.6" />
+  </svg>,
+  // ④ 생명의 꽃 (2:2739)
+  <svg key="seed" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.9">
+    <circle cx="50" cy="50" r="20" />
+    {PETALS.map((p) => (
+      <circle key={`${p.cx}-${p.cy}`} cx={p.cx} cy={p.cy} r="20" />
+    ))}
+  </svg>,
+];

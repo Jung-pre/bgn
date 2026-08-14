@@ -9,6 +9,18 @@
   display: flex;
   align-items: flex-end;
   gap: 0.75rem;
+  /* GNB 와 같은 곡선·길이로 사라져야 두 요소가 따로 노는 느낌이 안 든다 */
+  transition: opacity 0.35s ease;
+}
+
+/* 브랜드 필름 구간에서는 GNB 와 **같이** 사라진다.
+   시안 2:994 는 UI 가 하나도 없는 풀블리드 영상 컷이다. GNB 만 숨기고
+   퀵바·챗봇 pill 을 남겨 두면 시안에 없는 요소 두 개가 영상 위에 그대로 떠 있게 된다.
+   토글 주체는 brand-film 섹션(<body data-gnb-hide="true">) 이고 여기서는 받기만 한다. */
+:global(body[data-gnb-hide="true"]) .fanRoot,
+:global(body[data-gnb-hide="true"]) .bottomBar {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .bubble {
@@ -115,6 +127,7 @@
   background: var(--color-white);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
+  transition: opacity 0.35s ease;
 }
 
 .bottomList {

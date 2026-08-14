@@ -1,26 +1,46 @@
+/* ==========================================================================
+   AI 브랜드 스토리 — Figma 실측 1:1
+
+     frame     2:1286  1920×767, bg primary/primary/100, pt 120? → 실측 96/96
+     Container 2:1938  854×575, flex-col gap 32, 가운데 정렬
+     Header    2:1939  flex gap 16 (탭 3개)
+     Tab       2:1940  min-w 200, px 24 py 16, radius full, bg white
+     Main Image 2:1946 854×484, radius 32, shadow 0 4 23 rgba(0,0,0,.12)
+     Play      2:1947  120×120, 카드 정중앙
+   ========================================================================== */
+
 .section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--gap-lg);
-  padding-block: var(--gap-section);
-  background: #e4eefb;
+  /* Figma 2:1938 — Container 의 gap 32 (탭 ↔ 카드) */
+  gap: 2rem;
+  /* Figma 2:1286 — 767 = 96 + 575 + 96 */
+  padding-block: 6rem;
+  /* Figma 2:1286 프레임 fill = primary/primary/100 */
+  background: var(--primary-100);
 }
 
 .tabs {
   display: flex;
-  gap: 0.75rem;
+  /* Figma 2:1939 */
+  gap: var(--gap-sm);
   max-width: 100%;
   padding-inline: var(--content-side-pad);
 }
 
+/* Figma 2:1940 — min-w 200 / px 24 py 16 / pc body 1 - M (SemiBold 18) */
 .tab {
   position: relative;
-  padding: 0.75rem 1.5rem;
+  min-width: 12.5rem;
+  padding: 1rem 1.5rem;
   border-radius: var(--radius-full);
   background: var(--color-white);
-  color: var(--color-text-body);
-  font-size: var(--fs-20);
+  font-size: var(--fs-18);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  color: var(--primary-900);
   white-space: nowrap;
   transition: color 0.25s ease;
 }
@@ -32,16 +52,18 @@
 
 .tabActive {
   color: var(--color-white);
-  font-weight: var(--weight-semibold);
 }
 
-/* 활성 표시 알약 — Motion layoutId 로 탭 사이를 이동한다 */
+/* 활성 표시 알약 — Motion layoutId 로 탭 사이를 이동한다.
+   Figma 2:1942 의 fill 은 보라(primary/sub/500) → 파랑(primary/primary/500)
+   방향의 radial 이다. 공용 --gradient-cta 는 방향이 반대(파랑→보라)라 그대로
+   쓰면 색이 뒤집힌다. 토큰을 고칠 수 없어 여기서만 정의한다. */
 .tabIndicator {
   position: absolute;
   inset: 0;
   z-index: 0;
   border-radius: var(--radius-full);
-  background: var(--gradient-cta);
+  background: linear-gradient(115deg, var(--primary-sub-500) 0%, var(--primary-500) 100%);
 }
 
 .tabLabel {
@@ -57,8 +79,9 @@
 */
 .stage {
   position: relative;
-  width: min(53.75rem, calc(100% - 2 * var(--content-side-pad))); /* 시안 860 */
-  aspect-ratio: 16 / 9;
+  /* Figma 2:1946 — 854×484 (16:9 가 아니다) */
+  width: min(53.375rem, calc(100% - 2 * var(--content-side-pad)));
+  aspect-ratio: 854 / 484;
 }
 
 .card {
@@ -66,10 +89,14 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: var(--gap-lg);
+  /* 시안의 카피는 카드 세로 중앙, 좌측 정렬이다 (하단 정렬이 아니다) */
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--gap-sm);
+  padding-inline: 4rem;
   border-radius: var(--radius-xl);
+  /* Figma 2:1946 */
+  box-shadow: 0 4px 23px 0 rgba(0, 0, 0, 0.12);
   overflow: hidden;
   color: var(--color-white);
 }
@@ -103,7 +130,6 @@
     linear-gradient(140deg, var(--primary-800) 0%, var(--primary-700) 100%);
 }
 
-.cardTag,
 .cardEyebrow,
 .cardTitle,
 .play {
@@ -111,44 +137,36 @@
   z-index: 1;
 }
 
-/* 카드에도 현재 주제를 남겨야 크로스페이드가 정보를 전달한다 */
-.cardTag {
-  align-self: flex-start;
+.cardEyebrow {
   margin: 0;
-  padding: 0.35rem 0.9rem;
-  border: 1px solid var(--whitebg-30);
-  border-radius: var(--radius-full);
-  background: var(--whitebg-10);
-  backdrop-filter: blur(6px);
-  font-size: var(--fs-14);
+  font-size: var(--fs-20);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-default);
   color: var(--whitebg-90);
 }
 
-.cardEyebrow {
-  margin: 0;
-  font-size: var(--fs-26);
-  color: var(--whitebg-80);
-}
-
+/* 시안 카피 높이 실측 ≈ 48px. Figma 텍스트 스케일(최대 42)에 없는 크기다.
+   모바일은 mo/headline 1(32)로 수렴시킨다. */
 .cardTitle {
   margin: 0;
-  font-size: var(--fs-42);
+  font-size: clamp(24px, 2.5vw, 48px);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-default);
   white-space: pre-line;
 }
 
+/* Figma 2:1947 — 120×120, 카드 정중앙 */
 .play {
   position: absolute;
   inset: 0;
   margin: auto;
   display: grid;
   place-items: center;
-  width: 5rem;
-  height: 5rem;
+  width: 7.5rem;
+  height: 7.5rem;
   border-radius: var(--radius-full);
-  border: 1px solid var(--whitebg-30);
-  background: var(--whitebg-20);
+  background: var(--whitebg-30);
   backdrop-filter: blur(8px);
   color: var(--color-white);
   transition:
@@ -157,13 +175,13 @@
 }
 
 .play svg {
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
 }
 
 .play:hover {
   transform: scale(1.06);
-  background: var(--whitebg-30);
+  background: var(--whitebg-50);
 }
 
 .play:focus-visible {
@@ -176,7 +194,7 @@
     padding-inline: clamp(40px, 7.3vw, 140px);
   }
   .stage {
-    width: min(53.75rem, calc(100% - 2 * clamp(40px, 7.3vw, 140px)));
+    width: min(53.375rem, calc(100% - 2 * clamp(40px, 7.3vw, 140px)));
   }
 }
 
@@ -192,27 +210,26 @@
     display: none;
   }
   .tab {
+    min-width: 0;
+    padding: 0.75rem 1.25rem;
     font-size: var(--fs-16);
   }
   .stage {
     width: calc(100% - 2 * var(--mobile-gutter));
   }
   .card {
-    padding: var(--gap-md);
-  }
-  .cardTitle {
-    font-size: var(--fs-24);
+    padding-inline: var(--gap-md);
   }
   .cardEyebrow {
     font-size: var(--fs-16);
   }
   .play {
-    width: 3.5rem;
-    height: 3.5rem;
+    width: 4.5rem;
+    height: 4.5rem;
   }
   .play svg {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.75rem;
+    height: 1.75rem;
   }
 }
 

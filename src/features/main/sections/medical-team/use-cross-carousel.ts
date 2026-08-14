@@ -19,13 +19,13 @@ import {
  * 아래 `crossLayout()` 이 그 배치를 담당한다.
  */
 
-/** 좌우로 보이는 카드 수. 이보다 멀면 opacity 0 → 루프 이음매가 안 보인다. */
+/**
+ * 좌우로 보이는 카드 수.
+ * 시안 2:995 에서 화면에 걸리는 카드가 활성 기준 ±3 이다(±3 은 양끝에서 잘려 나간다).
+ * 8장이면 ±4 짜리 한 장만 남는데, 그건 이미 뷰포트 밖이라 여기서 투명 처리해
+ * 루프 이음매를 감춘다.
+ */
 const VISIBLE_DEPTH = 3;
-/** 멀어질수록 작아지는 정도 */
-const SCALE_STEP = 0.075;
-const OPACITY_STEP = 0.24;
-/** 부채꼴 기울기(deg/장) — 시안 2:3143 의 겹침 배치가 부채꼴이다 */
-const TILT_DEG = 2.2;
 
 /** 드래그 확정 임계값 — 뷰포트 비율과 최소 px 중 큰 쪽 */
 const DRAG_COMMIT_RATIO = 0.08;
@@ -45,38 +45,30 @@ export interface CrossCardLayout {
 /**
  * 카드 한 장의 배치.
  *
- * ## "교차"를 만드는 방법 — 왜 홀/짝 레인인가
- * 후보가 둘이었다:
- *   (A) 홀/짝 카드의 y 를 반대로 주기
- *   (B) 활성 기준 좌우가 z·scale·y 로 겹치며 지나가는 코버플로우 변형
- * **둘을 합쳤다.** (B) 만으로는 카드가 결국 한 줄 위를 미끄러져 "교차"로 안 읽히고,
- * (A) 만으로는 겹침(시안 2:3143 의 40px overlap)이 표현되지 않는다.
+ * ## 시안이 말하는 "교차"
+ * 시안 2:995 는 **겹치지 않는 한 줄**이다. 카드 320, gap 32 로 나란히 놓이고
+ * 홀/짝이 42px 위아래로 엇갈린 지그재그다. 회전·축소·투명도 감쇠가 전혀 없다.
+ * (이전 구현의 부채꼴 코버플로우는 시안에 근거가 없어 걷어냈다. 근거로 삼았던
+ *  2:3143 은 히어로 2안 잔재인 의료진 컷아웃 띠였고, 이 섹션 프레임이 아니다.)
  *
- * 레인 부호는 **활성 인덱스가 아니라 카드 자신의 인덱스 홀짝**에 묶는다.
- * 그래야 이웃한 두 장이 항상 서로 다른 레인에 있고, 덱이 한 칸 밀릴 때
- * 위·아래 서로 다른 높이로 **엇갈려** 지나간다. offset 홀짝에 묶으면
- * 같은 카드가 이동마다 위아래로 까딱거려 교차가 아니라 진동으로 보인다.
- *
- * 활성 카드(depth 0)만 레인 진폭 0 → 항상 중앙에 정렬된다.
+ * ## 레인은 카드 인덱스 홀짝에 묶는다
+ * offset 홀짝에 묶으면 덱이 한 칸 밀릴 때마다 **같은 카드가 위아래로 까딱거린다**
+ * (교차가 아니라 진동). 인덱스 홀짝에 묶으면 각 카드는 제 높이를 유지한 채
+ * 옆으로 흐르고, 이웃과 항상 다른 높이라 서로 엇갈려 지나간다.
+ * 활성 인덱스 0(짝수)일 때 활성 카드가 위 레인 — 시안 초기 상태와 같다.
  */
 export function crossLayout(index: number, activeIndex: number, count: number): CrossCardLayout {
   const offset = signedOffset(index, activeIndex, count);
   const depth = Math.abs(offset);
   const hidden = depth > VISIBLE_DEPTH;
 
-  // 레인 진폭: 0 → 1 → 1.4 → 1.8. 선형으로 두면 바깥 카드가 너무 내려간다.
-  const laneDepth = depth === 0 ? 0 : 0.6 + depth * 0.4;
-  const lane = index % 2 === 0 ? 1 : -1;
-
   return {
     hidden,
     style: {
       "--offset": offset,
-      "--lane": lane * laneDepth,
-      "--tilt": offset * TILT_DEG,
-      "--lift": depth === 0 ? 1 : 0,
-      "--scale": (1 - depth * SCALE_STEP).toFixed(3),
-      "--opacity": hidden ? 0 : (1 - depth * OPACITY_STEP).toFixed(2),
+      // 0 = 위 레인, 1 = 아래 레인. 실제 간격은 CSS `--lane-y` 가 정한다.
+      "--lane": index % 2 === 0 ? 0 : 1,
+      "--opacity": hidden ? 0 : 1,
       // 페이지 레이어(globals.css --z-*)와 무관한 덱 내부 순서다.
       zIndex: count - depth,
     } as CSSProperties,

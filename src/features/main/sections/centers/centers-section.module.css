@@ -1,40 +1,33 @@
 /* ==========================================================================
    진료센터 가로 아코디언 — Figma 실측 1:1
 
-     center card      2:5393  1640×640, padding 20  → 카드 240×600
-     center Image     2:5292  1160×3840, padding 20 → 확장 카드 1120×600
-     center card_mo   2:5362   524×520, padding 20  → 축소 카드  64×480
-     center Image_mo  2:5329  1625×520, padding 20  → 모바일 카드 240×480
+     섹션        2:1950  bg white, pt 120 / pb 96 / px 80
+     Container   2:1951  flex-col gap 32 (트랙 ↔ 컨트롤)
+     트랙        2:1952  1760×600, gap 32
+     기본 카드   2:1953  240×600, radius 24, px 24 py 64, gradient + 노이즈
+     확장 카드   2:1954  1120×600, radius 24, 사진 + 좌측 워시, 본문은 다크
+     `≡` 스트립  2:1961   64×600, radius 16, 같은 그라데이션 + menu 48
+     컨트롤      2:1966  ‹40 + 도트(20/dot 6, gap 8) + ›40, gap 32, 가운데
 
-   내부 폭(= 콘텐츠 1760 − 갭 32×5 = 1600)이 상태와 무관하게 유지된다:
-     기본  240 × 6              + 32 × 5 = 1600
-     확장  1120 + 64 × 5        + 32 × 5 = 1600
-     그룹  328 × 4 + 64 × 2     + 32 × 5 = 1600   ← `≡` 토글
+   트랙 폭 산술 (창 안 3장 + `≡`):
+     240 + 1120 + 240 + 64 + 32×3 = 1760
+   그룹(`≡`) 모드는 4장이 함께 펼쳐진다:
+     392×4 + 64 + 32×4 = 1760
    ========================================================================== */
 
 .section {
   position: relative;
-  padding-block: var(--gap-section);
-  background: var(--bg-ice);
+  /* Figma 2:1950 — pt 120 / pb 96 */
+  padding-block: 7.5rem 6rem;
+  /* Figma 2:1950 프레임 fill = grayscale/white */
+  background: var(--color-white);
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-sm);
-  width: 100%;
-  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
-  margin: 0 auto var(--gap-xl);
-  padding-inline: var(--content-side-pad);
-}
-
-/* `≡` 토글의 절대배치 기준. 트랙 자체에 position 을 주면
-   모바일에서 스크롤 컨테이너가 되면서 absolute 자식이 함께 스크롤된다. */
 .trackWrap {
-  position: relative;
   width: 100%;
   max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
   margin-inline: auto;
+  padding-inline: var(--content-side-pad);
 }
 
 .track {
@@ -43,48 +36,50 @@
   width: 100%;
   height: var(--center-card-height);
   margin: 0;
-  padding-inline: var(--content-side-pad);
+  padding: 0;
   list-style: none;
 }
 
 /**
- * 고정 px 이 아니라 flex-grow 비율로 푼다.
- * 240px 을 박으면 1440px 뷰포트에서 넘치고, 확장 1120 도 마찬가지다.
- * 비율로 두면 컨테이너 폭이 얼마든 시안 비율이 그대로 유지된다.
+ * 폭은 고정 px 이 아니라 flex-grow 비율로 푼다.
+ * 240/1120 을 박으면 1440 뷰포트에서 넘친다. 비율이면 컨테이너 폭이
+ * 얼마든 시안 비율이 그대로 유지된다.
  *
- *   확장 : 축소 = 1120 : 64 = 17.5  : 1
- *   그룹 : 축소 =  328 : 64 =  5.125 : 1   ← (1600 − 64×2 − 32×5) / 4 = 328
- *   기본 : 축소 =  240 : 64 =  3.75  : 1   ← hover 프리뷰가 되돌리는 폭
+ *   기본 : 확장 = 240 : 1120 =  3 : 14
+ *   그룹 : 그룹 = 392 : 392  =  5 :  5  (4장 균등)
  */
 .item {
-  flex: 1 1 0;
+  flex: 3 1 0;
   min-width: 0;
-  transition: flex-grow 0.55s cubic-bezier(0.33, 1, 0.68, 1);
+  transition:
+    flex-grow 0.55s cubic-bezier(0.33, 1, 0.68, 1),
+    margin-right 0.55s cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 .itemExpanded {
-  flex-grow: 17.5;
+  flex-grow: 14;
 }
 
 /* 그룹(`≡`) 모드에서 4장이 동시에 펼쳐질 때의 비율. .itemExpanded 뒤에 와야 한다. */
 .itemGrouped {
-  flex-grow: 5.125;
+  flex-grow: 5;
 }
 
 /**
- * hover 프리뷰 — `MQ.hoverable`(src/shared/config/breakpoints.ts)과 같은 문자열이다.
- * 값이 바뀌면 여기도 같이 고칠 것(CSS 에서 TS 상수를 참조할 방법이 없다).
+ * 창 밖 카드 — 폭 0 으로 접는다.
  *
- * 확정 확장은 클릭에만 준다(Figma 주석). hover 는 축소 64 → 시안 기본 240 까지만
- * 되돌려 "누를 수 있다"는 신호를 준다. 그룹 모드에서는 이미 4장이 펼쳐져 있어
- * 프리뷰까지 얹으면 남은 2장이 사라지므로 끈다.
+ * 트랙은 `gap` 으로 간격을 주는데, 폭 0 카드가 남아 있으면 그만큼 gap 이
+ * 더 생겨 1760 산술이 깨진다. `margin-right: -gap` 으로 자기 뒤의 gap 을
+ * 정확히 상쇄한다(플렉스는 총합만 보므로 카드 위치와 무관하게 성립).
+ *   6칸 기준 gap 5개(160) + 접힌 3칸(−96) = 64 = 보이는 3장 사이의 gap 2개
  */
-@media (hover: hover) and (pointer: fine) {
-  .track:not([data-group-open]) .item:not(.itemExpanded):hover {
-    flex-grow: 3.75;
-  }
+.itemHidden {
+  flex: 0 0 0;
+  margin-right: calc(-1 * var(--center-card-gap));
+  overflow: hidden;
 }
 
+/* Figma 2:5400 — px 24 / py 64, 라벨 상단 · 화살표 하단(둘 다 좌측 정렬) */
 .card {
   position: relative;
   display: flex;
@@ -92,7 +87,6 @@
   align-items: flex-start;
   justify-content: space-between;
   height: 100%;
-  /* Figma: px-[24px] py-[64px] */
   padding: 64px 24px;
   border-radius: var(--center-card-radius);
   overflow: hidden;
@@ -101,14 +95,22 @@
      + 노이즈 텍스처 오버레이(mix-blend-mode: color-burn).
      텍스처 이미지는 에셋 받으면 ::after 로 얹는다. */
   background: var(--gradient-center-card);
+  transition: color 0.35s ease;
 }
 
-/* 펼친 카드는 실사 배경 + 하단 그라데이션 오버레이 (시안 p3) */
+/**
+ * 펼친 카드 (Figma 2:1954)
+ * 배경은 실사 사진 + 좌측 워시 그라데이션이고, 카피는 **다크 텍스트**다.
+ * (기존 구현은 흰 글씨 + 유리 패널이었는데 시안과 정반대였다.)
+ * 사진 에셋이 없어 아래 2번째 레이어를 자리표로 둔다 — 받으면 이 줄만 교체.
+ */
 .itemExpanded .card {
   justify-content: flex-end;
+  padding: 64px 32px;
+  color: var(--gray-900);
   background:
-    linear-gradient(180deg, rgba(10, 32, 72, 0) 35%, rgba(10, 32, 72, 0.72) 100%),
-    var(--gradient-center-card);
+    linear-gradient(90deg, rgba(207, 233, 255, 0.6) 0%, rgba(232, 243, 255, 0) 41.391%),
+    linear-gradient(135deg, var(--primary-50) 0%, var(--primary-200) 60%, var(--primary-300) 100%);
 }
 
 /* 활성 카드만 링크로 바로 이동한다(다른 카드는 1탭이 '펼치기')는 걸
@@ -117,20 +119,15 @@
   cursor: pointer;
 }
 
-/* 축소/기본 상태 라벨 — pc/headline/headline 2 (Bold 32 / 1.25 / -3%).
-   --fs-32 의 clamp min(24)이 mo/headline 2 실값이라 모바일 오버라이드가 필요 없다. */
+/* 기본 카드 라벨 — pc/headline/headline 2 (Bold 32 / 1.25 / -3%).
+   시안은 **가로쓰기**다. 축소 64px 세로쓰기는 모바일 스와이퍼에만 남는다. */
 .shortLabel {
+  width: 100%;
   font-size: var(--fs-32);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-default);
-  white-space: nowrap;
   transition: opacity 0.3s ease;
-}
-
-/* 카드가 64px 로 좁아지면 가로쓰기가 불가능하다 → 세로쓰기 */
-.item:not(.itemExpanded) .shortLabel {
-  writing-mode: vertical-rl;
 }
 
 .itemExpanded .shortLabel {
@@ -139,17 +136,12 @@
   pointer-events: none;
 }
 
-/* 펼친 카드 내부 — 유리 패널.
-   Figma: backdrop-blur 10 / padding 32·64 */
+/* 펼친 카드 내부 (Figma 2:1955) — px 32 / pb 64 / gap 8, 하단 정렬 */
 .expanded {
   display: flex;
   flex-direction: column;
   gap: var(--gap-xs);
   width: 100%;
-  padding: 32px 64px;
-  border-radius: var(--radius-md);
-  background: var(--whitebg-10);
-  backdrop-filter: blur(10px);
   opacity: 0;
   transform: translateY(12px);
   transition:
@@ -170,14 +162,21 @@
   font-size: var(--fs-eng-24);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-eng);
-  color: var(--primary-300);
+  color: var(--primary-500);
 }
 
-/* pc/title/title 1 (Bold 42 / 1.5 / -3%) */
+/* Figma 2:1957 — 제목/본문 묶음 gap 16 */
+.nameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+/* pc/headline/headline 1 (Bold 42 / 1.25 / -3%) */
 .name {
   font-size: var(--fs-42);
   font-weight: var(--weight-bold);
-  line-height: var(--leading-normal);
+  line-height: var(--leading-tight);
   letter-spacing: var(--tracking-default);
 }
 
@@ -187,64 +186,108 @@
   font-size: var(--fs-18);
   line-height: var(--leading-normal);
   letter-spacing: var(--tracking-default);
-  color: var(--whitebg-80);
+  color: var(--gray-700);
+  /* 사전의 `\n` 이 없으면 본문이 한 줄로 흘러 우하단 `+` 버튼 뒤로 잘린다 */
+  white-space: pre-line;
 }
 
-/* 그룹 모드 카드는 폭이 328 밖에 안 된다. 본문 18px 을 넣으면 4~5줄로 흘러
+/* 그룹 모드 카드는 폭이 392 밖에 안 된다. 본문 18px 을 넣으면 여러 줄로 흘러
    카드 높이를 넘긴다 → 제목까지만 보여주고 본문은 확정 선택(1120)에서만. */
 .itemGrouped .desc {
   display: none;
 }
 
-/* arrow-detail 48×48 (Figma 2:5403) */
+/* arrow-detail 48×48 (Figma 2:5403) — 원형 배경 없이 선 화살표만 */
 .arrow {
-  position: absolute;
-  right: 24px;
-  bottom: 64px;
-  display: grid;
-  place-items: center;
+  display: block;
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-full);
-  background: var(--whitebg-20);
-  font-size: var(--fs-20);
+  color: var(--color-white);
   transition:
     transform 0.3s ease,
-    background-color 0.3s ease;
+    opacity 0.3s ease;
+}
+
+.arrow svg {
+  width: 100%;
+  height: 100%;
 }
 
 .card:hover .arrow {
   transform: translateX(4px);
-  background: var(--whitebg-30);
 }
 
-/* --- `≡` 그룹 토글 --------------------------------------------------------
-   arrow-detail 과 같은 48×48. 트랙 우측 끝 카드의 빈 상단에 얹는다. */
-.groupToggle {
+/* 펼친 카드는 화살표 대신 `+` 를 쓴다.
+   `display:none` 인 이유 — 화살표는 흐름 안 요소(space-between 의 아래쪽)라
+   숨기기만 하면 48px 자리가 남아 카피의 pb 64 가 어긋난다. */
+.itemExpanded .arrow {
+  display: none;
+}
+
+/* Figma 2:1984 — 96×96, bg rgba(0,114,236,.6) + border primary/500 + blur 3.
+   시안 좌표(1179,571)를 확장 카드 기준으로 환산하면 우 197 / 하 53 이다. */
+.plus {
   position: absolute;
-  top: 24px;
-  right: calc(var(--content-side-pad) + 8px);
-  z-index: 1;
+  right: 12.3125rem;
+  bottom: 3.3125rem;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 6rem;
+  height: 6rem;
   border-radius: var(--radius-full);
-  background: var(--whitebg-30);
-  backdrop-filter: blur(10px);
-  transition: background-color 0.3s ease;
+  border: 1px solid var(--primary-500);
+  background: rgba(0, 114, 236, 0.6);
+  backdrop-filter: blur(3px);
+  color: var(--color-white);
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 0.35s ease 0.12s,
+    transform 0.35s ease 0.12s;
+  pointer-events: none;
+}
+
+.plus svg {
+  width: 3rem;
+  height: 3rem;
+}
+
+.itemExpanded .plus {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 그룹 모드(392)에서는 `+` 가 카피를 덮는다 */
+.itemGrouped .plus {
+  display: none;
+}
+
+/* --- `≡` 그룹 토글 (Figma 2:1961) -----------------------------------------
+   트랙의 마지막 칸. 64×600, radius 16, 카드와 같은 그라데이션. */
+.groupToggleItem {
+  flex: 0 0 var(--center-card-collapsed);
+}
+
+.groupToggle {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
+  background: var(--gradient-center-card);
+  transition: filter 0.3s ease;
 }
 
 .groupToggle:hover,
 .groupToggle[aria-pressed="true"] {
-  background: var(--whitebg-50);
+  filter: brightness(1.08);
 }
 
 .groupToggleIcon {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  width: 20px;
+  gap: 6px;
+  width: 28px;
 }
 
 .groupToggleIcon > span {
@@ -259,81 +302,83 @@
   width: 60%;
 }
 
-/* --- 하단 컨트롤 (기획안 목업: 프로그레스 6칸 + 좌우 원형 화살표) ----------- */
+/* --- 하단 컨트롤 (Figma 2:1966) --------------------------------------------
+   기획안의 프로그레스 6칸이 아니라 **도트**다. 그룹 전체가 가운데 정렬. */
 .controls {
   display: flex;
   align-items: center;
-  gap: var(--gap-md);
-  width: 100%;
-  max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
-  margin: var(--gap-lg) auto 0;
-  padding-inline: var(--content-side-pad);
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 2rem;
 }
 
 .navButton {
   display: grid;
   place-items: center;
   flex: none;
-  width: 3rem;
-  height: 3rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: var(--radius-full);
-  background: var(--color-white);
-  box-shadow: var(--shadow-pill);
-  font-size: var(--fs-20);
-  color: var(--brand-navy);
+  background: var(--primary-100);
+  color: var(--primary-500);
   transition:
-    transform 0.25s ease,
-    background-color 0.25s ease;
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
+.navButton svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* 시안 2:1967 의 ‹ 는 보라→파랑 그라데이션 상태로 그려져 있다(= hover 컷).
+   기본은 2:1981 의 primary/100 로 두고 hover 에서 그라데이션으로 바꾼다. */
 .navButton:hover {
-  transform: translateY(-2px);
-  background: var(--primary-50);
+  background: linear-gradient(115deg, var(--primary-sub-500) 0%, var(--primary-500) 100%);
+  color: var(--color-white);
 }
 
-.progress {
+.dots {
   display: flex;
+  align-items: center;
   gap: var(--gap-xs);
-  flex: 1 1 auto;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.progressCell {
-  flex: 1 1 0;
-}
-
-.progressBar {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 4px;
+/* Figma 2:1971 — 20×20 히트영역 안에 6px 도트 */
+.dot {
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid transparent;
   border-radius: var(--radius-full);
-  background: var(--gray-300);
-  overflow: hidden;
+  transition: border-color 0.3s ease;
 }
 
-/* 활성 칸만 좌→우로 채워진다 */
-.progressBar::after {
+.dot::after {
   content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--primary-500);
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 0.45s cubic-bezier(0.33, 1, 0.68, 1);
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--gray-500);
+  transition: background-color 0.3s ease;
 }
 
-.progressBarActive::after {
-  transform: scaleX(1);
+.dotActive {
+  border-color: var(--primary-500);
+}
+
+.dotActive::after {
+  background: var(--primary-500);
 }
 
 /* --- 태블릿 (1024 이하) — 3열 그리드 ---------------------------------------
-   클릭 아코디언이라 터치에서도 동작은 하지만, 이 폭에서는 축소 카드가 31px 로
-   계산돼 세로쓰기 라벨(32px)조차 들어가지 않는다. 폭이 원인이므로 여기서만
-   그리드로 바꾼다. 그리드에는 '활성 인덱스'가 없으므로 컨트롤도 감춘다. */
+   클릭 아코디언이라 터치에서도 동작은 하지만, 이 폭에서는 창 3장 구성이
+   1120:240 비율을 유지할 수 없다. 폭이 원인이므로 여기서만 그리드로 바꾼다.
+   그리드에는 '활성 인덱스'가 없으므로 컨트롤도 감춘다. */
 @media (max-width: 1024px) {
   .track {
     display: grid;
@@ -344,17 +389,20 @@
 
   .item,
   .itemExpanded,
-  .itemGrouped {
+  .itemGrouped,
+  .itemHidden {
     flex: none;
+    margin-right: 0;
+    overflow: visible;
   }
 
-  .card {
+  .card,
+  .itemExpanded .card {
     aspect-ratio: 240 / 600;
     padding: 32px 20px;
-  }
-
-  .item:not(.itemExpanded) .shortLabel {
-    writing-mode: horizontal-tb;
+    justify-content: space-between;
+    color: var(--color-white);
+    background: var(--gradient-center-card);
   }
 
   .itemExpanded .shortLabel {
@@ -363,24 +411,22 @@
   }
 
   .expanded,
-  .groupToggle,
+  .plus,
   .controls {
     display: none;
   }
 
-  .arrow {
-    right: 20px;
-    bottom: 32px;
+  .itemExpanded .arrow {
+    display: block;
   }
 }
 
 /* --- 모바일 (768 이하) — 센터모드 스와이퍼 (시안 p4_08/09) ----------------
    중앙 카드 240×480(= center Image_mo), 좌우 peek 64×480(= center card_mo).
-   `≡` 토글은 Figma 주석대로 제거(컴포넌트에서 렌더 자체를 하지 않는다). */
+   `≡` 는 Figma 주석대로 제거(컴포넌트에서 렌더 자체를 하지 않는다). */
 @media (max-width: 768px) {
-  .header {
-    margin-bottom: var(--gap-lg);
-    padding-inline: var(--mobile-gutter);
+  .trackWrap {
+    padding-inline: 0;
   }
 
   .track {
@@ -399,9 +445,11 @@
     display: none;
   }
 
-  .item {
+  .item,
+  .itemHidden {
     flex: 0 0 auto;
     width: var(--center-card-collapsed);
+    margin-right: 0;
     scroll-snap-align: center;
     transition: width 0.45s cubic-bezier(0.33, 1, 0.68, 1);
   }
@@ -412,37 +460,52 @@
     width: var(--center-card-default);
   }
 
-  .card {
+  .card,
+  .itemExpanded .card {
     aspect-ratio: auto;
     padding: 32px 20px;
   }
 
+  .itemExpanded .card {
+    justify-content: flex-end;
+    color: var(--gray-900);
+    background:
+      linear-gradient(90deg, rgba(207, 233, 255, 0.6) 0%, rgba(232, 243, 255, 0) 41.391%),
+      linear-gradient(135deg, var(--primary-50) 0%, var(--primary-200) 60%, var(--primary-300) 100%);
+  }
+
+  /* 64px 로 좁아지면 가로쓰기가 불가능하다 → 세로쓰기 */
   .item:not(.itemExpanded) .shortLabel {
     writing-mode: vertical-rl;
   }
 
+  .itemExpanded .shortLabel {
+    position: absolute;
+    opacity: 0;
+  }
+
   .expanded {
     display: flex;
-    padding: 20px;
   }
 
   .desc {
     display: none;
   }
 
-  /* 화살표는 스와이퍼 조작에 필요하므로 다시 노출한다(그리드와 달리 활성 인덱스가 있다) */
-  .controls {
-    display: flex;
-    gap: var(--gap-sm);
-    margin-top: var(--gap-md);
-    padding-inline: var(--mobile-gutter);
-  }
-
   .arrow {
     width: 40px;
     height: 40px;
-    right: 20px;
-    bottom: 32px;
+  }
+
+  .itemExpanded .arrow {
+    display: none;
+  }
+
+  /* 화살표·도트는 스와이퍼 조작에 필요하므로 다시 노출한다 */
+  .controls {
+    display: flex;
+    margin-top: var(--gap-md);
+    padding-inline: var(--mobile-gutter);
   }
 }
 
@@ -450,10 +513,13 @@
    (모든 상태가 CSS 최종값이라 early-return 으로 사라질 콘텐츠가 없다) */
 @media (prefers-reduced-motion: reduce) {
   .item,
+  .card,
   .expanded,
   .shortLabel,
   .arrow,
-  .progressBar::after,
+  .plus,
+  .dot,
+  .dot::after,
   .navButton,
   .groupToggle {
     transition: none;

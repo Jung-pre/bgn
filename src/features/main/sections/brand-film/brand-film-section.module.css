@@ -5,12 +5,38 @@
   aspect-ratio: 16 / 9;
   min-height: 100vh;
   overflow: hidden;
-  background: var(--primary-900);
+  /* 영상이 붙기 전에도 프레임이 웜톤으로 읽히도록. 시안 2:994 는 석양 컷이고
+     이 섹션은 사이트에서 유일한 웜톤 블록이다(다른 섹션은 전부 블루/라벤더). */
+  background: #1a2246; /* 2:994 상단 하늘 최농도 */
 }
 
 .video {
   position: absolute;
   inset: 0;
+}
+
+/**
+ * 영상 에셋 도착 전 자리표.
+ *
+ * 공용 `VideoSlot` 의 기본 placeholder 는 블루-라벤더(사이트 기본 톤)라
+ * 이 섹션에 쓰면 시안과 정반대 색이 된다. 공용 컴포넌트를 건드리지 않고
+ * 이 섹션 안에서만 석양 그라데이션으로 덮는다. 색은 2:994 프레임에서 직접 뽑았다:
+ *   상단 하늘 #4a5b96 → 중단 #d9a074 → 지평선 #f6c98a → 하단 강물 #3d4a7a
+ * 영상이 오면 이 블록은 렌더되지 않으므로 자연히 사라진다.
+ */
+.video [data-video-placeholder] {
+  background:
+    radial-gradient(46% 26% at 50% 62%, rgba(255, 214, 150, 0.85) 0%, transparent 70%),
+    linear-gradient(
+      180deg,
+      #2c3768 0%,
+      #4a5b96 26%,
+      #a97f86 48%,
+      #e8ab77 60%,
+      #d99a74 68%,
+      #6a6f96 80%,
+      #3d4a7a 100%
+    );
 }
 
 @media (max-width: 768px) {

@@ -142,6 +142,14 @@ export interface EventItemMessages {
 }
 
 export interface EventSectionMessages extends SectionHeaderMessages {
+  /**
+   * 시안 `2:2846` 의 본문은 두 굵기가 섞여 있다 —
+   * "BGN의 특별한 혜택"만 SemiBold, 나머지는 Regular.
+   * 문자열을 쪼개 두면 번역마다 굵기 구간이 달라져도 사전만 고치면 되므로,
+   * `description` 안에 그대로 등장하는 **부분 문자열**을 여기에 둔다.
+   * (컴포넌트는 `description.split(descriptionStrong)` 으로 감싸면 된다.)
+   */
+  descriptionStrong: string;
   cta: string;
   events: EventItemMessages[];
 }
@@ -223,33 +231,66 @@ const ko: Dictionary = {
   medicalTeamSection: {
     eyebrow: "BGN Medical Team",
     title: "BGN 의료진",
+    // 시안 2:1009 — "풍부한 수술 경험과 전문성"만 SemiBold, 나머지 Regular.
+    description: "풍부한 수술 경험과 전문성을 바탕으로 더 나은 결과를 고민합니다.",
     cta: "의료진소개 보러가기",
-    // 시안 도트 인디케이터가 8개 → 의료진 8인
+    // 시안 도트 인디케이터가 8개 → 의료진 8인.
+    //
+    // 배열 순서는 **시안 초기 상태를 그대로 재현하도록** 맞췄다.
+    // 캐러셀은 activeIndex 0 에서 시작해 0번을 가운데 두고 좌우로 순환 배치하므로
+    // (use-cross-carousel.ts `signedOffset`), 시안 2:1016 의
+    // 김소현 · 이수민 · [박세광] · 김정완 · 한정엽 배열을 맞추려면
+    // 박세광이 0, 왼쪽 두 명이 배열 끝(6·7)으로 가야 한다.
+    // 카드 지그재그 레인(index 홀짝)도 이 순서일 때만 시안과 일치한다.
+    //
+    // 시안에 이름이 적힌 의료진은 5명뿐이다(나머지 카드는 같은 얼굴의 자리표시용
+    // 복제였다). 3·4·5번은 원본을 받기 전까지 빈 문자열로 둔다.
     doctors: [
-      { name: "박세광", title: "대표원장" },
+      { name: "박세광", title: "대표원장" }, // 2:1041 (활성 카드)
+      { name: "김정완", title: "원장" }, // 2:1047
+      { name: "한정엽", title: "원장" }, // 2:1054
       { name: "", title: "" },
       { name: "", title: "" },
       { name: "", title: "" },
-      { name: "", title: "" },
-      { name: "", title: "" },
-      { name: "", title: "" },
-      { name: "", title: "" },
+      { name: "김소현", title: "원장" }, // 2:1028
+      { name: "이수민", title: "원장" }, // 2:1035
     ],
   },
 
   aiSystemSection: {
     eyebrow: "AI Precision System",
     title: "BGN AI 정밀 검사 시스템",
+    // 시안 2:1106 — 헤드라인 뒤쪽 "정밀 검사 시스템"만 primary/700 로 강조된다.
+    titleMarker: "정밀 검사 시스템",
+    // 시안 2:1107 — 2행. 앞줄 "16년간 축적된 안과 데이터"가 SemiBold.
+    description:
+      "16년간 축적된 안과 데이터를 기반으로\n환자에게 가장 적합한 시력교정 솔루션을 제안합니다",
+    // 카드 본문은 각 카드의 본문 노드에서 그대로 옮겼다(2:1113 / 2:1128 / 2:1143 / 2:1155).
     steps: [
-      { step: "1", title: "데이터 수집", description: "", dataLabel: "OPTICAL MAPPING" },
+      {
+        step: "1",
+        title: "데이터 수집",
+        description: "안구를 정밀 스캔하여\n다양한 정보를 수집합니다",
+        dataLabel: "OPTICAL MAPPING",
+      },
       {
         step: "2",
         title: "AI 빅데이터 분석",
-        description: "",
+        description: "76만 건 이상의 임상 데이터를\nAI가 분석하고 학습합니다",
         dataLabel: "760,000+ CLINICAL CASES",
       },
-      { step: "3", title: "AI 시뮬레이션", description: "", dataLabel: "ACCURACY 99.2%" },
-      { step: "4", title: "맞춤형 제안", description: "", dataLabel: "SMILE PRO / ICL / LASIK" },
+      {
+        step: "3",
+        title: "AI 시뮬레이션",
+        description: "개인별 눈 상태를 분석하여\n수술 결과를 가상으로 예측합니다",
+        dataLabel: "ACCURACY 99.2%",
+      },
+      {
+        step: "4",
+        title: "맞춤형 제안",
+        description: "AI 분석 결과를 기반으로\n최적의 시력교정 솔루션을 제안합니다",
+        dataLabel: "SMILE PRO / ICL / LASIK",
+      },
     ],
     marquee: "AI Precision System",
   },
@@ -258,8 +299,10 @@ const ko: Dictionary = {
     eyebrow: "AI Consultation",
     title: "BGN AI 정밀 검사 상담 신청",
     titleMarker: "상담 신청",
+    // 시안 2:1218 — 2행. 앞줄 "25년 안과 노하우를 결합"이 SemiBold.
+    // `.desc` 가 white-space: pre-line 이라 개행이 그대로 살아난다.
     description:
-      "25년 안과 노하우와 AI 시스템으로 가장 안전하고 정확한 시력교정을 제안해 드립니다.",
+      "25년 안과 노하우를 결합한 AI 시스템으로\n가장 안전하고 정확한 눈 건강 솔루션을 제안합니다",
     namePlaceholder: "이름을 입력해주세요",
     phonePlaceholder: "연락처를 입력해주세요",
     agreement: "개인정보 처리방침 동의",
@@ -279,47 +322,63 @@ const ko: Dictionary = {
     title: "진료 센터",
     // ⚠️ 시안에서 명칭 표기가 섞여 있었다(스마일센터 / 스마일라식센터).
     //    개발 전 용어 통일 필요 — 일단 GNB 메뉴 표기를 기준으로 맞춰 둔다.
+    //
+    // description 은 센터 카드 컴포넌트 세트 `2:5292` 의 각 variant 본문을 그대로 옮겼다.
+    // 시안은 3행이지만 `.desc` 에 white-space 지정이 없어 현재는 한 줄로 흐른다
+    // (개행 의도를 잃지 않도록 `\n` 은 남겨 둔다).
     centers: [
       {
         shortName: "스마일센터",
         name: "스마일라식센터",
         nameEn: "Smart Lasik Center",
-        description: "",
+        // 2:5298 — 시안 본문은 제목과 달리 "스마트라식센터"로 적혀 있다(시안 원문 유지).
+        description:
+          "정밀한 검사와 첨단 장비를 바탕으로\n눈 상태에 맞는 안전한 시력교정을\n제공하는 스마트라식센터",
         href: "/center/smile",
       },
       {
         shortName: "시력교정센터",
         name: "시력교정센터",
         nameEn: "Vision Correction Center",
-        description: "",
+        // 2:5304
+        description:
+          "최첨단 장비와 노하우로 안전하게!\n눈 건강을 최우선으로 생각하는\n밝은눈안과 시력교정센터",
         href: "/center/vision-correction",
       },
       {
         shortName: "백내장센터",
         name: "백내장센터",
         nameEn: "Cataract Center",
-        description: "",
+        // 2:5310
+        description:
+          "정밀한 진단과 체계적인 수술 시스템으로\n개인의 눈 상태에 맞는 맞춤형 백내장 치료를\n제공하는 백내장센터",
         href: "/center/cataract",
       },
       {
         shortName: "드림렌즈센터",
         name: "드림렌즈센터",
         nameEn: "Dream Lens Center",
-        description: "",
+        // 2:5316
+        description:
+          "자는 동안 시작되는 근시 관리\n성장기 아이의 눈 상태를 꼼꼼히 확인하고\n근시 진행을 고려한 드림렌즈를 처방합니다.",
         href: "/center/dream-lens",
       },
       {
         shortName: "건성안센터",
         name: "건성안센터",
         nameEn: "Dry Eye Center",
-        description: "",
+        // 2:5322
+        description:
+          "정밀한 눈물막·안구표면 검사부터\n개인의 건조증 원인에 맞춘 체계적인 치료를\n제공하는 건성안센터",
         href: "/center/dry-eye",
       },
       {
         shortName: "안종합검진센터",
         name: "안종합검진센터",
         nameEn: "Comprehensive Eye Examination Center",
-        description: "",
+        // 2:5328
+        description:
+          "정밀한 안과 검진과 체계적인 검사 시스템으로\n눈 건강 상태를 꼼꼼하게 확인하고\n질환을 조기에 발견하는 안종합검진센터",
         href: "/center/examination",
       },
     ],
@@ -401,7 +460,9 @@ const ko: Dictionary = {
   eventSection: {
     eyebrow: "BGN EVENT",
     title: "BGN밝은눈안과 EVENT",
+    // 시안 2:2846 — 2행, 둘째 줄 앞부분만 SemiBold.
     description: "더 밝은 세상을 향한\nBGN의 특별한 혜택을 만나보세요",
+    descriptionStrong: "BGN의 특별한 혜택",
     cta: "이벤트 보러가기",
     events: [
       {
@@ -444,17 +505,23 @@ const ko: Dictionary = {
       { label: "개인정보처리방침", href: "/policy/privacy", strong: true },
       { label: "이용약관", href: "/policy/terms" },
       { label: "환자권리장전", href: "/policy/patient-rights" },
-      { label: "비급여자료고지", href: "/policy/non-covered" },
+      // 시안 2:2949 는 "비급여재료비"다(이전 표기 "비급여자료고지"는 시안에 없다).
+      { label: "비급여재료비", href: "/policy/non-covered" },
     ],
     business: [
-      { label: "상호명", value: "밝은눈안과의원" },
-      { label: "대표자", value: "박세경" },
+      // ⚠️ 상호명 — 시안 2:2953 은 "밝은눈안과병원", 기획안(09-brief.md)은 "의원"으로 정정 지시.
+      //    법적 표기라 임의로 못 정한다. 시안 기준으로 두되 **디자이너/법무 확인 필요**.
+      { label: "상호명", value: "밝은눈안과병원" },
+      // 시안 2:2956 — 대표자는 "박세광"(히스토리 인용문 발화자와도 일치).
+      { label: "대표자", value: "박세광" },
       { label: "사업자 등록번호", value: "110-99-05290" },
       { label: "주소", value: "서울특별시 송파구 올림픽로 300 롯데월드타워 11층" },
       { label: "대표번호", value: "1600-5770" },
+      // 시안에는 없는 항목이다(기획안 추가분). 시안 반영 시 지우지 말 것.
       { label: "개인정보보호책임자", value: "허서윤" },
     ],
-    copyright: "Copyright © BGN Eye Clinic. All rights reserved.",
+    // 시안 2:2995 는 "EyeClinic"(붙여 씀)이다.
+    copyright: "Copyright © BGN EyeClinic. All rights reserved.",
   },
 };
 

@@ -2,18 +2,31 @@
    의료진 교차 스와이퍼
 
    Figma 주석 2:1016 : "8명 의료진 배치, 스와이퍼 교차하며 카드 이동"
-   Figma 실측 2:3143 : 840×200 안에 카드 140×200, x간격 100 → 40px 겹침(부채꼴)
+   Figma 프레임 2:995 (1920×969) 실측 — 플랫 이미지라 육안 계측이다:
+     · 카드 320 × 400 (= 4:5), radius 16, 카드 간 gap 32 → 이동 step 352
+     · 카드는 **겹치지 않는다.** 홀/짝으로 y 가 42px 엇갈린 지그재그 한 줄이다
+     · 활성 카드는 확대·회전 없이 **파랑→보라 그라데이션 링(2px)** 으로만 구분된다
+     · 좌우 끝 카드는 잘려 나간다(뷰포트 밖) — 페이드가 아니라 클리핑이다
 
-   겹침을 px 로 박지 않고 **비율**로 둔다.
-     --card-step = --card-w × 100/140   (= 카드 폭의 71.4%, 겹침 28.6%)
-   카드 폭이 뷰포트에 따라 바뀌어도 시안의 겹침 비율이 유지된다.
+   ⚠️ 이전 구현은 부채꼴로 겹쳐 쌓은 코버플로우(rotate + scale + opacity 페이드)였다.
+   시안에는 회전도, 축소도, 투명도 감쇠도, 겹침도 없다. 전부 걷어냈다.
    ========================================================================== */
 
+/* 시안 배경은 좌측 연분홍-라벤더 → 우측 하늘색으로 흐르고 우하단에 빛 스월이 있다.
+   스월은 이미지 에셋이라 재현하지 않고, 그라데이션 두 겹으로 톤만 맞춘다.
+   분홍/하늘 두 값은 토큰이 없어 2:995 에서 직접 뽑았다. */
 .section {
   position: relative;
   padding-block: var(--gap-section);
   overflow: hidden;
-  background: linear-gradient(120deg, var(--bg-lavender) 0%, var(--primary-50) 100%);
+  background:
+    radial-gradient(90% 130% at 100% 65%, rgba(150, 200, 245, 0.5) 0%, transparent 62%),
+    linear-gradient(
+      100deg,
+      #f6ecf4 0%,
+      /* 2:995 좌상단 */ var(--bg-lavender) 45%,
+      #dcebfb 100% /* 2:995 우측 */
+    );
 }
 
 .header {
@@ -23,8 +36,23 @@
   gap: var(--gap-lg);
   width: 100%;
   max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
-  margin: 0 auto var(--gap-xl);
+  /* 2:995 — 타이틀 하단 215 → 카드 상단 330 */
+  margin: 0 auto 7rem;
   padding-inline: var(--content-side-pad);
+}
+
+/* 시안 타이틀은 "BGN" + 파란 사각 테두리로 감싼 "의료진" 두 덩어리다.
+   형광 마커(.marker, 배경 채움)와 다른 표현이라 전역 클래스를 쓰지 않는다. */
+.titleBox {
+  display: inline-block;
+  margin-left: 0.12em;
+  padding: 0.02em 0.14em;
+  border: 2px solid var(--primary-500);
+}
+
+/* 시안 2:995 — 타이틀 바로 아래 한 줄 설명. 공용 `.section-desc` 위에 여백만 얹는다 */
+.desc {
+  margin-top: 1.5rem;
 }
 
 .cta {
@@ -46,13 +74,13 @@
 }
 
 .viewport {
-  /* 카드 기하 — 시안 2:3143 비율 */
-  --card-w: 20rem;
-  --card-step: calc(var(--card-w) * 100 / 140);
-  /* 홀/짝 레인의 y 진폭. 이게 "교차"의 실제 크기다. */
-  --lane-y: 1.75rem;
-  /* 활성 카드만 살짝 떠오른다 */
-  --active-lift: 1.25rem;
+  /* 카드 기하 — 전부 2:995 실측 비율이다. 320/1920 = 16.667vw */
+  --card-w: clamp(160px, 16.667vw, 320px);
+  --card-h: calc(var(--card-w) * 400 / 320);
+  /* 카드 폭 + gap 32 */
+  --card-step: calc(var(--card-w) * 352 / 320);
+  /* 홀/짝 레인 간격 42px. 이게 "교차"의 실제 크기다. */
+  --lane-y: calc(var(--card-w) * 42 / 320);
 }
 
 /**
@@ -66,7 +94,7 @@
  */
 .stage {
   position: relative;
-  height: calc(var(--card-w) * 200 / 140 + 4.5rem);
+  height: calc(var(--card-h) + var(--lane-y));
   touch-action: pan-y;
   cursor: grab;
   user-select: none;
@@ -88,12 +116,9 @@
 }
 
 /**
- * 카드 배치는 전부 CSS 변수로 들어온다(`crossLayout()` in use-cross-carousel.ts).
- *   --offset  덱 중심 기준 몇 칸       → x
- *   --lane    홀/짝 레인 × 거리 계수   → y (교차)
- *   --lift    활성만 1                 → y (부양)
- *   --tilt    부채꼴 각도(deg)
- *   --scale / --opacity                → 깊이감
+ * 카드 배치는 CSS 변수 두 개로 들어온다(`crossLayout()` in use-cross-carousel.ts).
+ *   --offset  덱 중심 기준 몇 칸  → x
+ *   --lane    0(위) / 1(아래)     → y (교차)
  * 값이 바뀌는 시점은 활성 인덱스가 바뀔 때뿐이라 transition 이 그대로 모션이 된다.
  */
 .card {
@@ -103,11 +128,10 @@
   width: var(--card-w);
   margin-left: calc(var(--card-w) / -2);
   transform: translate3d(
-      calc(var(--offset, 0) * var(--card-step)),
-      calc(var(--lane, 0) * var(--lane-y) - var(--lift, 0) * var(--active-lift)),
-      0
-    )
-    rotate(calc(var(--tilt, 0) * 1deg)) scale(var(--scale, 1));
+    calc(var(--offset, 0) * var(--card-step)),
+    calc(var(--lane, 0) * var(--lane-y)),
+    0
+  );
   opacity: var(--opacity, 1);
   transition:
     transform 0.62s cubic-bezier(0.33, 1, 0.68, 1),
@@ -115,95 +139,162 @@
   will-change: transform;
 }
 
-/* 투명해진 카드(루프 이음매)는 클릭도 받지 않는다 */
+/* 화면 밖으로 접힌 카드(루프 이음매)는 클릭도 받지 않는다 */
 .card[aria-hidden] {
   pointer-events: none;
 }
 
 .cardButton {
-  display: flex;
-  flex-direction: column;
+  display: block;
   width: 100%;
-  text-align: left;
 }
 
+/* 카드 본체 = 인물 사진. 사진 에셋이 아직 없어 그라데이션으로 자리를 잡는다. */
 .portrait {
+  position: relative;
+  display: block;
   width: 100%;
-  /* 시안 2:3143 카드 비율 140 × 200 */
-  aspect-ratio: 140 / 200;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--primary-100) 0%, var(--primary-200) 100%);
+  height: var(--card-h);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8f9fc 0%, #e9eef6 58%, #dde5f0 100%); /* 2:995 카드 */
   box-shadow: var(--shadow-card);
   transition: box-shadow 0.45s ease;
 }
 
+/* 활성 카드는 파랑→보라 링 2px 하나로만 구분된다(시안에 확대·상승 없음).
+   테두리에 그라데이션을 쓰려면 border 로는 안 되므로 mask 로 링만 남긴다. */
+.cardActive .portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--gradient-cta);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
 .cardActive .portrait {
-  box-shadow: 0 24px 60px rgba(10, 32, 72, 0.22);
+  box-shadow: 0 20px 48px rgba(10, 32, 72, 0.18);
+}
+
+/* 이름은 카드 밖이 아니라 사진 하단에 얹힌다(시안). 밝은 사진 위 검정 글씨라
+   가독성 확보용 스크림을 아래쪽에만 깐다. */
+.caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 3.5rem 1rem 1.75rem;
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.72) 62%);
+  text-align: center;
 }
 
 .name {
-  display: block;
-  margin-top: var(--gap-sm);
   font-size: var(--fs-24);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-default);
-  color: var(--color-text-primary);
+  color: var(--color-text-strong);
 }
 
+/* 시안은 "김소현 원장" 이 한 줄이다 — 직함이 이름 뒤에 이어 붙는다. */
 .role {
-  display: block;
+  margin-left: 0.35em;
   font-size: var(--fs-18);
   font-weight: var(--weight-regular);
-  color: var(--color-text-muted);
+  color: var(--color-text-strong);
 }
 
+/* 2:995 — 카드 하단 772 → 컨트롤 중심 820 */
 .controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--gap-md);
-  margin-top: var(--gap-xl);
+  gap: 2.5rem;
+  margin-top: 3rem;
 }
 
+/* 시안 화살표는 40px 원 + 셰브론이다. 시안 이미지에서 좌측만 파랑으로 칠해져
+   있는데 두 방향 다 항상 유효한 버튼이라 "hover 상태를 그려둔 것"으로 읽었다.
+   기본은 흰 원, hover/focus 에서 파랑으로 채운다. */
 .arrow {
   display: grid;
   place-items: center;
-  width: 3rem;
-  height: 3rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: var(--radius-full);
   background: var(--color-white);
   box-shadow: var(--shadow-pill);
-  font-size: var(--fs-20);
-  color: var(--brand-navy);
-  transition: transform 0.25s ease;
+  color: var(--primary-500);
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
-.arrow:hover {
-  transform: translateY(-2px);
+.arrow:hover,
+.arrow:focus-visible {
+  background: var(--primary-500);
+  color: var(--color-white);
 }
 
+.arrow svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* 도트 피치 28px(= 14 + gap 14). 활성 도트가 커져도 나머지가 밀리지 않게
+   li 폭을 활성 크기로 고정한다. */
 .dots {
   display: flex;
-  gap: var(--gap-xs);
+  align-items: center;
+  gap: 0.875rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.dots > li {
+  display: grid;
+  place-items: center;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
 .dot {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: var(--radius-full);
   background: var(--gray-300);
   transition:
     width 0.3s ease,
+    height 0.3s ease,
     background-color 0.3s ease;
 }
 
+/* 시안 활성 도트는 넓은 알약이 아니라 **도넛**(링 + 가운데 점)이다. */
 .dotActive {
-  width: 1.75rem;
-  background: var(--brand-primary);
+  position: relative;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1.5px solid var(--primary-500);
+  background: transparent;
+}
+
+.dotActive::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: var(--radius-full);
+  background: var(--primary-500);
 }
 
 @media (max-width: 1440px) {
@@ -216,20 +307,29 @@
   .header {
     flex-direction: column;
     align-items: flex-start;
+    margin-bottom: var(--gap-xl);
     padding-inline: var(--mobile-gutter);
   }
 
-  /* 375 폭에서 카드 3장이 겹쳐 들어오도록 축소. 겹침 비율(--card-step)은 그대로. */
+  /* 375 폭에서 활성 카드 + 좌우 이웃 일부가 보이도록. 비율(--card-step/--lane-y)은 그대로. */
   .viewport {
-    --card-w: 13rem;
-    --lane-y: 1rem;
-    --active-lift: 0.75rem;
+    --card-w: 60vw;
+  }
+
+  /* 1024 이하는 rem 이 16px 로 고정된다 — 데스크톱 간격(40+14px)을 그대로 두면
+     화살표 2개 + 도트 8개가 375 폭을 꽉 채워 양 끝에 붙는다. */
+  .controls {
+    gap: var(--gap-md);
+    margin-top: var(--gap-lg);
+  }
+
+  .dots {
+    gap: 0.5rem;
   }
 }
 
 /* 전역 reduce 규칙이 transition 을 끈다. 여기서는 최종 상태만 남으므로
-   카드가 사라지거나 겹쳐 보이는 문제는 없다(레이아웃이 transform 이 아닌
-   left/width 가 아니라 항상 계산된 최종값이다). */
+   카드가 사라지거나 겹쳐 보이는 문제는 없다(배치가 항상 계산된 최종값이다). */
 @media (prefers-reduced-motion: reduce) {
   .stage,
   .card,

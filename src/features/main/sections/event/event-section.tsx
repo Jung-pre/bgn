@@ -7,17 +7,23 @@ import { useOneStepCarousel } from "./use-one-step-carousel";
 import styles from "./event-section.module.css";
 
 /**
- * BGN EVENT — 시안 p1_21 / p4_19~20.
+ * BGN EVENT — 시안 `2:2832` (PC) / p4_19~20.
  *
- * 좌측 25% 텍스트 + 우측 75% 카드 슬라이더. 카드가 우측 화면 밖으로 흘러나간다.
- * 인디케이터가 도트가 아니라 **프로그레스 바**인 게 다른 캐러셀과 다른 점.
+ * 좌측 카피 408 + 간격 128 + 우측 슬라이더(시안 2:2833 실측).
+ * 카드가 우측 화면 밖으로 흘러나간다. 인디케이터가 도트가 아니라
+ * **프로그레스 바**인 게 다른 캐러셀과 다른 점.
  *
  * ## Figma 주석 (2:2852)
  *   `카드 최대 8개, 버튼 클릭시 한개씩`
  *
  * → (1) 최대 8장으로 자르고 (2) 화살표 1클릭 = 카드 1장 이동.
- *   이전 구현은 `scrollBy(clientWidth * 0.5)` 라 화면 폭에 따라 이동량이
- *   1.4~2.1장으로 달라졌다. 이동 단위 계산은 `useOneStepCarousel` 로 뺐다.
+ *   이동 단위 계산은 `useOneStepCarousel` 로 뺐다.
+ *
+ * ## 카드는 이미지 한 장뿐이다
+ * 시안 `2:2854`~`2:2856` 은 480×480 이미지 3장이고 **아래에 제목·부제가 없다**.
+ * 이벤트 배너 안에 이미 카피가 들어 있기 때문이다. 이전 구현은 카드 밑에
+ * 제목/부제를 그려서 시안보다 카드 한 장이 훨씬 길었다.
+ * 링크 접근성은 `.sr-only` 텍스트로 유지한다.
  *
  * ## 카드 크기
  * 시안 480×480 정사각. 데스크톱 root font-size 가 뷰포트 비례
@@ -46,15 +52,33 @@ export function EventSection({ messages }: EventSectionProps) {
     <section ref={sectionRef} className={styles.section} aria-labelledby="event-title">
       <div className={styles.inner}>
         <header className={styles.copy} data-reveal-item>
-          <p className="eyebrow" lang="en">
+          <p className={`eyebrow ${styles.eyebrow}`} lang="en">
             {messages.eyebrow}
           </p>
           <h2 id="event-title" className={styles.title}>
-            {messages.title}
+            {renderAccent(messages.title, ACCENT)}
           </h2>
-          {messages.description ? <p className={styles.desc}>{messages.description}</p> : null}
+          {messages.description ? (
+            <p className={styles.desc}>
+              {renderStrong(messages.description, messages.descriptionStrong)}
+            </p>
+          ) : null}
           <Link href="/event" className={styles.cta}>
-            {messages.cta} <span aria-hidden>→</span>
+            {messages.cta}
+            {/* 시안 2:2849 arrow-detail — 원 안의 화살표 */}
+            <svg
+              className={styles.ctaIcon}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="9.25" />
+              <path d="M9 12h6M12.6 9.2 15.4 12l-2.8 2.8" />
+            </svg>
           </Link>
         </header>
 
@@ -72,8 +96,11 @@ export function EventSection({ messages }: EventSectionProps) {
               <li key={ev.href} className={styles.card}>
                 <Link href={ev.href} className={styles.cardLink} draggable={false}>
                   <div className={styles.thumb} aria-hidden />
-                  <p className={styles.cardTitle}>{ev.title}</p>
-                  {ev.subtitle ? <p className={styles.cardSub}>{ev.subtitle}</p> : null}
+                  {/* 시안 카드에는 텍스트가 없다. 링크 이름만 보조기기에 남긴다 */}
+                  <span className="sr-only">
+                    {ev.title}
+                    {ev.subtitle ? ` — ${ev.subtitle}` : ""}
+                  </span>
                 </Link>
               </li>
             ))}
@@ -92,27 +119,84 @@ export function EventSection({ messages }: EventSectionProps) {
             >
               <span ref={progressRef} className={styles.progressBar} />
             </div>
-            <button
-              type="button"
-              className={styles.arrow}
-              onClick={() => step(-1)}
-              disabled={!canPrev}
-              aria-label="이전 이벤트"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              className={styles.arrow}
-              onClick={() => step(1)}
-              disabled={!canNext}
-              aria-label="다음 이벤트"
-            >
-              →
-            </button>
+            <div className={styles.arrows}>
+              <button
+                type="button"
+                className={styles.arrow}
+                onClick={() => step(-1)}
+                disabled={!canPrev}
+                aria-label="이전 이벤트"
+              >
+                <ChevronIcon direction="left" />
+              </button>
+              <button
+                type="button"
+                className={styles.arrow}
+                onClick={() => step(1)}
+                disabled={!canNext}
+                aria-label="다음 이벤트"
+              >
+                <ChevronIcon direction="right" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+/** 시안 2:2845 — 타이틀 중 이 토큰만 primary/700 + 형광 마커가 걸린다 */
+const ACCENT = "EVENT";
+
+/** 타이틀의 영문 포인트 어절을 시안대로 강조한다 */
+function renderAccent(title: string, accent: string) {
+  if (!title.endsWith(accent)) return title;
+  return (
+    <>
+      {title.slice(0, -accent.length)}
+      <span className={`marker ${styles.titleAccent}`} lang="en">
+        {accent}
+      </span>
+    </>
+  );
+}
+
+/**
+ * 본문 중 한 구간만 굵게 — 시안 `2:2846` 은 "BGN의 특별한 혜택"만 SemiBold 다.
+ *
+ * 문구를 `<strong>` 이 박힌 JSX 로 사전에 넣지 않고 **부분 문자열 매칭**으로 처리한다.
+ * 번역마다 굵기 구간이 달라져도 사전(`descriptionStrong`)만 고치면 되고,
+ * 사전이 순수 문자열로 남아야 번역 도구에 그대로 넘길 수 있기 때문이다.
+ *
+ * 매칭 실패(번역이 아직 안 됐거나 오타)면 조용히 원문 그대로 낸다 — 문구가
+ * 사라지는 것보다 굵기가 빠지는 쪽이 훨씬 낫다.
+ */
+function renderStrong(text: string, strong: string) {
+  if (!strong) return text;
+  const at = text.indexOf(strong);
+  if (at < 0) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <strong className={styles.descStrong}>{strong}</strong>
+      {text.slice(at + strong.length)}
+    </>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d={direction === "left" ? "M14.5 5.5 8 12l6.5 6.5" : "M9.5 5.5 16 12l-6.5 6.5"} />
+    </svg>
   );
 }

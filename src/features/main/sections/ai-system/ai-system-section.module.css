@@ -1,18 +1,79 @@
+/* =============================================================================
+   AI 정밀 검사 시스템 — Figma 2:1088 (1920 × 1007)
+
+   섹션 산술 (전부 Figma 실측):
+     상하 패딩 120  +  헤더 167  +  간격 64  +  카드 520  +  하단 120 ≈ 1007
+     카드 컨테이너 2:1108 = 1760 × 520 → 416 × 4 + 32 × 3
+     마퀴 2:1089 는 카드 **뒤로 겹친다**. 아래로 밀어내면 섹션이 1007 을 넘는다.
+
+   ⚠️ rem 은 뷰포트 비례(1920 → 16px)다. 카드 안 좌표를 px 로 박으면 1440 에서
+      어긋나므로 카드는 aspect-ratio + % 좌표로 잡는다. 우측 정렬 배지는 `left`
+      가 아니라 `right` 로 앵커한다 — 폰트(clamp px)는 rem 처럼 줄지 않아서
+      `left` 로 두면 좁은 화면에서 카드 밖으로 밀려 잘린다.
+   ========================================================================== */
+
 .section {
   position: relative;
   padding-block: var(--gap-section);
-  background: #f4f8fd;
+  /* 2:1088 은 플랫 컬러가 아니다. 위가 흰색, 아래로 갈수록 옅은 블루.
+     하단 톤은 프레임 렌더 실측(근사) — Figma 변수로 관리되지 않는 값. */
+  background: linear-gradient(180deg, var(--color-white) 0%, var(--primary-50) 45%, #e8f0fb 100%);
   overflow: hidden;
 }
 
 .header {
+  position: relative;
+  z-index: var(--z-content);
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
+  gap: 0.5rem; /* 2:1102 → 2:1103 = 8 */
   width: 100%;
   max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
-  margin: 0 auto var(--gap-xl);
+  margin: 0 auto var(--gap-xl); /* 헤더(167) → 카드(y 231) = 64 */
   padding-inline: var(--content-side-pad);
+}
+
+/* 2:1102 는 eng-point **2**(Belleza 24) 다. 공용 `.eyebrow` 는 eng-point 1(32).
+   공용 토큰을 바꾸면 다른 섹션까지 흔들려서 이 섹션에서만 좁힌다.
+   → 공용 `.eyebrow` 사이즈가 섹션마다 다른 건 디자인 시스템 이슈로 보고함. */
+.header :global(.eyebrow) {
+  width: fit-content;
+  font-size: var(--fs-eng-24);
+  /* 2:1102 는 단색이 아니라 `gradiant 2` 그라데이션 텍스트다.
+     변수 실값이 MCP 로 해석되지 않아 globals 의 --gradient-cta 로 근사. */
+  background-image: var(--gradient-cta);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* 2:1103 — "BGN AI"(#171717) + 마커 박스가 gap 8 로 나란히 선다. */
+.header :global(.section-title) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  /* 2:1104 는 #171717(neutral gray/900). 공용 --color-text-strong(#0a2048)이 아니다. */
+  color: var(--gray-900);
+}
+
+/* 2:1105 + 2:1210(Group 2432) — 형광펜 밑줄이 아니라 **옅은 블루 박스 + 좌우 세로 바**.
+   공용 `.marker`(background-size 0.45em 밑줄)와 모양이 다르므로 여기서 따로 잡는다. */
+.titleMark {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  padding-inline: 0.25rem; /* 2:1105 px-4 */
+  border-inline: 2px solid var(--primary-500);
+  background: var(--primary-100);
+  color: var(--primary-700); /* 2:1106 #0c3ca2 */
+  /* 헤드라인 wipe 와 같은 방향으로 자라야 "함께 배치"로 읽힌다 */
+  transform-origin: 0% 50%;
+}
+
+.header :global(.section-desc) {
+  margin-top: 0.5rem; /* 2:1103 → 2:1107 = 16 (gap 8 + 8) */
+  color: var(--gray-700); /* 2:1107 #3d3d3d */
 }
 
 /* 좌→우 wipe 대상.
@@ -22,41 +83,14 @@
   will-change: clip-path;
 }
 
-/* 주석 "함께 꾸밈요소 배치" — 헤드라인과 같은 좌→우 방향으로 자라는 장식 */
-.deco {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  margin-top: var(--gap-xs);
-}
-
-.decoRule {
-  display: block;
-  flex: 1;
-  max-width: 22rem;
-  height: 2px;
-  border-radius: var(--radius-full);
-  background: var(--gradient-cta);
-}
-
-.decoTicks {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.decoTick {
-  display: block;
-  width: 1.5rem;
-  height: 2px;
-  border-radius: var(--radius-full);
-  background: var(--primary-200);
-}
+/* ── 카드 그리드 ────────────────────────────────────────────────────────── */
 
 .grid {
+  position: relative;
+  z-index: var(--z-content);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 2.5rem;
+  gap: 2rem; /* 2:1108 — 416×4 + 32×3 = 1760 */
   width: 100%;
   max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
   margin-inline: auto;
@@ -64,86 +98,151 @@
   list-style: none;
 }
 
+/* 2:1109 — 흰 카드 + 드롭섀도가 아니라 **반투명 유리 카드**다.
+   위 80% 흰색 → 아래 하늘색 32% 그라데이션 + 흰 1px 보더 + blur 6. */
 .card {
+  position: relative;
+  aspect-ratio: 416 / 520;
+  padding: 1.5rem 2rem; /* 24 / 32 */
+  border: 1px solid var(--color-white);
+  border-radius: var(--radius-lg); /* 24 */
+  background: linear-gradient(180deg, var(--whitebg-80) 25%, rgba(131, 205, 255, 0.32) 100%);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-pill); /* 1px 2px 8px rgba(16,106,170,.12) */
+  overflow: hidden;
+}
+
+.cardHead {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: var(--gap-lg);
-  border-radius: var(--radius-lg);
-  background: var(--color-white);
-  box-shadow: var(--shadow-card);
+  gap: 0.25rem; /* 2:1110 gap 4 */
 }
 
+/* 2:1111 — Belleza 32, #0c3ca2 → #0a2048 세로 그라데이션 텍스트 */
 .step {
+  width: fit-content;
   margin: 0;
   font-family: var(--font-display-stack);
-  font-size: var(--fs-32);
-  color: var(--brand-primary);
+  font-size: var(--fs-eng-32);
+  line-height: 1.1;
+  letter-spacing: var(--tracking-eng);
+  background-image: linear-gradient(180deg, var(--primary-700) 0%, var(--primary-900) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
+/* 2:1112 — title 3 (SemiBold 26). Bold 32 가 아니다. */
 .cardTitle {
   margin: 0;
-  font-size: var(--fs-32);
-  font-weight: var(--weight-bold);
-  color: var(--color-text-primary);
+  font-size: var(--fs-26);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-800);
 }
 
+/* 2:1113 — body 1 (18) / #525252 */
 .cardDesc {
-  margin: 0;
-  font-size: var(--fs-20);
-  line-height: var(--leading-relaxed);
-  color: var(--color-text-muted);
-}
-
-.visual {
   position: relative;
-  margin-top: auto;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background:
-    radial-gradient(60% 60% at 50% 45%, rgba(124, 185, 255, 0.28) 0%, transparent 70%),
-    var(--brand-tint);
+  z-index: 1;
+  margin: 0.5rem 0 0;
+  font-size: var(--fs-18);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-600);
+  /* 사전의 `\n` 은 디자이너가 끊은 줄이다. 없으면 공백으로 접힌다 */
+  white-space: pre-line;
 }
 
-.viz {
-  display: block;
-  width: 100%;
-  height: 100%;
+/* ── 카드 비주얼 ────────────────────────────────────────────────────────── */
+
+/*
+  시안의 카드 이미지는 474~508px PNG(홍채 / 큐브 / 안구 와이어프레임)다.
+  **에셋이 저장소에 없어서** 같은 자리·같은 크기의 SVG 추상 도형으로 대체했다.
+  PNG 가 들어오면 `.art` 자리에 <Image /> 를 넣고 SVG 를 지우면 된다.
+*/
+.art {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.artFigure {
+  position: absolute;
   overflow: visible;
 }
 
-/* ── 1. OPTICAL MAPPING ─────────────────────────────────────────────────── */
-
-.vizGrid line {
-  stroke: var(--primary-300);
-  stroke-width: 1;
-  opacity: 0.35;
+.artSvg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
 }
 
-.vizRing {
+/* 카드별 오브젝트 위치·크기 — 2:1088 렌더 실측(카드 폭 대비 %).
+   `width` 는 SVG 박스 기준이라 그 안 도형이 차지하는 비율까지 역산해서 잡았다.
+     1번 홍채   중심 (50%, 79%) · 지름 ≈ 카드폭 102%  → 도형이 박스의 94%
+     2번 큐브   중심 (63%, 68%) · 폭   ≈ 카드폭 67%   → 도형이 박스의 78%
+     3번 안구   중심 (67%, 69%) · 지름 ≈ 카드폭 63%   → 도형이 박스의 74% */
+.artIris {
+  left: 50%;
+  top: 36%;
+  width: 108%;
+  translate: -50% 0;
+}
+
+.artCube {
+  left: 63%;
+  top: 33%;
+  width: 86%;
+  translate: -50% 0;
+}
+
+.artSphere {
+  left: 67%;
+  top: 35%;
+  width: 85%;
+  translate: -50% 0;
+}
+
+.glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    circle,
+    rgba(124, 185, 255, 0.38) 0%,
+    rgba(124, 185, 255, 0.12) 45%,
+    transparent 70%
+  );
+}
+
+.vizLine {
   fill: none;
   stroke: var(--primary-500);
-  stroke-width: 2;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vizLineSoft {
+  fill: none;
+  stroke: var(--primary-300);
+  stroke-width: 1;
   stroke-linecap: round;
 }
 
 .vizCore {
-  fill: var(--primary-500);
+  fill: var(--primary-700);
 }
-
-.vizScanLine {
-  stroke: var(--primary-sub-500);
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-
-.vizScanGlow {
-  fill: var(--primary-300);
-  opacity: 0.28;
-}
-
-/* ── 2. CLINICAL CASES 격자 ─────────────────────────────────────────────── */
 
 .vizDot {
   fill: var(--primary-300);
@@ -153,79 +252,279 @@
   fill: var(--primary-500);
 }
 
-/* ── 3. ACCURACY 게이지 + 추이선 ────────────────────────────────────────── */
-
-.vizGaugeTrack {
-  fill: none;
-  stroke: var(--color-white);
-  stroke-width: 10;
-  stroke-linecap: round;
-  opacity: 0.8;
-}
-
-.vizGaugeValue {
-  fill: none;
+.vizFace {
+  fill: rgba(0, 114, 236, 0.18);
   stroke: var(--primary-500);
-  stroke-width: 10;
-  stroke-linecap: round;
-}
-
-.vizTrend {
-  fill: none;
-  stroke: var(--primary-sub-500);
-  stroke-width: 2.5;
-  stroke-linecap: round;
+  stroke-width: 1.2;
   stroke-linejoin: round;
 }
 
-/* ── 4. 추천 적합도 바 ──────────────────────────────────────────────────── */
-
-.vizBarName,
-.vizBarScore {
-  font-family: var(--font-display-stack);
-  font-size: 13px;
-  letter-spacing: var(--tracking-eng);
+.vizScanLine {
+  stroke: var(--primary-300);
+  stroke-width: 1.4;
+  stroke-linecap: round;
 }
 
-.vizBarName {
-  fill: var(--primary-900);
+.vizScanGlow {
+  fill: var(--primary-300);
+  opacity: 0.18;
 }
 
-.vizBarScore {
-  fill: var(--primary-500);
+/* ── 배지 / 데이터 패널 (2:1118·2:1133·2:1144·2:1176) ───────────────────── */
+
+/*
+  시안의 데이터 라벨은 카드 아래 한 줄 텍스트가 아니라 **이미지 위에 뜬 유리 배지**다.
+  공통 크롬: whitebg-70 + 흰 2px 보더 + radius 8 + blur 3 + 카드와 같은 섀도.
+*/
+.badge {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem; /* 8 / 16 */
+  border: 2px solid var(--color-white);
+  border-radius: var(--radius-sm); /* 8 */
+  background: var(--whitebg-70);
+  backdrop-filter: blur(3px);
+  box-shadow: var(--shadow-pill);
+  white-space: nowrap;
 }
 
-.vizBarTrack {
-  fill: var(--color-white);
-  opacity: 0.85;
+.badgeText {
+  margin: 0;
+  font-size: var(--fs-14);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  color: var(--primary-500); /* 2:1119 / 2:1121 */
 }
 
-.vizBarValue {
-  fill: var(--primary-500);
+/* 2:1123 만 primary-700 */
+.badgeTextDeep {
+  color: var(--primary-700);
 }
 
-.dataLabel {
+.badgeValue {
+  margin: 0;
+  font-size: var(--fs-18);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  color: var(--primary-500);
+}
+
+/* 2:1135 / 2:1145 — Belleza 13, gray-500 */
+.badgeCaption {
   margin: 0;
   font-family: var(--font-display-stack);
-  font-size: var(--fs-16);
-  letter-spacing: var(--tracking-wide);
-  color: var(--brand-primary);
+  font-size: var(--fs-13);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-default);
+  text-transform: uppercase;
+  color: var(--gray-500);
 }
 
-/* 카운트업 중 숫자 폭이 변하면 라벨이 덜컹거린다 → 탭룰러 + 최소 폭 확보 */
+/* 카운트업 중 숫자 폭이 변하면 라벨이 덜컹거린다 → 탭룰러 */
 .dataValue {
   display: inline-block;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
 
-.marquee {
-  margin-top: var(--gap-xl);
+/* 배지 좌표 — 카드(416×520) 대비 % */
+.badgeSph {
+  left: 7.69%;
+  top: 46.35%;
+}
+
+.badgeAxis {
+  right: 6.73%;
+  top: 36.15%;
+}
+
+.badgeOptical {
+  right: 7.93%;
+  top: 85.96%;
+}
+
+.badgeCases {
+  left: 7.69%;
+  top: 75.77%;
+}
+
+.badgeAccuracy {
+  left: 7.69%;
+  top: 66.35%;
+}
+
+.sparkline {
+  display: block;
+  width: 6.375rem; /* 2:1147 = 102 */
+  height: auto;
+  overflow: visible;
+}
+
+.sparkPath {
+  fill: none;
+  stroke: var(--primary-500);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── 4번 카드: 추천 패널 + 레이더 (2:1156) ─────────────────────────────── */
+
+/* 2:1156 — 패널(264×156)과 레이더(165×131)를 한 컬럼으로 묶는다.
+   레이더를 따로 절대배치하면, 폰트는 clamp px 라 안 줄고 박스만 rem 으로 줄어드는
+   좁은 화면에서 패널이 아래로 자라 레이더와 겹친다. */
+.recommendGroup {
+  position: absolute;
+  z-index: 1;
+  left: 18.27%;
+  /* top 이 아니라 bottom 앵커. 패널 글자는 clamp px 라 좁은 화면에서 안 줄어드는데
+     박스만 rem 으로 줄어서, top 으로 잡으면 레이더 라벨이 카드 밖으로 잘린다.
+     시안 기준 그룹 하단 여백 = (520 - 485) / 520 = 6.73% */
+  bottom: 6.73%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem; /* 2:1176 하단(344) → 2:1157 상단(354) */
+  width: 63.46%;
+}
+
+.recommend {
+  margin: 0;
+  padding: 0.25rem 0.5rem; /* 2:1176 — 4 / 8 */
+  border: 2px solid var(--color-white);
+  border-radius: var(--radius-sm);
+  background: var(--whitebg-70);
+  backdrop-filter: blur(3px);
+  box-shadow: 1px 6px 24px rgba(82, 87, 91, 0.1); /* 2:1176 */
+  list-style: none;
+}
+
+.recommendHead {
+  margin: 0;
+  padding: 0.5rem;
+  font-size: var(--fs-14);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-700);
+}
+
+.recommendRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  font-size: var(--fs-14);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-500);
+}
+
+/* 2:1179 — 1순위 행만 primary-100 배경 + primary-700 텍스트 */
+.recommendRowTop {
+  background: var(--primary-100);
+  color: var(--primary-700);
+}
+
+.recommendName {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+/* 2:1181 — 20px 라디오. 선택된 행은 채운 원 + 흰 링, 나머지는 옅은 배경 + 파란 링 */
+.radio {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-full);
+  background: var(--primary-100);
+}
+
+.radioRing {
+  display: grid;
+  place-items: center;
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 1px solid var(--primary-500);
+  border-radius: var(--radius-full);
+}
+
+.radioDot {
+  width: 0.25rem;
+  height: 0.25rem;
+  border-radius: var(--radius-full);
+  background: var(--primary-500);
+}
+
+.recommendRowTop .radio {
+  background: var(--primary-500);
+}
+
+.recommendRowTop .radioRing {
+  border-color: var(--color-white);
+}
+
+.recommendRowTop .radioDot {
+  background: var(--color-white);
+}
+
+/* 2:1157 — 165×131. 라벨까지 SVG 안에 넣어야 좁은 화면에서 같이 줄어든다.
+   좌측 오프셋 40/264 = 15.15% (패널 왼쪽 76 → 레이더 왼쪽 116) */
+.radar {
+  display: block;
+  width: 62.5%;
+  margin-left: 15.15%;
+  overflow: visible;
+}
+
+.radarGrid {
+  fill: none;
+  stroke: var(--primary-200);
+  stroke-width: 0.8;
+}
+
+.radarArea {
+  fill: rgba(0, 114, 236, 0.16);
+  stroke: var(--primary-500);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.radarLabel {
+  font-family: var(--font-pretendard-stack);
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-default);
+  fill: var(--gray-700);
+}
+
+/* ── 마퀴 ───────────────────────────────────────────────────────────────── */
+
+/* 2:1089 — 카드 **뒤**로 지나간다. 아래로 밀면 섹션 높이가 시안(1007)을 넘는다.
+   `.section` 을 앞에 붙여 특이도를 올린다 — Marquee 컴포넌트의 `.root{position:relative}`
+   와 클래스 하나 대 하나라 순서에 따라 지는 경우가 있다. */
+.section .marquee {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 9.75rem; /* 1007 - 851 = 156 */
+  z-index: var(--z-marquee);
+  pointer-events: none;
 }
 
 .marquee :global(*) {
-  color: rgba(10, 32, 72, 0.12);
-  -webkit-text-stroke-color: rgba(10, 32, 72, 0.25);
+  color: rgba(10, 32, 72, 0.05);
+  -webkit-text-stroke-color: rgba(10, 32, 72, 0.16);
 }
 
 @media (max-width: 1440px) {
@@ -238,6 +537,12 @@
 @media (max-width: 1024px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* rem 고정 구간(≤1024)에서는 카드가 커져 마퀴가 카드와 겹치면 읽히지 않는다 */
+  .section .marquee {
+    position: static;
+    margin-top: var(--gap-xl);
   }
 }
 
@@ -259,9 +564,5 @@
   .card {
     flex: 0 0 78%;
     scroll-snap-align: start;
-  }
-
-  .decoRule {
-    max-width: none;
   }
 }

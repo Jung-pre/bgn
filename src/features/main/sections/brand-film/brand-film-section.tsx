@@ -40,7 +40,8 @@ export function BrandFilmSection() {
       });
 
       return () => {
-        st.kill();
+        // revert 까지 해야 ScrollTrigger 가 만든 DOM/스타일이 남지 않는다.
+        st.kill(true);
         delete document.body.dataset.gnbHide;
       };
     },

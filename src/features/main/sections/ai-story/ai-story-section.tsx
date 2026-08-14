@@ -9,9 +9,15 @@ import type { AiStorySectionMessages } from "@/shared/i18n/messages";
 import styles from "./ai-story-section.module.css";
 
 /**
- * AI 브랜드 스토리(영상 탭) — 시안 p1_09 / p4_08.
+ * AI 브랜드 스토리(영상 탭) — Figma `2:1286` / Container `2:1938`.
  *
- * 세그먼트 탭 3개 + 대형 비디오 카드 1장.
+ * 세그먼트 탭 3개 + 대형 비디오 카드 1장(854×484).
+ *
+ * ## 시안에 없어서 뺀 것
+ * 카드 좌상단의 "현재 탭" 칩(cardTag)을 렌더하고 있었는데 시안에는 없다.
+ * 시안의 카드는 **한 장의 영상 썸네일**이고 그 위에 카피가 구워져 있다
+ * (아이브로우 + 2줄 타이틀, 카드 세로 중앙 · 좌측 정렬 · 좌여백 64).
+ * 썸네일 에셋이 아직 없어 그라데이션 자리표 위에 같은 위치로 카피만 얹는다.
  *
  * ## 역할 분담 (CLAUDE.md "역할 경계")
  *   · GSAP(`useSectionReveal`) — 섹션 진입 등장. 대상은 **스테이지 래퍼**.
@@ -85,7 +91,6 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
     selectTab(next, true);
   };
 
-  const activeLabel = messages.tabs[activeTab] ?? "";
   const tone = CARD_TONES[activeTab % CARD_TONES.length] ?? "toneA";
 
   const handlePlay = () => {
@@ -158,7 +163,6 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
             {/* TODO: 영상 썸네일(poster) / <video> 로 교체. 현재는 자리표 그라데이션. */}
             <div className={clsx(styles.cardBg, styles[tone])} aria-hidden />
 
-            <p className={styles.cardTag}>{activeLabel}</p>
             <p className={styles.cardEyebrow}>{messages.videoEyebrow}</p>
             <h2 className={styles.cardTitle}>{messages.videoTitle}</h2>
 
