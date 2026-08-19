@@ -9,7 +9,8 @@ import type { AiConsultSectionMessages } from "@/shared/i18n/messages";
 import styles from "./ai-consult-section.module.css";
 
 /**
- * AI 정밀 검사 상담 신청 — Figma `2:1204` (기본) / `2:1244` (확대).
+ * AI 정밀 검사 상담 신청 — Figma `8:1078` (기본) / `8:1118` (확대).
+ *   (구 노드 ID: 2:1204 / 2:1244)
  *
  * ## 검수에서 뒤집힌 근거 (중요)
  * 직전 구현은 이 섹션을 "이 사이트에서 유일한 중간톤(슬레이트) 블록"으로 칠하고
@@ -23,7 +24,11 @@ import styles from "./ai-consult-section.module.css";
  * `2:1242` `magnific_the-object-floats-slowly-…` — 주석 원문:
  *   "영상 삽입 예정 / 해당 영역 클릭시 하단 상담신청 Fade in"
  * 3D 유리 `B` 를 만들 자리가 아니라 **영상 슬롯**이다. 클릭하면 딤 위로 폼이
- * 페이드인하는 확대 상태(`2:1244`)로 전환된다 — 이번에 구현했다.
+ * 페이드인하는 확대 상태(`8:1118`)로 전환된다.
+ *
+ * 영상은 아직 없지만 시안의 그 프레임(유리 재질 B 로고)이 스틸로 들어왔다 →
+ * `VideoSlot` 의 `poster` 로 넣는다. VideoSlot 은 `src` 없이 `poster` 만으로
+ * <img> 를 렌더하므로, 나중에 영상이 오면 `src` 한 줄만 추가하면 된다.
  *
  * 확대 상태에서 폼을 **복제하지 않는다.** 같은 DOM 에 클래스만 얹어 위치를 바꾼다.
  * 복제하면 입력값·동의 체크가 두 벌로 갈라진다.
@@ -67,7 +72,8 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
       className={clsx(styles.section, expanded && styles.sectionExpanded)}
       aria-labelledby="consult-title"
     >
-      {/* 2:1204 하단 도트 메시 웨이브 (에셋 미보유 — CSS 근사) */}
+      {/* 8:1078 하단 도트 메시 웨이브 — `/main/ai/bg.webp`. 장식이라 CSS 배경으로 깐다
+          (DOM <img> 로 두면 alt="" 요소가 하나 더 늘 뿐 얻는 게 없다). */}
       <span className={styles.mesh} aria-hidden />
 
       {/* 딤 자체가 닫기 트리거다. 닫혀 있을 땐 disabled 로 포커스 순서에서 빼되
@@ -150,7 +156,7 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
             setExpanded(true);
           }}
         >
-          <VideoSlot decorative className={styles.objectVideo} />
+          <VideoSlot decorative poster="/main/ai/logo-glass.webp" className={styles.objectVideo} />
         </button>
       </div>
 

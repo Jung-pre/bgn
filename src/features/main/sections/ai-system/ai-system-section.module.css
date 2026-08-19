@@ -1,5 +1,5 @@
 /* =============================================================================
-   AI 정밀 검사 시스템 — Figma 2:1088 (1920 × 1007)
+   AI 정밀 검사 시스템 — Figma 8:962 (1920 × 1007, 구 2:1088)
 
    섹션 산술 (전부 Figma 실측):
      상하 패딩 120  +  헤더 167  +  간격 64  +  카드 520  +  하단 120 ≈ 1007
@@ -15,10 +15,24 @@
 .section {
   position: relative;
   padding-block: var(--gap-section);
-  /* 2:1088 은 플랫 컬러가 아니다. 위가 흰색, 아래로 갈수록 옅은 블루.
+  /* 8:962 는 플랫 컬러가 아니다. 위가 흰색, 아래로 갈수록 옅은 블루.
      하단 톤은 프레임 렌더 실측(근사) — Figma 변수로 관리되지 않는 값. */
   background: linear-gradient(180deg, var(--color-white) 0%, var(--primary-50) 45%, #e8f0fb 100%);
   overflow: hidden;
+}
+
+/* 8:962 상단을 가로지르는 흰 실크 웨이브 = `/main/ai/bg-2.webp` (2000×1333).
+   시안에서는 거의 톤온톤이라 존재감이 아주 옅다 → 낮은 opacity + 아래로 페이드.
+   장식이라 DOM <img> 대신 ::before 로 깐다(alt="" 요소를 늘릴 이유가 없다). */
+.section::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 46%;
+  background: url("/main/ai/bg-2.webp") center top / cover no-repeat;
+  mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 100%);
+  opacity: 0.32;
+  pointer-events: none;
 }
 
 .header {
@@ -157,117 +171,74 @@
   white-space: pre-line;
 }
 
-/* ── 카드 비주얼 ────────────────────────────────────────────────────────── */
+/* ── 카드 비주얼 (8:962 — 1~3번 카드의 3D 렌더 사진) ────────────────────── */
 
-/*
-  시안의 카드 이미지는 474~508px PNG(홍채 / 큐브 / 안구 와이어프레임)다.
-  **에셋이 저장소에 없어서** 같은 자리·같은 크기의 SVG 추상 도형으로 대체했다.
-  PNG 가 들어오면 `.art` 자리에 <Image /> 를 넣고 SVG 를 지우면 된다.
-*/
 .art {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
 
-.artFigure {
-  position: absolute;
-  overflow: visible;
-}
+/*
+  에셋 바탕이 순백이 아니라 **아주 옅은 회청색 그라데이션**이다. 그대로 얹으면
+  유리 카드 위에 사각 이음매가 그대로 보인다 → `multiply` 로 합성한다.
+  카드 배경(위 흰색 → 아래 하늘색)이 사진의 밝은 영역에 그대로 배어들어
+  시안처럼 오브젝트가 카드에 녹아 있는 톤이 나온다. 눈동자·큐브 같은 어두운 영역은
+  multiply 로도 거의 변하지 않아 디테일을 잃지 않는다.
 
-.artSvg {
-  position: relative;
-  display: block;
-  width: 100%;
+  ⚠️ 좌표·크기는 전부 **카드 폭 대비 %** 다. 카드가 aspect-ratio 로 줄어드는 구조라
+     px 로 박으면 1440 에서 오브젝트만 남고 위치가 어긋난다.
+
+  ⚠️ 가로 중앙 정렬에 `translate: -50%` 를 쓰지 않는다. GSAP 은 `x/y/scale` 을 만질 때
+     CSS `translate` 를 자기 매트릭스로 흡수해 버려서, reduced-motion 경로의
+     `settleReducedMotion({ x: 0, y: 0 })` 가 그 -50% 까지 0 으로 눌러 버린다
+     (이미지가 통째로 옆으로 밀려 카드 밖으로 나간다).
+     대신 `margin-left: -(width / 2)` 로 잡는다 — % 마진도 컨테이너 **폭** 기준이라
+     width 와 같은 기준이고, transform 을 전혀 쓰지 않아 GSAP 이 건드릴 수 없다.
+*/
+.artImage {
+  position: absolute;
   height: auto;
-  overflow: visible;
+  /* globals.css 의 `img { max-width: 100% }` 리셋이 아래 100% 초과 width 를 잘라
+     오브젝트가 전부 카드 폭에 갇힌다 → 이 이미지들만 해제. */
+  max-width: none;
+  mix-blend-mode: multiply;
 }
 
-/* 카드별 오브젝트 위치·크기 — 2:1088 렌더 실측(카드 폭 대비 %).
-   `width` 는 SVG 박스 기준이라 그 안 도형이 차지하는 비율까지 역산해서 잡았다.
-     1번 홍채   중심 (50%, 79%) · 지름 ≈ 카드폭 102%  → 도형이 박스의 94%
-     2번 큐브   중심 (63%, 68%) · 폭   ≈ 카드폭 67%   → 도형이 박스의 78%
-     3번 안구   중심 (67%, 69%) · 지름 ≈ 카드폭 63%   → 도형이 박스의 74% */
-.artIris {
+/* 1. 데이터 수집 — 각막 스캔.
+   기준: 시안에서 돔(각막)이 카드 폭을 거의 꽉 채우고, 동공 중심이 카드 높이 ≈87%.
+   값은 렌더 스크린샷을 시안과 겹쳐 보며 맞췄다(에셋 여백이 커서 계산만으론 안 맞는다).
+   위쪽 레이저 장치는 시안에서 테두리만 살짝 보이므로 짧게만 페이드한다. */
+.artCard1 {
   left: 50%;
-  top: 36%;
-  width: 108%;
-  translate: -50% 0;
+  top: 37%;
+  width: 133%;
+  margin-left: -66.5%;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 20%);
 }
 
-.artCube {
-  left: 63%;
-  top: 33%;
-  width: 86%;
-  translate: -50% 0;
+/* 2. AI 빅데이터 분석 — 데이터 큐브.
+   기준: 시안에서 큐브 폭 ≈ 카드 폭 47%, 큐브 중심 ≈ (62%, 76%).
+   에셋의 큐브가 캔버스 안에서 작고 왼쪽에 치우쳐 있어 크게 확대하고 오른쪽으로 민다. */
+.artCard2 {
+  left: 84%;
+  top: 22%;
+  width: 214%;
+  margin-left: -107%;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 14%);
 }
 
-.artSphere {
-  left: 67%;
-  top: 35%;
-  width: 85%;
-  translate: -50% 0;
-}
-
-.glow {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 150%;
-  aspect-ratio: 1;
-  translate: -50% -50%;
-  border-radius: var(--radius-full);
-  background: radial-gradient(
-    circle,
-    rgba(124, 185, 255, 0.38) 0%,
-    rgba(124, 185, 255, 0.12) 45%,
-    transparent 70%
-  );
-}
-
-.vizLine {
-  fill: none;
-  stroke: var(--primary-500);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.vizLineSoft {
-  fill: none;
-  stroke: var(--primary-300);
-  stroke-width: 1;
-  stroke-linecap: round;
-}
-
-.vizCore {
-  fill: var(--primary-700);
-}
-
-.vizDot {
-  fill: var(--primary-300);
-}
-
-.vizDotStrong {
-  fill: var(--primary-500);
-}
-
-.vizFace {
-  fill: rgba(0, 114, 236, 0.18);
-  stroke: var(--primary-500);
-  stroke-width: 1.2;
-  stroke-linejoin: round;
-}
-
-.vizScanLine {
-  stroke: var(--primary-300);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-}
-
-.vizScanGlow {
-  fill: var(--primary-300);
-  opacity: 0.18;
+/* 3. AI 시뮬레이션 — 유리 플랫폼 위의 안구.
+   기준: 시안에서 안구 폭 ≈ 카드 폭 45%, 안구 중심 ≈ (65%, 53%).
+   이 에셋만 배경이 흰색이 아니라 **하늘색**이라 multiply 로도 사각 이음매가 남는다.
+   → 오브젝트 주변만 남기는 타원 마스크를 씌워, 남는 파랑이 시안의 은은한
+   백글로우처럼 읽히게 한다. */
+.artCard3 {
+  left: 52%;
+  top: 18%;
+  width: 210%;
+  margin-left: -105%;
+  mask-image: radial-gradient(ellipse 44% 60% at 50% 46%, #000 42%, transparent 100%);
 }
 
 /* ── 배지 / 데이터 패널 (2:1118·2:1133·2:1144·2:1176) ───────────────────── */

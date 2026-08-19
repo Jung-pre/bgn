@@ -43,12 +43,50 @@ export interface HistorySectionProps {
   messages: HistorySectionMessages;
 }
 
+/**
+ * 연혁 세트별 사진 — 시안 5프레임을 순서대로 읽어 맞췄다.
+ * `messages.eras` 에는 이미지 필드가 없고 i18n 은 다른 담당 영역이라
+ * **컴포넌트 상수**로 둔다. `eras` 와 같은 순서(2009→2024)로 1:1 대응한다.
+ *
+ *   8:1929  2009~2010  아이얼안과 공동 라식 전문센터 합작 체결식 단체컷
+ *   8:2014  2011~2013  BGN 로고 벽 앞 인증패 수여 (ZEISS 스마일 라식 센터 선정)
+ *   8:2099  2014~2023  글로벌 학회 상패 수여 (WOC TOKYO 수상)
+ *   8:2184  2024~2026  ZEISS SMILE pro CENTER / SMILE CENTER 인증 엠블럼
+ *
+ * award.webp(401×301)·cert.webp(1231×924)는 둘 다 정확히 4:3 이라
+ * 카드(640×480)에 맞춰 내보낸 컷임을 알 수 있다 — 매칭 근거 하나 더.
+ */
+const ERA_PHOTOS: { src: string; alt: string }[] = [
+  {
+    src: "/main/history/event-2.webp",
+    alt: "2011년 아이얼안과와 체결한 공동 라식 전문센터 합작 체결식 기념 촬영",
+  },
+  {
+    src: "/main/history/award.webp",
+    alt: "ZEISS 공식 인증 스마일 라식 센터 선정 인증패를 전달받는 박세광 대표원장",
+  },
+  {
+    src: "/main/history/cert.webp",
+    alt: "글로벌 학회에서 비쥬맥스 라식 부문 상패를 전달받는 모습",
+  },
+  {
+    src: "/main/history/zeiss.webp",
+    alt: "ZEISS SMILE pro CENTER · ZEISS SMILE CENTER 인증 엠블럼",
+  },
+];
+
 export function HistorySection({ messages }: HistorySectionProps) {
   const sectionRef = useHistoryReveal<HTMLElement>();
   const eras = messages.eras;
 
   return (
     <section ref={sectionRef} className={styles.section} aria-labelledby="history-title">
+      {/* 시안 8:1858 의 배경 = 흰 바탕 + 웨이브 텍스처(40%) + 파랑↔보라 overlay.
+          블렌드가 타임라인 카피까지 물들이면 안 되므로 별도 레이어로 깔고
+          `.timeline` 을 z-index 로 위에 올린다(가상요소로 하면 ::after 가
+          콘텐츠보다 뒤에 그려져 오버레이가 글자를 덮는다). */}
+      <div className={styles.bgWave} aria-hidden />
+
       <div className="container">
         <div className={styles.timeline} data-history-axis-host>
           {/* 중앙 세로 축 — 스크롤에 따라 채워진다 */}
@@ -59,14 +97,27 @@ export function HistorySection({ messages }: HistorySectionProps) {
           {/* 인트로 — 시안 2:1989. 시대 세트와 같은 3단 그리드다.
               시안에서 이 행의 노드는 이미 활성(파란 점)이라 상태를 고정해 둔다 */}
           <div className={styles.era} data-visible="true">
-            <div className={styles.photoFrame} aria-hidden>
-              {/* 시안은 의료진 단체 사진. 인트로 카드만 기울기가 크다(≈9°) */}
+            <div className={styles.photoFrame}>
+              {/* Figma 8:1869 — 카드(640×480 r24)가 세 겹이다:
+                  ① 파란 사선 배경(bg.webp) ② 보라→파랑 옅은 그라데이션
+                  ③ **누끼** 의료진(group-2.webp, object-contain).
+                  ①②는 CSS 배경으로, ③만 img 로 얹는다. 인트로 카드만 기울기가 크다(≈9°) */}
               <div
                 className={styles.photoCard}
+                data-variant="intro"
                 style={{ "--tilt-rest": "9deg" } as CSSProperties}
-                data-asset-placeholder
                 data-history-photo
-              />
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- 카드 크기에 맞춘
+                    누끼 PNG(WebP)라 리사이즈 이점이 없다 */}
+                <img
+                  className={styles.photoFill}
+                  src="/main/history/group-2.webp"
+                  alt="BGN 밝은눈안과 의료진 단체 사진"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
             </div>
 
             <span className={styles.node} aria-hidden />
@@ -79,11 +130,23 @@ export function HistorySection({ messages }: HistorySectionProps) {
           </div>
 
           <ol className={styles.eras}>
-            {eras.map((era) => (
+            {eras.map((era, i) => (
               <li key={era.period} className={styles.era} data-history-set>
-                {/* 이미지 카드 — 텍스트와 같은 li 안이라 항상 함께 흐른다 */}
-                <div className={styles.photoFrame} aria-hidden>
-                  <div className={styles.photoCard} data-asset-placeholder data-history-photo />
+                {/* 이미지 카드 — 텍스트와 같은 li 안이라 항상 함께 흐른다.
+                    사진은 연혁의 근거라 장식이 아니다 → 실제 alt 를 준다. */}
+                <div className={styles.photoFrame}>
+                  <div className={styles.photoCard} data-history-photo>
+                    {ERA_PHOTOS[i] ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- 위와 같은 이유
+                      <img
+                        className={styles.photoFill}
+                        src={ERA_PHOTOS[i].src}
+                        alt={ERA_PHOTOS[i].alt}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : null}
+                  </div>
                 </div>
 
                 <span className={styles.node} aria-hidden />

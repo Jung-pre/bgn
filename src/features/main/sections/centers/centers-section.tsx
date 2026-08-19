@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import clsx from "clsx";
 import Link from "next/link";
 import { useIsMobileLayout } from "@/shared/lib/use-media-query";
@@ -40,6 +41,49 @@ import styles from "./centers-section.module.css";
 export interface CentersSectionProps {
   messages: CentersSectionMessages;
 }
+
+/**
+ * 확장 카드 배경 사진의 크롭/톤 — Figma `8:5199`~`8:5229` 실측.
+ *
+ * 시안은 이미지 fill 을 카드(1120×600)보다 크게 잡고 세로 위치를 카드마다 다르게 준다.
+ * 그 값을 그대로 옮기면(퍼센트 좌표) 카드 종횡비가 1120:600 이 아닌 뷰포트에서 사진이
+ * 찌그러지므로, **보이는 영역의 중심**을 계산해 `object-position` 으로 환산했다.
+ *   예) 스마일 8:5199 = h 124.44% / top −5.2% → 세로 21%
+ *       백내장 8:5211 = h 124.88% / top −10.76% → 세로 38%
+ *       건성안 8:5223 = h 116.25% / top −2.79% → 세로 13%
+ *       안종합 8:5229 = h 206.29% / top −97%   → 하단(계산값이 100% 를 넘는다)
+ *
+ * `src` 는 전부 i18n 값(`center.image`)을 쓴다. 예전에 시력교정센터만 여기서
+ * 덮어썼는데, 원인이던 `vision.webp`(= exam.webp 와 같은 컷) 문제를 i18n 쪽에서
+ * `consult.webp` 로 고쳤으므로 오버라이드는 걷어냈다. 사진 선택은 사전이,
+ * 크롭 좌표는 여기가 담당한다 — 책임이 두 곳으로 갈리지 않게.
+ */
+const CENTER_PHOTO: Record<string, { src?: string; position: string; tone?: "dark" }> = {
+  "/center/smile": { position: "center 21%" },
+  "/center/vision-correction": { position: "center bottom" },
+  "/center/cataract": { position: "center 38%" },
+  // 8:5217 만 사진이 어두워 워시·카피가 다크 톤으로 뒤집힌다
+  "/center/dream-lens": { position: "center center", tone: "dark" },
+  "/center/dry-eye": { position: "center 13%" },
+  "/center/examination": { position: "center bottom" },
+};
+
+/**
+ * 축소 카드 실크 텍스처의 크롭 — 시안은 같은 실크 원본(`/main/centers/bg.webp`)을
+ * 카드마다 다르게 잘라 color-burn 으로 얹어서 결이 전부 다르다.
+ * 실측: 스마일 `8:5169` = 426%×128% / x 69%, 백내장 `8:5163` = 382%×111% / x 50%,
+ *       시력교정 `8:5181` = cover.
+ * 나머지 3장은 노드를 열어보지 않았고 순수 장식이라, 이웃 카드와 결이 겹치지
+ * 않도록 같은 범위 안에서 고른 값이다.
+ */
+const CARD_TEXTURE: { size: string; pos: string }[] = [
+  { size: "426% 128%", pos: "69% 50%" },
+  { size: "cover", pos: "50% 50%" },
+  { size: "382% 111%", pos: "50% 50%" },
+  { size: "320% 120%", pos: "18% 50%" },
+  { size: "cover", pos: "84% 50%" },
+  { size: "360% 115%", pos: "36% 50%" },
+];
 
 /** arrow-detail 48×48 (Figma 2:5403) — 원형 배경 없는 가는 선 화살표 */
 function ArrowDetailIcon() {
@@ -96,13 +140,18 @@ export function CentersSection({ messages }: CentersSectionProps) {
         <ul
           ref={trackRef}
           className={styles.track}
-          /* 모바일에서 트랙이 실제 가로 스크롤 영역이 된다.
-             Lenis 가 wheel/touch 를 가로채므로 반드시 opt-out. */
-          data-lenis-prevent
+          /* ⚠️ `data-lenis-prevent` 를 달지 않는다.
+             예전에는 모바일에서 트랙을 `overflow-x: auto` 스크롤 컨테이너로 만들어
+             이 속성이 필요했지만, 시안(`8:4549`)은 스크롤이 아니라 **3장 창**이다
+             (64 + 16 + 240 + 16 + 64 = 400, 375 프레임에서 좌우 12.5 씩 블리드).
+             스크롤 컨테이너가 아닌 요소에 prevent 를 달면 Lenis 가 이 위의
+             wheel·touch 를 통째로 네이티브로 흘려보내 세로 스크롤이 튄다. */
         >
           {centers.map((center, i) => {
             const expanded = isExpanded(i);
             const collapsed = windowed && !isVisible(i);
+            const photo = CENTER_PHOTO[center.href];
+            const texture = CARD_TEXTURE[i % CARD_TEXTURE.length] ?? CARD_TEXTURE[0]!;
             return (
               <li
                 key={center.href}
@@ -120,6 +169,13 @@ export function CentersSection({ messages }: CentersSectionProps) {
                 <Link
                   href={center.href}
                   className={styles.card}
+                  data-tone={photo?.tone}
+                  style={
+                    {
+                      "--tex-size": texture.size,
+                      "--tex-pos": texture.pos,
+                    } as CSSProperties
+                  }
                   aria-current={i === activeIndex ? "true" : undefined}
                   tabIndex={collapsed ? -1 : undefined}
                   /* 키보드 tab 이동만으로도 카드가 펼쳐져야 내용을 읽을 수 있다 */
@@ -133,6 +189,22 @@ export function CentersSection({ messages }: CentersSectionProps) {
                     }
                   }}
                 >
+                  {/* 확장(1120) 상태의 배경 사진 + 좌측 워시 (Figma 8:5199~8:5229).
+                      카드 링크가 이미 센터명을 읽어주므로 사진은 순수 장식이다. */}
+                  <span className={styles.media} aria-hidden>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- 카드를 꽉 채우는
+                        배경 사진이라 next/image 의 리사이즈 이점이 없고, 폭이 아코디언
+                        상태에 따라 240↔1120 으로 계속 바뀌어 sizes 를 확정할 수 없다 */}
+                    <img
+                      className={styles.photo}
+                      src={photo?.src ?? center.image}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      style={{ objectPosition: photo?.position }}
+                    />
+                  </span>
+
                   {/* 기본(240) 상태: 상단 가로쓰기 라벨 + 하단 화살표 (Figma 2:5393) */}
                   <span className={styles.shortLabel} aria-hidden={expanded || undefined}>
                     {center.shortName}

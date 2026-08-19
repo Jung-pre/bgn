@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { gsap, useGSAP } from "@/shared/lib/gsap";
+import { gsap, ScrollTrigger, useGSAP } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
 import { VideoSlot } from "@/components/video-slot/video-slot";
 import type { BlogPostMessages, BlogSectionMessages } from "@/shared/i18n/messages";
@@ -65,12 +66,38 @@ const INTRO_RATIO = 0.22;
 /** 한 페이지에 이 섹션은 하나뿐이다. useId 의 특수문자를 url(#…) 에 넣지 않는다 */
 const MASK_ID = "web-blog-letter-hole";
 
-/** 인라인 SVG 좌표계 = 시안 PC 프레임(1920×920). 1920 뷰포트에서 1:1 로 떨어진다 */
-const VB_W = 1920;
-const VB_H = 920;
+/**
+ * 인라인 SVG 좌표계 = 시안 프레임 실측.
+ *
+ * ⚠️ PC 값을 모바일에서 그대로 쓰면 안 된다. 덮개는 `preserveAspectRatio="slice"`
+ * (= background-size: cover)라 375×812 화면에서는 세로에 맞춰 확대되고,
+ * 그 배율이면 1920 폭이 1016px 로 그려져 **글자가 좌우로 잘려 나간다.**
+ * (실제로 모바일에서 "BGN Web blog" 의 양 끝이 화면 밖으로 나가 있었다)
+ *
+ * 그래서 뷰포트별로 좌표계를 갈아 끼운다. 모바일 시안(`8:4891`)은
+ * 375×812 풀스크린에 **2줄**로 앉는다.
+ */
+const VIEWBOX = {
+  pc: { w: 1920, h: 920 },
+  mo: { w: 375, h: 812 },
+} as const;
 
 /** 카드 하단 대형 워터마크. 시안 문구는 섹션 타이틀과 다르다(2:2457) */
 const WATERMARK = "BGN AI Web blog";
+
+/**
+ * 브랜드 컷(2:2457)의 사진. 게시글이 아니라 고정 배너라 messages 에 없다.
+ * 시안은 이 자리에 수술 현미경 컷(post-1)을 쓰는데, 그건 messages.posts[0] 이
+ * 이미 쓰고 있어 바로 옆 카드와 같은 사진이 두 번 나온다.
+ * → 시안에서 마지막 카드에 쓰인 접수 사인 컷(post-4)으로 돌린다.
+ */
+const BRAND_IMAGE = "/main/blog/post-4.webp";
+
+/**
+ * 썸네일 폭 = `.thumb` 40rem. root font-size 가 뷰포트 비례(1920→16px)라
+ * 데스크톱 전 구간에서 실측이 33vw 로 떨어진다. 모바일은 카드 폭 100%.
+ */
+const THUMB_SIZES = "(max-width: 768px) 92vw, 33vw";
 
 /** 태그 색 팔레트 개수(`.tone0`~`.tone3`) */
 const TONE_COUNT = 4;
@@ -88,11 +115,40 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
 
   useGSAP(
     () => {
-      if (isMobile) return;
       const section = sectionRef.current;
       const track = trackRef.current;
       const stage = stageRef.current;
       if (!section || !track || !stage) return;
+
+      if (isMobile) {
+        /*
+          ⚠️ 이 분기는 "아무것도 안 함"이 아니라 **치우는 일**을 해야 한다.
+
+          `useIsMobileLayout` 은 `useSyncExternalStore` 라 하이드레이션 첫 렌더에서
+          **서버 스냅샷(=false, 데스크톱)** 을 쓴다. 실제 로그로 확인한 실행 순서:
+
+              effect(isMobile=false) → cleanup → effect(isMobile=false) → effect(isMobile=true)
+                                                                          ↑ cleanup 이 없다
+
+          즉 모바일 기기에서도 데스크톱 분기가 먼저 돌고, 그 ScrollTrigger 가
+          **정리되지 않은 채 살아남는다.** 살아 있는 scrub 트리거는 스크롤·refresh 마다
+          덮개에 `autoAlpha: 0 / scale: 1.14`(fromTo 의 from 값)를 다시 써 넣기 때문에,
+          여기서 `gsap.set(clearProps)` 로 지워 봐야 곧바로 되돌아온다.
+          (모바일에서 타이틀 덮개가 `visibility: hidden` 으로 굳어 있던 원인)
+
+          그래서 **이 섹션에 걸린 ScrollTrigger 를 직접 찾아 revert 시킨다.**
+          `kill(true)` 의 revert 가 pin-spacer 까지 DOM 에서 걷어낸다.
+          그 뒤 남은 인라인 스타일은 `removeAttribute` 로 확실히 턴다 —
+          GSAP 경유로 지우면 다음 refresh 에 또 덮어써진다.
+        */
+        for (const st of ScrollTrigger.getAll()) {
+          const trigger = st.trigger;
+          if (trigger instanceof Node && section.contains(trigger)) st.kill(true);
+        }
+        stage.removeAttribute("style");
+        track.removeAttribute("style");
+        return;
+      }
 
       if (prefersReducedMotionSync()) {
         /* 동작 줄이기: pin·가로이동을 걸지 않고 **직접 가로 스크롤되는 트랙**으로
@@ -163,13 +219,15 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
         .to(track, { x: () => -distance(), ease: "none", duration: 1 - INTRO_RATIO }, INTRO_RATIO);
 
       return () => {
-        fadeIn.scrollTrigger?.kill();
-        fadeIn.kill();
-        /* `kill(true)` — revert 를 안 하면 pin-spacer 가 DOM 에 남는다.
-           이 훅은 isMobile 이 하이드레이션 직후 뒤집힐 때 다시 도는데,
-           그때마다 스페이서가 쌓여 아래 섹션이 한 화면씩 밀린다. */
+        /* `kill()` 이 아니라 `revert()` 다.
+           kill 은 트윈을 멈추기만 하고 **마지막에 적용된 인라인 스타일을 남긴다.**
+           scrub 트윈은 진행도 0 에서 from 값(autoAlpha 0)이 박혀 있으므로,
+           kill 로 끝내면 요소가 안 보이는 채로 굳는다. revert 는 원래 상태로 되돌린다.
+           ScrollTrigger 도 `kill(true)` 로 revert 해야 pin-spacer 가 DOM 에서 빠진다. */
+        fadeIn.scrollTrigger?.kill(true);
+        fadeIn.revert();
         tl.scrollTrigger?.kill(true);
-        tl.kill();
+        tl.revert();
       };
     },
     { scope: sectionRef, dependencies: [isMobile, messages.posts.length] },
@@ -202,62 +260,22 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
 
   return (
     <section ref={sectionRef} className={styles.section} aria-labelledby="blog-title">
-      {/* ① Figma 2:2400 — 배경 영상 */}
-      <VideoSlot decorative className={styles.bgVideo} rootMargin="400px 0px" />
+      {/* ① Figma 8:2268 — 배경 영상. 영상 도착 전에는 poster 가 화면을 채운다.
+          **원본 컷(bg.webp)** 을 쓴다. 시안의 배경은 이 컷에 ②의 blur 75 가 먹은
+          모습이라, 이미 블러된 `video-poster.webp` 를 넣으면 두 번 흐려지면서
+          시안보다 밝고 밋밋해진다(왼쪽 금빛 덩어리가 사라진다). */}
+      <VideoSlot
+        decorative
+        className={styles.bgVideo}
+        poster="/main/blog/bg.webp"
+        rootMargin="400px 0px"
+      />
       {/* ② Figma 2:2401 — 색상블러. blur 75 + 블루 0.2 오버레이 */}
       <div className={styles.colorBlur} aria-hidden />
-      {/* ②-b 영상 도착 전 임시 톤 보정 (CSS 주석 참고) */}
-      <div className={styles.bgTone} aria-hidden />
 
-      {/* ③ Figma 2:2571 — 글자 모양으로 뚫린 덮개. 구멍 사이로 ①②가 비친다 */}
+      {/* ③ Figma 2:2571 / 8:4891 — 글자 모양으로 뚫린 덮개. 구멍 사이로 ①②가 비친다 */}
       <div ref={stageRef} className={styles.maskStage} aria-hidden>
-        <svg
-          className={styles.maskSvg}
-          viewBox={`0 0 ${VB_W} ${VB_H}`}
-          /* slice = background-size:cover. 덮개가 항상 화면을 다 덮는다 */
-          preserveAspectRatio="xMidYMid slice"
-          focusable="false"
-        >
-          <defs>
-            <mask id={MASK_ID} maskUnits="userSpaceOnUse" x="0" y="0" width={VB_W} height={VB_H}>
-              {/* 흰색 = 덮개가 남는 영역 */}
-              <rect x="0" y="0" width={VB_W} height={VB_H} fill="#fff" />
-              {/* 검은색 = 뚫리는 영역(글자). 시안은 한 줄이다 */}
-              <text
-                className={styles.maskText}
-                x={VB_W / 2}
-                y={VB_H / 2 + 40}
-                textAnchor="middle"
-                fill="#000"
-              >
-                {messages.title}
-              </text>
-            </mask>
-          </defs>
-          <rect
-            x="0"
-            y="0"
-            width={VB_W}
-            height={VB_H}
-            className={styles.maskPlate}
-            mask={`url(#${MASK_ID})`}
-          />
-          {/*
-            시안 2:2399 의 글자는 **밝은 흰색**이다. 구멍만 뚫어 두면 배경 영상이
-            어두운 구간에서 글자가 거의 안 보인다(지금 자리표 영상이 그렇다).
-            같은 좌표에 옅은 흰 글자를 한 장 더 얹어 밝기를 확보한다 —
-            반투명이라 구멍 아래 영상의 움직임은 그대로 비친다.
-            실제 영상이 들어오면 이 값을 낮춰도 된다.
-          */}
-          <text
-            className={`${styles.maskText} ${styles.maskShine}`}
-            x={VB_W / 2}
-            y={VB_H / 2 + 40}
-            textAnchor="middle"
-          >
-            {messages.title}
-          </text>
-        </svg>
+        <MaskPlate title={messages.title} mobile={isMobile} />
       </div>
 
       {/* 마스크는 장식이므로 제목 텍스트는 반드시 여기로 노출한다 */}
@@ -287,7 +305,14 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
             /* 시안 2:2457 — 태그도 제목도 없는 브랜드 컷 */
             return (
               <div key={item.key} className={`${styles.card} ${styles.brandCard}`} aria-hidden>
-                <div className={styles.thumb} />
+                <Image
+                  src={BRAND_IMAGE}
+                  alt=""
+                  width={640}
+                  height={400}
+                  className={styles.thumb}
+                  sizes={THUMB_SIZES}
+                />
                 <p className={styles.watermark} lang="en">
                   {WATERMARK}
                 </p>
@@ -298,7 +323,16 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
           return (
             <article key={item.key} className={styles.card}>
               <Link href={item.post.href} className={styles.cardLink}>
-                <div className={styles.thumb} aria-hidden />
+                {/* 제목이 바로 아래 h3 로 나오므로 썸네일은 장식으로 넘긴다 */}
+                <Image
+                  src={item.post.image}
+                  alt=""
+                  aria-hidden
+                  width={640}
+                  height={400}
+                  className={styles.thumb}
+                  sizes={THUMB_SIZES}
+                />
                 <ul className={styles.tags}>
                   {item.post.tags.map((t) => (
                     <li key={t} className={`${styles.tag} ${styles[`tone${tagTone.get(t) ?? 0}`]}`}>
@@ -338,6 +372,70 @@ const PETALS = Array.from({ length: 6 }, (_, i) => {
   const angle = (i * Math.PI) / 3;
   return { cx: 50 + Math.cos(angle) * 17, cy: 50 + Math.sin(angle) * 17 };
 });
+
+/**
+ * 글자 구멍이 뚫린 덮개판.
+ *
+ * PC 는 한 줄, 모바일은 **2줄**이다 — 시안이 그렇게 나뉘어 있고(`8:4891`),
+ * 375 폭에 "BGN Web blog" 를 한 줄로 넣으면 글자가 읽을 수 없을 만큼 작아진다.
+ * 줄 나눔은 첫 어절(BGN) 기준 — 사전 문구가 바뀌어도 규칙이 유지된다.
+ */
+function MaskPlate({ title, mobile }: { title: string; mobile: boolean }) {
+  const vb = mobile ? VIEWBOX.mo : VIEWBOX.pc;
+  const [head = title, ...rest] = title.split(" ");
+  const lines = mobile && rest.length > 0 ? [head, rest.join(" ")] : [title];
+  const cx = vb.w / 2;
+  /* 여러 줄일 때 블록 전체를 세로 중앙에 두려면 첫 줄을 (n-1)/2 만큼 끌어올려야 한다.
+     70 = 모바일 글자 56px(뷰박스 단위) × 행간 1.25 */
+  const lineH = mobile ? 70 : 0;
+  const top = vb.h / 2 + (mobile ? 12 : 40) - ((lines.length - 1) * lineH) / 2;
+
+  const rows = (extra?: string) =>
+    lines.map((line, i) => (
+      <text
+        key={line}
+        className={extra ? `${styles.maskText} ${extra}` : styles.maskText}
+        x={cx}
+        y={top + i * lineH}
+        textAnchor="middle"
+        {...(extra ? {} : { fill: "#000" })}
+      >
+        {line}
+      </text>
+    ));
+
+  return (
+    <svg
+      className={styles.maskSvg}
+      viewBox={`0 0 ${vb.w} ${vb.h}`}
+      /* slice = background-size:cover. 덮개가 항상 화면을 다 덮는다 */
+      preserveAspectRatio="xMidYMid slice"
+      focusable="false"
+    >
+      <defs>
+        <mask id={MASK_ID} maskUnits="userSpaceOnUse" x="0" y="0" width={vb.w} height={vb.h}>
+          {/* 흰색 = 덮개가 남는 영역 / 검은색 = 뚫리는 영역(글자) */}
+          <rect x="0" y="0" width={vb.w} height={vb.h} fill="#fff" />
+          {rows()}
+        </mask>
+      </defs>
+      <rect
+        x="0"
+        y="0"
+        width={vb.w}
+        height={vb.h}
+        className={styles.maskPlate}
+        mask={`url(#${MASK_ID})`}
+      />
+      {/*
+        시안 2:2399 의 글자는 **밝은 흰색**이다. 구멍만 뚫어 두면 배경이 어두운
+        구간에서 글자가 거의 안 보인다. 같은 좌표에 옅은 흰 글자를 한 장 더 얹어
+        밝기를 확보한다 — 반투명이라 구멍 아래 영상의 움직임은 그대로 비친다.
+      */}
+      {rows(styles.maskShine)}
+    </svg>
+  );
+}
 
 const SYMBOLS = [
   // ① 가는 빛살 별 (2:2457)

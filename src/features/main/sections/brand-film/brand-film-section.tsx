@@ -19,8 +19,13 @@ import styles from "./brand-film-section.module.css";
  * `<body data-gnb-hide="true">` 를 세운다. GNB 쪽은 이 속성을 CSS 로 받는다
  * (컴포넌트 간 결합을 만들지 않으려고 context 대신 data 속성을 쓴다).
  */
-const VIDEO_SRC = undefined; // TODO: 영상 도착 시 "/main/brand-film.mp4"
-const VIDEO_POSTER = undefined; // TODO: "/main/brand-film-poster.webp"
+const VIDEO_SRC = undefined; // TODO: 영상 도착 시 "/main/brand-film/film.mp4"
+/**
+ * 시안 `8:961` 그 프레임이다 — 한강 야경 위에 빛으로 그린 `BGn` 글씨가 떠 있는 컷.
+ * (같은 폴더의 `poster.webp` 는 글씨 없는 클린 플레이트라 시안과 다르다.)
+ * 영상이 오면 `VIDEO_SRC` 만 채우면 되고 이 값은 그대로 poster 로 남는다.
+ */
+const VIDEO_POSTER = "/main/brand-film/poster-2.webp";
 
 export function BrandFilmSection() {
   const sectionRef = useRef<HTMLElement>(null);

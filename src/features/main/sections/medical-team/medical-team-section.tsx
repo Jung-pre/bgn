@@ -111,13 +111,39 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
                     tabIndex={hidden ? -1 : undefined}
                     onClick={() => select(i)}
                   >
-                    {/* 시안은 이름이 카드 밖이 아니라 사진 하단에 얹혀 있고,
-                        활성 카드만이 아니라 **모든 카드**에 붙어 있다. */}
                     <span className={styles.portrait}>
-                      <span className={styles.caption}>
-                        <span className={styles.name}>{doctor.name}</span>
-                        <span className={styles.role}>{doctor.title}</span>
+                      {/* 시안 8:868 — 카드마다 뒤에 큰 `Bgn` 워터마크가 깔린다.
+                          로고 에셋(SVG)이 없어 텍스트로 세운다. 장식이라 a11y 트리에서 뺀다. */}
+                      <span className={styles.watermark} aria-hidden lang="en">
+                        Bgn
                       </span>
+                      {doctor.photo ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- 누끼 인물은 카드 폭에 맞춰 CSS 로 눕히므로 next/image 의 레이아웃 제어가 오히려 방해된다
+                        <img
+                          className={styles.photo}
+                          src={doctor.photo}
+                          /* 이름이 없는 카드(doctor-06/07/08)는 부를 이름이 없다.
+                             빈 alt 로 장식 처리하고 버튼의 aria-label 이 대신 읽힌다. */
+                          alt={doctor.name ? `${doctor.name} ${doctor.title}`.trim() : ""}
+                          loading="lazy"
+                          decoding="async"
+                          draggable={false}
+                        />
+                      ) : null}
+                      {/* 인물 하단을 덮는 스크림. 흰 가운 위 흰 글씨가 겹치므로
+                          이름이 없는 카드에서도 카드 바닥 톤을 맞추려 항상 깐다. */}
+                      <span className={styles.scrim} aria-hidden />
+                      {/* 시안은 이름이 카드 밖이 아니라 사진 하단에 얹혀 있고,
+                          활성 카드만이 아니라 **모든 카드**에 붙어 있다.
+                          이름이 비면 빈 줄만 남으므로 아예 렌더하지 않는다. */}
+                      {doctor.name ? (
+                        <span className={styles.caption}>
+                          <span className={styles.name}>{doctor.name}</span>
+                          {doctor.title ? (
+                            <span className={styles.role}>{doctor.title}</span>
+                          ) : null}
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                 </li>

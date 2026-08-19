@@ -91,26 +91,89 @@
   border-radius: var(--center-card-radius);
   overflow: hidden;
   color: var(--color-white);
-  /* Figma 2:5400: linear-gradient(180deg, #9c96b9 → primary/300)
-     + 노이즈 텍스처 오버레이(mix-blend-mode: color-burn).
-     텍스처 이미지는 에셋 받으면 ::after 로 얹는다. */
+  /* Figma 8:5169: linear-gradient(180deg, #9c96b9 → primary/300)
+     + 실크 텍스처 오버레이(mix-blend-mode: color-burn) */
   background: var(--gradient-center-card);
+  /* 텍스처(::before)의 color-burn 이 카드 **자기 배경**하고만 섞이게 가둔다.
+     isolate 가 없으면 블렌드 대상이 페이지 배경까지 올라가 카드가 회색으로 탄다. */
+  isolation: isolate;
   transition: color 0.35s ease;
 }
 
 /**
- * 펼친 카드 (Figma 2:1954)
- * 배경은 실사 사진 + 좌측 워시 그라데이션이고, 카피는 **다크 텍스트**다.
- * (기존 구현은 흰 글씨 + 유리 패널이었는데 시안과 정반대였다.)
- * 사진 에셋이 없어 아래 2번째 레이어를 자리표로 둔다 — 받으면 이 줄만 교체.
+ * 축소 카드 실크 텍스처 — Figma 8:5169 / 8:5181 / 8:5163.
+ * 시안은 카드마다 **같은 실크 원본을 다르게 잘라** 얹어서 결이 전부 다르다.
+ * 크기·위치는 컴포넌트가 카드별로 넘기는 CSS 변수로 받는다(아래 CARD_TEXTURE).
+ */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("/main/centers/bg.webp") var(--tex-pos, 50% 50%) / var(--tex-size, cover)
+    no-repeat;
+  mix-blend-mode: color-burn;
+  pointer-events: none;
+}
+
+/* --- 확장 카드 배경 사진 (Figma 8:5199~8:5229) -----------------------------
+   사진 + 좌측 워시를 한 겹으로 묶어 카드가 펼쳐질 때 통째로 페이드인시킨다.
+   축소 상태에서는 opacity 0 이라 아래의 그라데이션 + 실크가 그대로 보인다. */
+.media {
+  position: absolute;
+  inset: 0;
+  /* 정지 요소(라벨·본문)보다 뒤에 그려지도록 스태킹 컨텍스트를 만든다 */
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 세로 크롭 지점은 카드마다 다르다 — 시안 실측값을 인라인으로 받는다 */
+}
+
+/* Figma 8:5199 — linear-gradient(90deg, rgba(207,233,255,.6) 0%, rgba(232,243,255,0) 41.391%).
+   사진 위에 얹혀야 좌측 카피가 읽힌다. */
+.media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(207, 233, 255, 0.6) 0%, rgba(232, 243, 255, 0) 41.391%);
+}
+
+/* 드림렌즈만 사진이 어두워 시안도 워시를 다크로 뒤집는다 (Figma 8:5217) */
+.card[data-tone="dark"] .media::after {
+  background: linear-gradient(90deg, rgba(23, 26, 31, 0.54) 0%, rgba(0, 0, 0, 0) 41.391%);
+}
+
+.itemExpanded .media {
+  opacity: 1;
+}
+
+/**
+ * 펼친 카드 (Figma 8:5199)
+ * 배경은 실사 사진(.media) + 좌측 워시이고, 카피는 **다크 텍스트**다.
+ * 아래 그라데이션은 사진이 디코드되기 전 1프레임을 메우는 바닥색이다 —
+ * 시안의 흰 바닥(bg-white)을 그대로 쓰면 카드가 흰 판으로 번쩍인다.
  */
 .itemExpanded .card {
   justify-content: flex-end;
   padding: 64px 32px;
   color: var(--gray-900);
-  background:
-    linear-gradient(90deg, rgba(207, 233, 255, 0.6) 0%, rgba(232, 243, 255, 0) 41.391%),
-    linear-gradient(135deg, var(--primary-50) 0%, var(--primary-200) 60%, var(--primary-300) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary-50) 0%,
+    var(--primary-200) 60%,
+    var(--primary-300) 100%
+  );
+}
+
+/* 다크 톤 카드(드림렌즈)는 시안에서 제목 흰색 · 본문 gray/100 이다 (Figma 8:5221·8:5222) */
+.itemExpanded .card[data-tone="dark"] {
+  color: var(--color-white);
 }
 
 /* 활성 카드만 링크로 바로 이동한다(다른 카드는 1탭이 '펼치기')는 걸
@@ -122,6 +185,9 @@
 /* 기본 카드 라벨 — pc/headline/headline 2 (Bold 32 / 1.25 / -3%).
    시안은 **가로쓰기**다. 축소 64px 세로쓰기는 모바일 스와이퍼에만 남는다. */
 .shortLabel {
+  /* .media 가 위치 지정 요소라 정지 흐름 요소보다 늦게 그려진다 — 카피를 위로 끌어올린다 */
+  position: relative;
+  z-index: 1;
   width: 100%;
   font-size: var(--fs-32);
   font-weight: var(--weight-bold);
@@ -136,8 +202,10 @@
   pointer-events: none;
 }
 
-/* 펼친 카드 내부 (Figma 2:1955) — px 32 / pb 64 / gap 8, 하단 정렬 */
+/* 펼친 카드 내부 (Figma 8:5200) — px 32 / pb 64 / gap 8, 하단 정렬 */
 .expanded {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: var(--gap-xs);
@@ -191,6 +259,16 @@
   white-space: pre-line;
 }
 
+/* 다크 톤 카드의 본문 (Figma 8:5222 = grayscale/neutral-gray/100) */
+.card[data-tone="dark"] .desc {
+  color: var(--gray-100);
+}
+
+/* 다크 톤에서 primary/500 아이브로우는 배경에 묻힌다 — 시안도 한 단계 밝다 */
+.card[data-tone="dark"] .nameEn {
+  color: var(--primary-200);
+}
+
 /* 그룹 모드 카드는 폭이 392 밖에 안 된다. 본문 18px 을 넣으면 여러 줄로 흘러
    카드 높이를 넘긴다 → 제목까지만 보여주고 본문은 확정 선택(1120)에서만. */
 .itemGrouped .desc {
@@ -199,6 +277,8 @@
 
 /* arrow-detail 48×48 (Figma 2:5403) — 원형 배경 없이 선 화살표만 */
 .arrow {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 48px;
   height: 48px;
@@ -234,6 +314,7 @@
   place-items: center;
   width: 6rem;
   height: 6rem;
+  z-index: 2;
   border-radius: var(--radius-full);
   border: 1px solid var(--primary-500);
   background: rgba(0, 114, 236, 0.6);
@@ -273,9 +354,22 @@
   place-items: center;
   width: 100%;
   height: 100%;
+  position: relative;
+  overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--gradient-center-card);
+  isolation: isolate;
   transition: filter 0.3s ease;
+}
+
+/* 시안(8:1824)에서 `≡` 스트립도 축소 카드와 같은 실크 결을 갖는다 */
+.groupToggle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("/main/centers/bg.webp") 20% 50% / 900% 130% no-repeat;
+  mix-blend-mode: color-burn;
+  pointer-events: none;
 }
 
 .groupToggle:hover,
@@ -284,6 +378,9 @@
 }
 
 .groupToggleIcon {
+  /* 실크 텍스처(::before)보다 위에 그려져야 한다 */
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -397,12 +494,19 @@
   }
 
   .card,
-  .itemExpanded .card {
+  .itemExpanded .card,
+  .itemExpanded .card[data-tone="dark"] {
     aspect-ratio: 240 / 600;
     padding: 32px 20px;
     justify-content: space-between;
     color: var(--color-white);
     background: var(--gradient-center-card);
+  }
+
+  /* 3열 그리드에는 '확장' 상태가 없다 — 6장 모두 축소 카드 모양이므로
+     사진 레이어를 아예 끈다(투명도 0 이면 이미지 디코딩만 낭비된다). */
+  .media {
+    display: none;
   }
 
   .itemExpanded .shortLabel {
@@ -424,7 +528,24 @@
 /* --- 모바일 (768 이하) — 센터모드 스와이퍼 (시안 p4_08/09) ----------------
    중앙 카드 240×480(= center Image_mo), 좌우 peek 64×480(= center card_mo).
    `≡` 는 Figma 주석대로 제거(컴포넌트에서 렌더 자체를 하지 않는다). */
+/* --- 모바일 — Figma `8:4548` (375×712) 실측 -------------------------------
+     트랙 컨테이너 8:4549 : x −12.5 / w 400 / h 480
+       축소 8:4550  x 0    w 64
+       확장 8:4551  x 80   w 240      → gap 16
+       축소 8:4552  x 336  w 64
+       64 + 16 + 240 + 16 + 64 = 400  (프레임 375 → 좌우 12.5 씩 화면 밖으로 블리드)
+     컨트롤 8:4553 : w 272 = 화살표 40 + 도트 160 + 화살표 40, gap 16
+
+   ⚠️ 예전 구현은 `overflow-x: auto` + scroll-snap 가로 스크롤러였다. 시안과 다르다.
+      시안은 데스크톱과 같은 **3장 창**이고 좌우 축소 카드가 화면 밖으로 살짝 잘려
+      "더 있다"를 알린다. 스크롤러로 두면 네 번째 카드가 어정쩡하게 걸쳐 보인다.
+      (실제로 375 에서 "백내장센터"가 오른쪽 끝에 반쯤 잘린 채 멈춰 있었다) */
 @media (max-width: 768px) {
+  /* 트랙이 좌우로 12.5 씩 넘치므로 페이지에 가로 스크롤바가 생기지 않게 가둔다 */
+  .section {
+    overflow: hidden;
+  }
+
   .trackWrap {
     padding-inline: 0;
   }
@@ -432,32 +553,28 @@
   .track {
     display: flex;
     grid-template-columns: none;
-    gap: 12px;
+    gap: 16px;
     height: 480px;
-    padding-inline: var(--mobile-gutter);
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
+    /* 8:4549 의 x −12.5 / w 400 을 뷰포트 폭에 비례해 재현한다 */
+    width: calc(100% + 25px);
+    margin-inline: -12.5px;
+    padding-inline: 0;
+    overflow: visible;
   }
 
-  .track::-webkit-scrollbar {
-    display: none;
+  /* 64 : 240 = 4 : 15 (데스크톱은 240 : 1120 = 3 : 14) */
+  .item {
+    flex: 4 1 0;
   }
 
-  .item,
-  .itemHidden {
-    flex: 0 0 auto;
-    width: var(--center-card-collapsed);
-    margin-right: 0;
-    scroll-snap-align: center;
-    transition: width 0.45s cubic-bezier(0.33, 1, 0.68, 1);
-  }
-
-  /* 모바일에는 그룹 모드가 없으므로 펼친 카드는 항상 한 장(= 활성)이다 */
   .itemExpanded,
   .itemGrouped {
-    width: var(--center-card-default);
+    flex-grow: 15;
+  }
+
+  .itemHidden {
+    flex: 0 0 0;
+    margin-right: -16px;
   }
 
   .card,
@@ -469,9 +586,21 @@
   .itemExpanded .card {
     justify-content: flex-end;
     color: var(--gray-900);
-    background:
-      linear-gradient(90deg, rgba(207, 233, 255, 0.6) 0%, rgba(232, 243, 255, 0) 41.391%),
-      linear-gradient(135deg, var(--primary-50) 0%, var(--primary-200) 60%, var(--primary-300) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--primary-50) 0%,
+      var(--primary-200) 60%,
+      var(--primary-300) 100%
+    );
+  }
+
+  .itemExpanded .card[data-tone="dark"] {
+    color: var(--color-white);
+  }
+
+  /* 모바일 확장 카드(240×480)에도 시안 8:5265~8:5290 처럼 사진이 깔린다 */
+  .itemExpanded .media {
+    display: block;
   }
 
   /* 64px 로 좁아지면 가로쓰기가 불가능하다 → 세로쓰기 */
@@ -488,6 +617,7 @@
     display: flex;
   }
 
+  /* 240px 폭에 본문 18px 을 넣으면 카드 높이를 넘긴다 — 시안도 제목까지만 나온다 */
   .desc {
     display: none;
   }
@@ -501,11 +631,11 @@
     display: none;
   }
 
-  /* 화살표·도트는 스와이퍼 조작에 필요하므로 다시 노출한다 */
+  /* 컨트롤은 스와이퍼 조작에 필요하므로 항상 노출한다 (8:4553) */
   .controls {
     display: flex;
-    margin-top: var(--gap-md);
-    padding-inline: var(--mobile-gutter);
+    gap: 16px;
+    margin-top: 32px;
   }
 }
 
@@ -515,6 +645,7 @@
   .item,
   .card,
   .expanded,
+  .media,
   .shortLabel,
   .arrow,
   .plus,

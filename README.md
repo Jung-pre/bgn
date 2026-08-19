@@ -7,7 +7,7 @@
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000/ko
+npm run dev          # http://localhost:3100/ko
 npm run build
 npm run analyze:chunk   # 빌드 후 — three/drei 가 진입 청크로 샜는지 검사
 npm run typecheck

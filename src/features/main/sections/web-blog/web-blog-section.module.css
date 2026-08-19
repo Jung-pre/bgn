@@ -12,41 +12,34 @@
   overflow: hidden;
 }
 
-/* ① Figma 2:2400 — 풀블리드 배경 영상 */
+/* ① Figma 8:2268 — 풀블리드 배경(현재는 bg.webp poster).
+   주석 2:2401 `영상에 색상블러 넣어두었습니다` 의 블러를 **여기서** 건다.
+   덮개에 backdrop-filter 로 걸면 합성 레이어가 없는 환경에서 통째로 무시돼
+   원본 실크 무늬가 선명하게 드러난다(시안은 형체를 알아볼 수 없을 만큼 흐리다).
+   블러 대상이 매체 자신이므로 지원 여부와 무관하게 항상 같은 그림이 나온다.
+
+   rem 인 이유: root font-size 가 뷰포트 비례(1920→16px)라 4.6875rem 이
+   시안 기준 75px 이고, 창이 줄면 블러 반경도 같은 비율로 준다. px 로 박으면
+   1440 에서 시안보다 훨씬 뭉개진다.
+
+   inset 을 음수로 넓히지 않는 이유: blur 가장자리의 투명 번짐을 지우려고 밖으로
+   빼면 object-fit:cover 의 크롭 기준이 함께 밀려 시안 왼쪽의 금빛 덩어리가
+   화면 밖으로 사라진다. 번짐은 섹션 폴백색(--brand-navy)과 같은 어두운 톤이라
+   가장자리 비네팅처럼 보일 뿐이므로 크롭을 지키는 쪽을 택했다. */
 .bgVideo {
   position: absolute;
   inset: 0;
   z-index: 0;
+  filter: blur(4.6875rem);
 }
 
-/* ② Figma 2:2401 — "색상블러". blur 75px + 블루 0.2 오버레이 */
+/* ② Figma 2:2401 — "색상블러" 중 색 레이어. 블러는 ① 이 담당한다 */
 .colorBlur {
   position: absolute;
   inset: 0;
   z-index: 1;
-  backdrop-filter: blur(75px);
-  -webkit-backdrop-filter: blur(75px);
   background: rgba(0, 114, 236, 0.2);
   pointer-events: none;
-}
-
-/*
-  ②-b 임시 톤 보정.
-  시안(2:2399)의 배경 영상은 짙은 네이비에 블루 사선 광이 흐르는 화면이다.
-  실제 영상이 아직 없어 `VideoSlot` 이 밝은 하늘색 자리표를 그리는데,
-  그대로 두면 섹션 전체가 시안과 정반대로 밝아진다.
-  **영상이 도착하면 이 레이어는 지운다.**
-*/
-.bgTone {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(60% 45% at 12% 30%, rgba(120, 116, 60, 0.35) 0%, transparent 70%),
-    radial-gradient(70% 55% at 30% 100%, rgba(0, 114, 236, 0.55) 0%, transparent 68%),
-    linear-gradient(160deg, #0a1c38 0%, #0a2048 45%, #071630 100%);
-  opacity: 0.94;
 }
 
 /* ③ Figma 2:2571 — 글자 모양으로 뚫린 덮개판.
@@ -69,12 +62,16 @@
    시안은 글자 주변이 배경 영상 그대로다 — 덮개를 진하게 깔면 시안보다 탁해진다. */
 .maskPlate {
   fill: var(--brand-navy);
-  opacity: 0.42;
+  /* 실제 배경(bg.webp)이 이미 짙은 네이비라 0.42 를 그대로 두면 시안보다 탁해진다 */
+  opacity: 0.3;
 }
 
 /* 인라인 SVG 라서 문서의 웹폰트(Belleza)를 그대로 쓴다.
    CSS mask-image 로 외부 SVG 를 불렀다면 이 폰트가 적용되지 않는다.
    시안 실측 120px — viewBox 가 1920×920(시안 프레임)이라 1920 뷰포트에서 1:1 이다. */
+/* 단위는 **viewBox 사용자 단위**다(px 가 아니라). PC viewBox 는 1920 폭이라
+   120 이 시안의 120px 와 1:1 로 떨어진다. 모바일은 viewBox 가 375 로 바뀌므로
+   같은 값을 쓰면 5배로 확대된다 → 아래 미디어쿼리에서 다시 잡는다. */
 .maskText {
   font-family: var(--font-display-stack);
   font-size: 120px;
@@ -83,7 +80,9 @@
 
 /* 구멍 위에 겹치는 옅은 흰 글자 (TSX 주석 참고) */
 .maskShine {
-  fill: rgba(255, 255, 255, 0.62);
+  /* 시안 8:2268 의 타이틀은 거의 순백이다. 배경이 어두운 컷으로 확정돼
+     0.62 로는 회색으로 뜬다 — 구멍 아래 움직임은 남을 만큼만 열어 둔다. */
+  fill: rgba(255, 255, 255, 0.86);
 }
 
 /* ④ 가로 트랙 — GSAP 이 x 를 트윈한다. CSS transition 을 걸면 scrub 과 싸운다.
@@ -172,13 +171,18 @@
   gap: var(--gap-sm);
 }
 
+/* 시안 8:2326 실측 640×400. `<img>` 라 폭만 주고 높이는 비율이 만든다.
+   원본 사진의 비율이 제각각이라(844×1125 세로컷도 있다) cover 로 잘라 맞춘다. */
 .thumb {
+  display: block;
   width: 40rem;
   max-width: 100%;
+  height: auto;
   aspect-ratio: 16 / 10;
+  object-fit: cover;
   border-radius: 0.75rem;
+  /* 디코딩 전 자리색 — 흰 카드 위 흰 구멍을 막는다 */
   background: linear-gradient(150deg, var(--gray-100) 0%, var(--gray-200) 100%);
-  overflow: hidden;
 }
 
 .tags {
@@ -257,7 +261,16 @@
   color: var(--brand-navy);
 }
 
-/* --- 모바일 — 세로 스택. 카드 1장 = 1화면, 타일이 디바이더 ------------------ */
+/* --- 모바일 — 세로 스택 -----------------------------------------------------
+   시안 실측(≤1024 에서 root font-size 는 16px 고정이라 rem = px 로 떨어진다):
+     인트로 `8:4891`  375×812  덮개 + 2줄 타이틀, 풀스크린
+     타일   `8:4935`  375×400  BGN / 심볼 / Eye Clinic Jamsil
+     브랜드 `8:4968`  375×357  사진 + 네이비 워터마크
+     카드   `8:4985`  375×464  사진 + 태그 + 2줄 제목 + 워터마크
+
+   ⚠️ 예전에 카드를 `min-height: 100svh` 로 뒀는데 시안과 다르다. 시안은
+      카드 한 장이 464 로 화면의 절반 남짓이고, 스크롤하면 타일과 카드가
+      번갈아 지나간다. 풀스크린으로 두면 3건 읽는 데 6화면을 넘긴다. */
 @media (max-width: 768px) {
   .section {
     min-height: 0;
@@ -265,12 +278,12 @@
   }
 
   /* pin 이 없으므로 덮개를 섹션 전체에 깔면 글자가 문서 한가운데로 내려간다.
-     흐름 안의 인트로 밴드로 바꿔 첫 화면에서 타이틀 역할을 하게 한다. */
+     흐름 안의 인트로 밴드로 바꿔 첫 화면에서 타이틀 역할을 하게 한다.
+     시안 8:4891 이 812(=풀스크린)라 svh 로 맞춘다. */
   .maskStage {
     position: relative;
     inset: auto;
-    height: 60svh;
-    margin-bottom: var(--gap-lg);
+    height: 100svh;
   }
 
   .track {
@@ -285,34 +298,47 @@
     width: 100%;
   }
 
-  /* 시안 p4_14~19 — 카드 1장이 화면 하나를 채운다 */
-  .card {
-    min-height: 100svh;
-    justify-content: center;
-    padding: var(--gap-lg) var(--mobile-gutter);
-  }
-
-  .thumb {
-    width: 100%;
-  }
-
+  /* 시안 8:4935 = 375×400 */
   .tile {
+    min-height: 400px;
     gap: var(--gap-md);
-    padding: var(--gap-xl) var(--mobile-gutter);
+    padding: 40px var(--mobile-gutter);
   }
 
   .tileSymbol {
-    width: 4.5rem;
-    height: 4.5rem;
+    width: 72px;
+    height: 72px;
+  }
+
+  /* 시안 8:4985 = 375×464. 높이는 내용이 만들고 좌우 패딩만 gutter 로 맞춘다 */
+  .card {
+    min-height: 0;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 24px var(--mobile-gutter) 32px;
+  }
+
+  /* 시안 8:4986 — 카드 폭에서 좌우 gutter 를 뺀 343×205, radius 12 */
+  .thumb {
+    width: 100%;
+    aspect-ratio: 343 / 205;
   }
 
   .cardTitle {
     font-size: var(--fs-20);
   }
 
+  /* 시안 8:4990 — 워터마크가 카드 하단에 흐릿하게 깔린다(잘리지 않는다) */
   .watermark {
     position: static;
     font-size: var(--fs-32);
+    white-space: nowrap;
+  }
+
+  /* viewBox 가 1920 → 375 로 바뀌었으므로 글자도 그 좌표계로 다시 잡는다.
+     시안 8:4891 의 2줄 타이틀 실측 ≈ 56 (375 폭 기준). */
+  .maskText {
+    font-size: 56px;
   }
 }
 

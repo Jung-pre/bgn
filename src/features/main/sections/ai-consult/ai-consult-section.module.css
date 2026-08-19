@@ -19,20 +19,29 @@
 }
 
 /*
-  2:1204 하단의 파란 도트 메시 웨이브. 원본은 이미지 에셋인데 저장소에 없어서
-  CSS 도트 필드 + 마스크로 근사했다. 에셋이 오면 이 블록을 <Image /> 로 교체.
+  8:1078 하단의 파란 도트 메시 웨이브 = `/main/ai/bg.webp` (2400×1351).
+
+  원본 에셋은 **흰 바탕 + 회색 도트**라 그대로 깔면 시안의 파란 메시가 안 나온다.
+  아래 레이어에 primary-500 단색을 두고 `background-blend-mode: screen` 으로 합성한다
+  — screen(흰 바탕, 파랑) = 흰색(= 섹션 배경과 이음매 없음),
+    screen(회색 도트, 파랑) = 옅은 파랑(= 시안의 도트 색). 색 보정 필터보다 예측 가능하다.
+  마스크는 시안처럼 위/오른쪽으로 사라지게 하는 용도로 유지.
 */
 .mesh {
   position: absolute;
   inset: auto 0 0 0;
-  height: 40%;
-  background-image: radial-gradient(circle, rgba(0, 114, 236, 0.5) 1px, transparent 1.2px);
-  background-size: 1.75rem 1.75rem;
+  height: 52%;
+  background-image:
+    url("/main/ai/bg.webp"), linear-gradient(var(--primary-500), var(--primary-500));
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: bottom center;
+  background-blend-mode: screen;
   mask-image:
-    linear-gradient(180deg, transparent 0%, #000 55%, transparent 98%),
-    linear-gradient(100deg, #000 0%, #000 55%, transparent 88%);
+    linear-gradient(180deg, transparent 0%, #000 42%, #000 100%),
+    /* 시안에서 도트는 우측 유리 오브젝트에 닿기 전에 사라진다 → 55% 부터 페이드 */
+    linear-gradient(100deg, #000 0%, #000 34%, transparent 72%);
   mask-composite: intersect;
-  opacity: 0.32;
   pointer-events: none;
 }
 
@@ -262,8 +271,8 @@
 
 /*
   주석: "영상 삽입 예정 / 해당 영역 클릭시 하단 상담신청 Fade in".
-  영상이 아직 없어서 VideoSlot 이 빈 상자로 남는다 → 시안의 유리 오브젝트 자리가
-  통째로 비어 보이지 않도록 부드러운 글로우만 깔아 둔다(에셋 오면 제거).
+  현재는 `logo-glass.webp`(유리 B) 스틸이 들어간다. 에셋 바탕이 흰색이라
+  섹션 흰 배경과 이음매가 없다 → 자리표용 글로우는 제거했다.
 */
 .media {
   position: relative;
@@ -271,7 +280,6 @@
   width: 47.625rem; /* 762 */
   aspect-ratio: 1;
   border-radius: var(--radius-lg);
-  background: radial-gradient(circle at 50% 46%, rgba(124, 185, 255, 0.18) 0%, transparent 62%);
   cursor: pointer;
 }
 
@@ -284,12 +292,12 @@
   border-radius: var(--radius-lg);
 }
 
-/* 영상 에셋이 없는 동안 VideoSlot 의 자리표가 시안에 없는 **큰 색 블록**으로 보인다.
-   공용 컴포넌트라 손대지 않고, 이 섹션에서만 원형으로 마스킹해 부유 오브젝트처럼
-   보이게 낮춘다. 영상이 붙으면 자리표 분기 자체가 사라져 이 규칙도 무의미해진다. */
-.objectVideo [data-video-placeholder] {
-  opacity: 0.4;
-  mask-image: radial-gradient(circle at 50% 46%, #000 0%, #000 34%, transparent 68%);
+/* 에셋 바탕이 순백이 아니라(≈#fdfdfd, 미세한 그라데이션) 그대로 얹으면 흰 섹션 위에
+   762 정사각형 이음매가 보이고, 뒤에 깔린 도트 메시까지 잘라 먹는다.
+   multiply 는 흰 바탕을 사실상 투명하게 만들어 두 문제를 한 번에 없앤다
+   (유리 B 본체는 밝은 회청색이라 톤이 거의 변하지 않는다). */
+.objectVideo img {
+  mix-blend-mode: multiply;
 }
 
 /* ── 확대 상태 (2:1244) ─────────────────────────────────────────────────── */
@@ -325,6 +333,13 @@
   justify-content: center;
   width: auto;
   text-align: center;
+}
+
+/* `.copyExpanded` 가 absolute 로 빠지면 `.inner` 의 flex 아이템이 오브젝트 하나만
+   남아 왼쪽으로 붙어버린다. 시안 8:1118 은 확대 상태에서도 유리 B 가 우측에 그대로
+   있다(딤 뒤로 흐릿하게) → 남은 아이템을 오른쪽에 고정한다. */
+.sectionExpanded .media {
+  margin-left: auto;
 }
 
 .copyExpanded .eyebrow,
@@ -401,11 +416,13 @@
     font-size: var(--fs-32);
   }
 
-  /* 모바일은 폼이 먼저, 오브젝트는 아래 (시안 p4_07) */
+  /* 모바일은 폼이 먼저, 오브젝트는 아래 (시안 p4_07).
+     시안 슬롯(2:1242)은 762×762 정사각이다. 4/3 으로 두면 VideoSlot 의
+     `object-fit: cover` 가 정사각 유리 B 의 위아래를 잘라 먹는다. */
   .media {
     order: 2;
     width: 100%;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 1;
   }
 }
 

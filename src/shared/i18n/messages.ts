@@ -48,6 +48,12 @@ export interface HeroSectionMessages {
 export interface DoctorMessages {
   name: string;
   title: string;
+  /**
+   * 누끼 인물 사진(WebP). Figma 원본에서 추출해 `public/main/team/` 에 넣었다.
+   * 이름 ↔ 얼굴 대응은 시안 `8:868` 카드에서 직접 확인한 것이다(추측 아님).
+   * 아직 이름을 못 읽은 3명은 `doctor-06/07/08` 로 임시 배정돼 있다.
+   */
+  photo: string;
 }
 
 export interface MedicalTeamSectionMessages extends SectionHeaderMessages {
@@ -98,6 +104,8 @@ export interface CenterMessages {
   nameEn: string;
   description: string;
   href: string;
+  /** 카드 배경 사진(WebP). 시안 `8:5162` center card 세트에서 추출 */
+  image: string;
 }
 
 export interface CentersSectionMessages extends SectionHeaderMessages {
@@ -126,6 +134,8 @@ export interface BlogPostMessages {
   tags: string[];
   title: string;
   href: string;
+  /** 카드 썸네일(WebP). 시안 `8:2419`~`8:2739` 에서 추출 */
+  image: string;
 }
 
 export interface BlogSectionMessages {
@@ -139,6 +149,8 @@ export interface EventItemMessages {
   title: string;
   subtitle: string;
   href: string;
+  /** 정사각 배너(WebP). 시안 `8:2700` 에서 추출 */
+  image: string;
 }
 
 export interface EventSectionMessages extends SectionHeaderMessages {
@@ -245,15 +257,21 @@ const ko: Dictionary = {
     //
     // 시안에 이름이 적힌 의료진은 5명뿐이다(나머지 카드는 같은 얼굴의 자리표시용
     // 복제였다). 3·4·5번은 원본을 받기 전까지 빈 문자열로 둔다.
+    /*
+      이름 ↔ 얼굴 대응은 시안 `8:868` 카드에서 직접 읽었다.
+      김소현=묶은머리 / 이수민=긴머리 / 박세광=넥타이 고령 / 김정완=옆가르마
+      (김정완은 가운 이름표 "원장 김정…"으로 2차 확인) / 한정엽=짧은머리 정면.
+      이름을 못 읽은 3명은 `doctor-06/07/08` 로 두고 시안 다른 상태에서 확인 필요.
+    */
     doctors: [
-      { name: "박세광", title: "대표원장" }, // 2:1041 (활성 카드)
-      { name: "김정완", title: "원장" }, // 2:1047
-      { name: "한정엽", title: "원장" }, // 2:1054
-      { name: "", title: "" },
-      { name: "", title: "" },
-      { name: "", title: "" },
-      { name: "김소현", title: "원장" }, // 2:1028
-      { name: "이수민", title: "원장" }, // 2:1035
+      { name: "박세광", title: "대표원장", photo: "/main/team/park-segwang.webp" }, // 2:1041
+      { name: "김정완", title: "원장", photo: "/main/team/kim-jeongwan.webp" }, // 2:1047
+      { name: "한정엽", title: "원장", photo: "/main/team/han-jeongyeop.webp" }, // 2:1054
+      { name: "", title: "", photo: "/main/team/doctor-06.webp" },
+      { name: "", title: "", photo: "/main/team/doctor-07.webp" },
+      { name: "", title: "", photo: "/main/team/doctor-08.webp" },
+      { name: "김소현", title: "원장", photo: "/main/team/kim-sohyun.webp" }, // 2:1028
+      { name: "이수민", title: "원장", photo: "/main/team/lee-sumin.webp" }, // 2:1035
     ],
   },
 
@@ -335,6 +353,7 @@ const ko: Dictionary = {
         description:
           "정밀한 검사와 첨단 장비를 바탕으로\n눈 상태에 맞는 안전한 시력교정을\n제공하는 스마트라식센터",
         href: "/center/smile",
+        image: "/main/centers/smile.webp",
       },
       {
         shortName: "시력교정센터",
@@ -344,6 +363,9 @@ const ko: Dictionary = {
         description:
           "최첨단 장비와 노하우로 안전하게!\n눈 건강을 최우선으로 생각하는\n밝은눈안과 시력교정센터",
         href: "/center/vision-correction",
+        // vision.webp 는 exam.webp 와 **같은 사진**이라 안종합검진 카드와 겹친다.
+        // 시안 8:5205 는 세극등 검사 컷이므로 consult.webp 가 맞다.
+        image: "/main/centers/consult.webp",
       },
       {
         shortName: "백내장센터",
@@ -353,6 +375,7 @@ const ko: Dictionary = {
         description:
           "정밀한 진단과 체계적인 수술 시스템으로\n개인의 눈 상태에 맞는 맞춤형 백내장 치료를\n제공하는 백내장센터",
         href: "/center/cataract",
+        image: "/main/centers/cataract.webp",
       },
       {
         shortName: "드림렌즈센터",
@@ -362,6 +385,7 @@ const ko: Dictionary = {
         description:
           "자는 동안 시작되는 근시 관리\n성장기 아이의 눈 상태를 꼼꼼히 확인하고\n근시 진행을 고려한 드림렌즈를 처방합니다.",
         href: "/center/dream-lens",
+        image: "/main/centers/dream-lens.webp",
       },
       {
         shortName: "건성안센터",
@@ -371,6 +395,7 @@ const ko: Dictionary = {
         description:
           "정밀한 눈물막·안구표면 검사부터\n개인의 건조증 원인에 맞춘 체계적인 치료를\n제공하는 건성안센터",
         href: "/center/dry-eye",
+        image: "/main/centers/dry-eye.webp",
       },
       {
         shortName: "안종합검진센터",
@@ -380,6 +405,7 @@ const ko: Dictionary = {
         description:
           "정밀한 안과 검진과 체계적인 검사 시스템으로\n눈 건강 상태를 꼼꼼하게 확인하고\n질환을 조기에 발견하는 안종합검진센터",
         href: "/center/examination",
+        image: "/main/centers/exam.webp",
       },
     ],
   },
@@ -443,16 +469,19 @@ const ko: Dictionary = {
         tags: ["Doctor's Story", "히포크라테스의 생각"],
         title: "백내장 명의? 증세의 정도를 확인하는 판단력이 필요합니다.",
         href: "/blog/1",
+        image: "/main/blog/post-1.webp",
       },
       {
         tags: ["Doctor's Story"],
         title: "스마일라식, 후기로는 알 수 없는 이야기",
         href: "/blog/2",
+        image: "/main/blog/post-2.webp",
       },
       {
         tags: ["서선의 기술", "안(眼)목 있는 이야기"],
         title: "부드러운 햇살에 속지 마세요, 눈 건강에 더 위험한 이유",
         href: "/blog/3",
+        image: "/main/blog/post-3.webp",
       },
     ],
   },
@@ -469,9 +498,20 @@ const ko: Dictionary = {
         title: "SUMMER EVENT 뜨거운 8월",
         subtitle: "8월 한정 시력교정술 특별혜택",
         href: "/event/1",
+        image: "/main/event/banner-1.webp",
       },
-      { title: "여름준비, 시력부터", subtitle: "혜택이 왔썸머", href: "/event/2" },
-      { title: "노안·백내장 수술 최대혜택 이벤트", subtitle: "", href: "/event/3" },
+      {
+        title: "여름준비, 시력부터",
+        subtitle: "혜택이 왔썸머",
+        href: "/event/2",
+        image: "/main/event/banner-3.webp",
+      },
+      {
+        title: "노안·백내장 수술 최대혜택 이벤트",
+        subtitle: "",
+        href: "/event/3",
+        image: "/main/event/banner-2.webp",
+      },
     ],
   },
 

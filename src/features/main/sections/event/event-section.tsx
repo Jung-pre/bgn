@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useSectionReveal } from "@/features/main/sections/common/use-section-reveal";
 import type { EventSectionMessages } from "@/shared/i18n/messages";
@@ -95,7 +96,22 @@ export function EventSection({ messages }: EventSectionProps) {
             {events.map((ev) => (
               <li key={ev.href} className={styles.card}>
                 <Link href={ev.href} className={styles.cardLink} draggable={false}>
-                  <div className={styles.thumb} aria-hidden />
+                  {/*
+                    배너 안에 카피가 이미 그려져 있어 alt 를 달면 아래 .sr-only 와
+                    링크 이름이 두 번 읽힌다 → 이미지는 장식으로 넘긴다.
+                    sizes: 카드 폭은 30rem 인데 root 가 뷰포트 비례(1920→16px)라
+                    데스크톱에서는 사실상 25vw 고정, 1024 이하는 root 16px 이라 480/240px.
+                  */}
+                  <Image
+                    src={ev.image}
+                    alt=""
+                    aria-hidden
+                    width={480}
+                    height={480}
+                    className={styles.thumb}
+                    sizes="(max-width: 768px) 240px, (max-width: 1024px) 480px, 25vw"
+                    draggable={false}
+                  />
                   {/* 시안 카드에는 텍스트가 없다. 링크 이름만 보조기기에 남긴다 */}
                   <span className="sr-only">
                     {ev.title}

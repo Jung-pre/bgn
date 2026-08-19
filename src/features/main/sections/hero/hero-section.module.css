@@ -60,46 +60,148 @@
   height: 100% !important;
 }
 
-/* 타워 배경 — Figma 2:3008 실측 그라데이션 */
+/* --- 타워 씬 (Figma 메인_02 8:2877, 1920×920) --------------------------------
+   시안이 1920×920 한 장의 합성이라, 좌표를 그대로 쓰려면 그 비율을 가진
+   "스테이지"를 하나 두고 그 안에서만 %로 배치해야 한다. 뷰포트에 직접
+   %를 쓰면 창 비율이 바뀔 때마다 구름과 광선의 상대 위치가 어긋난다. */
+
+.towerLayer {
+  /* 스테이지가 cqw/cqh 로 자기 크기를 잡는다 */
+  container-type: size;
+  /* 타워·구름이 프레임 밖으로 한참 넘치므로 여기서 잘라낸다 */
+  overflow: hidden;
+}
+
+/* 하늘 — 시안에서는 프레임 fill 로 깔린 사진 한 장(bg-1).
+   이미지가 디코딩되기 전 한 프레임을 메우려고 근사 그라데이션을 밑에 깐다. */
 .towerSky {
   position: absolute;
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgb(121, 179, 246) 18.699%,
-    rgb(208, 204, 194) 66.929%,
-    rgb(165, 175, 188) 100%
+    rgb(140, 180, 234) 0%,
+    rgb(186, 197, 226) 52%,
+    rgb(214, 216, 226) 100%
   );
 }
 
-.towerImg {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  translate: -30% 0;
-  height: 110%;
-  width: auto;
-  opacity: 0.65; /* Figma 실측 */
-  object-fit: contain;
-}
-
-.towerTexture {
+.towerSkyImg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  mix-blend-mode: soft-light;
-  opacity: 0.5; /* Figma 실측 */
+  /* 세로 뷰포트에서 잘릴 때 시안의 오른쪽 푸른 하늘을 남긴다 */
+  object-position: 68% 50%;
 }
 
-/* 에셋 도착 전 자리표 */
-.towerPlaceholder {
+/* 시안 프레임을 뷰포트에 cover 로 채운다. bottom 기준이라 지평선이 흔들리지 않는다.
+   ⚠️ 가운데 정렬에 `translate: -50%` 를 쓰면 안 된다. transform 계열 속성은
+   이 요소를 스태킹 컨텍스트 = **격리 그룹**으로 만들어서, 안쪽 레이어의
+   mix-blend-mode 가 바깥의 하늘까지 닿지 못한다(파티클 soft-light 가 통째로
+   일반 합성으로 떨어져 하늘이 저녁처럼 어두워졌던 원인).
+   그래서 음수 margin 으로만 센터링한다. */
+.towerStage {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: max(100cqw, calc(100cqh * 1920 / 920));
+  margin-left: calc(max(100cqw, calc(100cqh * 1920 / 920)) * -0.5);
+  aspect-ratio: 1920 / 920;
+}
+
+/* 패럴랙스 래퍼 — JS 가 매 프레임 transform 만 쓴다.
+   ⚠️ `will-change: transform` 은 이 요소를 **스태킹 컨텍스트**로 만든다.
+   그래서 블렌드는 반드시 자식이 아니라 이 래퍼 자신에 걸어야 한다.
+   자식에 걸면 배경이 투명한 자기 그룹 안에서만 섞여 블렌드가 통째로 죽는다
+   (파티클이 하늘을 어둡게 덮어 저녁 하늘이 됐던 원인). */
+.px {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(45% 70% at 62% 60%, rgba(255, 255, 255, 0.55) 0%, transparent 65%),
-    radial-gradient(80% 50% at 20% 85%, rgba(255, 255, 255, 0.5) 0%, transparent 70%);
+  will-change: transform;
+}
+
+/* 시안 그룹 블렌드 — 반드시 `.px` 와 같은 요소에 붙인다 */
+.softLight {
+  mix-blend-mode: soft-light;
+}
+
+/* 광선은 시안에서 프레임에 마스크로 잘려 있다.
+   ⚠️ 패럴랙스 래퍼 **바깥**에 둬야 한다. 안쪽에 두면 잘라내는 사각형까지 같이
+   움직여서 화면 오른쪽에 직선 경계가 그대로 드러난다. */
+.stageClip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.sprite {
+  position: absolute;
+  display: block;
+  max-width: none;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 타워 — 8:2947 `bg` 사각형이 마스크라 그 박스로 먼저 자르고 사진을 넣는다 */
+.towerCrop {
+  position: absolute;
+  left: 36.7708%; /* 706 / 1920 */
+  top: 6.087%; /* 56 / 920 */
+  width: 62.4479%; /* 1199 / 1920 */
+  height: 111.7427%; /* 1028.03 / 920 */
+  overflow: hidden;
+}
+
+.towerPic {
+  position: absolute;
+  left: 4.0033%; /* (754 − 706) / 1199 */
+  top: -6.5173%; /* (−11 − 56) / 1028.03 */
+  width: 117.181%; /* 1405 / 1199 */
+  height: 124.2183%; /* 1277 / 1028.03 */
+  max-width: none;
+  object-fit: fill;
+  opacity: 0.65; /* Figma 8:2948 실측 */
+  pointer-events: none;
+}
+
+/* 파티클 텍스처 — 8:2880. 1920×1080 박스에 넣는다.
+   opacity/soft-light 는 위 `.px` 래퍼(= 스태킹 컨텍스트)에 걸린다. */
+.particlesBox {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 117.3913%; /* 1080 / 920 */
+  overflow: hidden;
+}
+
+.particlesImg {
+  position: absolute;
+  left: 0;
+  top: 0.02%;
+  width: 100%;
+  height: 112.02%; /* Figma 실측 */
+  max-width: none;
+  object-fit: fill;
+}
+
+/* 하단 구름 띠 — 8:2904. 시안도 덩어리 단위로 soft-light 다.
+   스프라이트마다 걸면 합성 횟수만 늘고 결과는 같다. */
+.cloudBand {
+  mix-blend-mode: soft-light;
+}
+
+/* 파티클 그룹 투명도 — Figma 8:2880 실측 50% */
+.particlesPx {
+  opacity: 0.5;
+}
+
+/* 상단 구름 덩어리 — 8:2881 / 8:2892. 블렌드 없이 opacity 40% 로만 얹힌다.
+   두 덩어리가 겹쳐 타워 첨탑 주변 하늘을 뿌옇게 만드는 게 목적이다. */
+.cloudTop {
+  mix-blend-mode: normal;
 }
 
 /* --- 카피 -------------------------------------------------------------------
@@ -297,6 +399,40 @@
 
   /* 하단 고정 퀵바가 있어서 스크롤 힌트를 뺀다 */
   .scrollHint {
+    display: none;
+  }
+
+  /* 타워 씬 — 세로 뷰포트에서 시안(2.09:1)을 cover 로 채우면 확대율이 4배가 돼
+     타워가 화면 밖으로 밀려난다. 폭 기준으로만 오버스캔하고 타워가 있는
+     오른쪽에 붙인 뒤, 아래를 비워 도시 스카이라인이 하단에 앉게 한다. */
+  .towerStage {
+    left: auto;
+    right: -30cqw;
+    bottom: 3cqh;
+    width: 300cqw;
+    margin-left: 0;
+  }
+
+  .towerSkyImg {
+    object-position: 72% 50%;
+  }
+
+  /* 스테이지가 화면보다 작아서, 광선을 스테이지에 자르면 하늘 한복판에
+     직선 경계가 생긴다. 자르기는 `.towerLayer` 에 맡긴다. */
+  .stageClip {
+    overflow: visible;
+  }
+
+  /* 파티클 텍스처(2400×1512)는 세로 화면에서 웨이브가 거의 안 보이는데
+     스테이지 윗변에 하드 엣지만 남긴다. 디코딩 비용까지 생각하면 빼는 게 낫다. */
+  .particlesPx {
+    display: none;
+  }
+
+  /* 소형 기기에서 20장 넘는 대형 블렌드 레이어는 스크롤 프레임을 잡아먹는다.
+     상단 구름 덩어리와, 화면 밖(시안 x −447~1086)인 좌측 띠를 뺀다. */
+  .cloudTop,
+  .cloudBand[data-band="0"] {
     display: none;
   }
 }

@@ -7,5 +7,9 @@ build
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
-_to_delete/
-docs/design/2026_BGN*.pdf
+
+# Figma 원본 에셋 작업 폴더 — 348MB 다운로드 원본과 컨택트 시트.
+# 최종 산출물은 public/ 에 WebP 로 들어가므로 저장소에는 넣지 않는다.
+# 다시 필요하면 `_figma/figma-download.ps1` 로 재수집(단, URL 은 7일 만료).
+/_figma/
+/_to_delete/

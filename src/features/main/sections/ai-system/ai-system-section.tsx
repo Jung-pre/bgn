@@ -10,7 +10,7 @@ import { countUpTween, formatNumeric, parseNumericLabel } from "./count-up";
 import styles from "./ai-system-section.module.css";
 
 /**
- * BGN AI 정밀 검사 시스템 — Figma `2:1088` (1920 × 1007).
+ * BGN AI 정밀 검사 시스템 — Figma `8:962` (1920 × 1007, 구 `2:1088`).
  *
  * ## 디자이너 주석 (docs/plan/07-interactions.md)
  *   헤드라인 2:1106 — "진입시 왼쪽에서 오른쪽 방향으로 텍스트 생성되며 함께 꾸밈요소 배치"
@@ -29,16 +29,24 @@ import styles from "./ai-system-section.module.css";
  *    이 마커 박스(2:1105 + 2:1210)다.
  * 5. 마퀴(2:1089)는 카드 아래가 아니라 **카드 뒤로 겹쳐** 지나간다.
  *
- * ## 왜 SVG 인가 (R3F 아님)
- * CLAUDE.md 확인 항목 6 "AI 섹션 데이터 비주얼의 3D 여부 — 전부 3D 는 프레임 예산
- * 초과". 4장이 동시에 뷰포트에 들어오므로 캔버스 4개는 불가. 전부 SVG + GSAP 이고,
- * `pathLength="1"` 정규화로 `getTotalLength()` 측정 없이 드로잉한다
- * (레이아웃 읽기 0회 = 스크롤 중 강제 리플로우 없음).
+ * ## 카드 오브젝트 = 실사 이미지 (2026-08 에셋 입고)
+ * 시안 1~3번 카드는 추상 도형이 아니라 **3D 렌더 사진**이다. 에셋이 없던 동안
+ * SVG(홍채 동심원 / 아이소메트릭 큐브 / 와이어프레임 안구)로 대체해 두었는데,
+ * 원본이 들어와 그대로 교체했다.
+ *   1 데이터 수집    → `eye-1.webp`    (레이저가 각막에 닿는 정면 스캔)
+ *   2 AI 빅데이터    → `eye-4.webp`    (데이터 큐브 — 파일명과 달리 눈이 아니라 큐브다)
+ *   3 AI 시뮬레이션  → `eye-hero.webp` (유리 플랫폼 위 안구 + 데이터 큐브)
+ *   4 맞춤형 제안    → 이미지 없음. 시안에도 패널 + 레이더뿐이라 그대로 둔다.
  *
- * ## 왜 이미지가 아니라 추상 도형인가
- * 시안 카드에는 474~508px PNG(홍채 / 큐브 / 안구 와이어프레임)가 들어간다.
- * 저장소 `public/` 이 비어 있어 **에셋을 받을 수 없다**. 같은 자리·같은 크기의
- * SVG 로 대체해 두었으니, PNG 가 오면 `StepArt` 를 <Image /> 로 갈아끼우면 된다.
+ * ## 배지·레이더는 SVG/DOM 을 유지한다
+ * 시안에서 SPH/AXIS/OPTICAL MAPPING/760,000+/ACCURACY 배지와 4번 카드의 추천 패널·
+ * 5각 레이더는 **사진 위에 얹힌 UI**다. 사진에 구워져 있지 않으므로 지금 구조가 맞다.
+ * 카운트업·스파크라인 드로잉도 그래서 살아 있다.
+ *
+ * ## 3D(R3F) 가 아닌 이유
+ * CLAUDE.md 확인 항목 6 — 4장이 동시에 뷰포트에 들어와 캔버스 4개는 프레임 예산 초과.
+ * 남은 SVG(스파크라인·레이더)는 `pathLength="1"` 정규화로 `getTotalLength()` 측정 없이
+ * 드로잉한다(레이아웃 읽기 0회 = 스크롤 중 강제 리플로우 없음).
  */
 export interface AiSystemSectionProps {
   messages: AiSystemSectionMessages;
@@ -76,7 +84,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
       const decos = pick<HTMLElement>(section, "[data-deco]");
       const cards = pick<HTMLElement>(section, "[data-ai-card]");
       const draws = pick<SVGGeometryElement>(section, "[data-draw]");
-      const dots = pick<SVGElement>(section, "[data-viz-dot]");
+      const arts = pick<HTMLImageElement>(section, "[data-art]");
       const badges = pick<HTMLElement>(section, "[data-badge]");
       const rows = pick<HTMLElement>(section, "[data-row]");
 
@@ -95,7 +103,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
       if (prefersReducedMotionSync()) {
         // early-return 금지. 최종 상태로 눌러 놓고 인라인 스타일을 지운다.
-        settleReducedMotion([...wipes, ...decos, ...cards, ...dots, ...badges, ...rows]);
+        settleReducedMotion([...wipes, ...decos, ...cards, ...arts, ...badges, ...rows]);
         // clearProps 가 커버하지 못하는 SVG 프레젠테이션 속성은 직접 확정.
         gsap.set([...wipes, ...decos], { clipPath: "none" });
         gsap.set(draws, { strokeDashoffset: 0 });
@@ -113,7 +121,9 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         transformOrigin: "50% 50%",
       });
       gsap.set(draws, { strokeDashoffset: (_i, target: Element) => drawLength(target) });
-      gsap.set(dots, { autoAlpha: 0, scale: 0.35, transformOrigin: "50% 50%" });
+      // 사진은 카드보다 살짝 늦게, 아주 조금 크게 들어온다 — 카드 등장이 '착' 하고
+      // 멈춘 뒤 오브젝트가 뒤따라 앉는 느낌. 크게 움직이면 사진이라 뭉개져 보인다.
+      gsap.set(arts, { autoAlpha: 0, scale: 1.06, transformOrigin: "50% 60%" });
       gsap.set(badges, { autoAlpha: 0, y: 10, scale: 0.94, transformOrigin: "50% 50%" });
       gsap.set(rows, { autoAlpha: 0, x: -8 });
       for (const { value, spec } of counters) {
@@ -160,13 +170,18 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
           );
         }
 
-        const cardDots = pick<SVGElement>(card, "[data-viz-dot]");
-        if (cardDots.length > 0) {
-          // 격자 좌상 → 우하로 번지게. 데이터가 채워지는 인상.
+        const cardArts = pick<HTMLImageElement>(card, "[data-art]");
+        if (cardArts.length > 0) {
           tl.to(
-            cardDots,
-            { autoAlpha: 1, scale: 1, duration: 0.45, stagger: { each: 0.018, from: "start" } },
-            at,
+            cardArts,
+            {
+              autoAlpha: 1,
+              scale: 1,
+              duration: 0.9,
+              ease: "power2.out",
+              clearProps: "opacity,visibility,transform",
+            },
+            at - 0.2,
           );
         }
 
@@ -198,27 +213,6 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
         const counter = counters.find((entry) => entry.card === card);
         if (counter) tl.add(countUpTween(counter.value, counter.spec), at + 0.2);
-
-        const scan = card.querySelector<SVGElement>("[data-viz-scan]");
-        if (scan) {
-          // 무한 반복 트윈을 타임라인에 직접 넣으면 타임라인 duration 이 무한이 된다.
-          // 별도 트윈을 만들어 두고 제 순서에 재생만 시킨다.
-          const scanLoop = gsap.to(scan, {
-            y: 52,
-            duration: 1.9,
-            ease: "sine.inOut",
-            repeat: -1,
-            yoyo: true,
-            paused: true,
-          });
-          tl.call(
-            () => {
-              scanLoop.play();
-            },
-            undefined,
-            at,
-          );
-        }
       });
     },
     { scope: sectionRef, dependencies: [messages.steps.length] },
@@ -288,213 +282,38 @@ function renderWithMark(title: string, marker?: string) {
   );
 }
 
-/* ── 카드 배경 오브젝트 ──────────────────────────────────────────────────── */
-
-function StepArt({ index }: { index: number }) {
-  switch (index) {
-    case 0:
-      return <IrisArt />;
-    case 1:
-      return <CubeArt />;
-    case 2:
-      return <EyeArt />;
-    default:
-      // 4번 카드는 시안에도 이미지가 없다 (2:1151 — 패널 + 레이더뿐).
-      return null;
-  }
-}
-
-/** 1. 데이터 수집 — 각막 토포그래피(동심원 + 방사 눈금) + 스캔 라인 */
-const IRIS_RINGS = [24, 38, 52, 66, 80, 94];
-const IRIS_SPOKES = Array.from({ length: 24 }, (_, i) => {
-  const rad = (i / 24) * Math.PI * 2;
-  return {
-    key: i,
-    x1: 100 + Math.cos(rad) * 34,
-    y1: 100 + Math.sin(rad) * 34,
-    x2: 100 + Math.cos(rad) * 92,
-    y2: 100 + Math.sin(rad) * 92,
-  };
-});
-
-function IrisArt() {
-  return (
-    <div className={clsx(styles.artFigure, styles.artIris)}>
-      <span className={styles.glow} />
-      <svg className={styles.artSvg} viewBox="0 0 200 200" aria-hidden focusable="false">
-        {IRIS_SPOKES.map((s) => (
-          <line
-            className={styles.vizLineSoft}
-            key={s.key}
-            x1={s.x1}
-            y1={s.y1}
-            x2={s.x2}
-            y2={s.y2}
-          />
-        ))}
-        {IRIS_RINGS.map((r) => (
-          <circle
-            key={r}
-            className={styles.vizLine}
-            cx="100"
-            cy="100"
-            r={r}
-            pathLength={1}
-            strokeDasharray="1 1"
-            data-draw="1"
-          />
-        ))}
-        <circle className={styles.vizCore} cx="100" cy="100" r="16" />
-        {/* 스캔 라인 — 그룹째 y 이동시킨다(개별 요소 좌표를 건드리지 않음) */}
-        <g data-viz-scan>
-          <rect className={styles.vizScanGlow} x="8" y="74" width="184" height="20" rx="10" />
-          <line className={styles.vizScanLine} x1="8" y1="84" x2="192" y2="84" />
-        </g>
-      </svg>
-    </div>
-  );
-}
+/* ── 카드 배경 오브젝트 (8:962 — 1~3번 카드의 3D 렌더 사진) ──────────────── */
 
 /**
- * 2. AI 빅데이터 분석 — 아이소메트릭 큐브 격자.
- * `Math.random()` 금지(React Compiler·리뷰 재현성) → 전부 인덱스 기반 결정값.
+ * 카드별 오브젝트. 위치·크기는 CSS(`.artCard1~3`)에서 카드 폭 대비 %로 잡는다 —
+ * 카드가 aspect-ratio 로 줄어드는 구조라 px 로 박으면 1440 에서 어긋난다.
+ *
+ * 전부 장식이다. 사진이 전하는 정보는 옆의 제목·설명·배지가 이미 글자로 갖고 있어
+ * alt 를 채우면 스크린리더에서 같은 말이 두 번 읽힌다 → `alt=""`.
+ * (`.art` 래퍼에 `aria-hidden` 이 걸려 있어 이중으로 막힌다.)
  */
-const CUBE_TOP = "100,26 178,65 100,104 22,65";
-const CUBE_LEFT = "22,65 100,104 100,179 22,140";
-const CUBE_RIGHT = "178,65 100,104 100,179 178,140";
+const STEP_ART = [
+  { src: "/main/ai/eye-1.webp", width: 1536, height: 1024, className: "artCard1" },
+  { src: "/main/ai/eye-4.webp", width: 1536, height: 1024, className: "artCard2" },
+  { src: "/main/ai/eye-hero.webp", width: 1672, height: 941, className: "artCard3" },
+] as const;
 
-/** 세 면 위에 균등 배치되는 격자 점 — 면마다 3×3 */
-const CUBE_DOTS = (() => {
-  const faces = [
-    // [원점, u 벡터, v 벡터]
-    [
-      [100, 26],
-      [78, 39],
-      [-78, 39],
-    ],
-    [
-      [22, 65],
-      [78, 39],
-      [0, 75],
-    ],
-    [
-      [178, 65],
-      [-78, 39],
-      [0, 75],
-    ],
-  ] as const;
-  const out: { key: string; cx: number; cy: number; r: number }[] = [];
-  faces.forEach(([origin, u, v], f) => {
-    for (let i = 1; i <= 3; i += 1) {
-      for (let j = 1; j <= 3; j += 1) {
-        out.push({
-          key: `${f}-${i}-${j}`,
-          cx: origin[0] + (u[0] * i) / 4 + (v[0] * j) / 4,
-          cy: origin[1] + (u[1] * i) / 4 + (v[1] * j) / 4,
-          r: (i + j) % 3 === 0 ? 2.6 : 1.8,
-        });
-      }
-    }
-  });
-  return out;
-})();
-
-/** 큐브 주변에 흩어진 작은 조각 — 시안의 부유하는 미니 큐브 */
-const CUBE_CHIPS = [
-  { key: "a", x: 4, y: 30, s: 10 },
-  { key: "b", x: 184, y: 24, s: 8 },
-  { key: "c", x: 186, y: 158, s: 10 },
-  { key: "d", x: 6, y: 162, s: 9 },
-  { key: "e", x: 96, y: 2, s: 6 },
-];
-
-function CubeArt() {
+function StepArt({ index }: { index: number }) {
+  const art = STEP_ART[index];
+  // 4번 카드는 시안에도 이미지가 없다 (8:962 — 패널 + 레이더뿐).
+  if (!art) return null;
   return (
-    <div className={clsx(styles.artFigure, styles.artCube)}>
-      <span className={styles.glow} />
-      <svg className={styles.artSvg} viewBox="0 0 200 200" aria-hidden focusable="false">
-        {CUBE_CHIPS.map((c) => (
-          <rect
-            className={styles.vizLineSoft}
-            key={c.key}
-            x={c.x}
-            y={c.y}
-            width={c.s}
-            height={c.s}
-            rx="1.5"
-          />
-        ))}
-        <polygon className={styles.vizFace} points={CUBE_TOP} />
-        <polygon className={styles.vizLine} points={CUBE_LEFT} />
-        <polygon className={styles.vizLine} points={CUBE_RIGHT} />
-        {CUBE_DOTS.map((d) => (
-          <circle
-            className={d.r > 2 ? styles.vizDotStrong : styles.vizDot}
-            key={d.key}
-            cx={d.cx}
-            cy={d.cy}
-            r={d.r}
-            data-viz-dot
-          />
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-/** 3. AI 시뮬레이션 — 와이어프레임 안구 + 홍채 + 광선 */
-const EYE_R = 74;
-/** 경선(세로) — rx 는 sin(t) 로 줄인다 */
-const EYE_MERIDIANS = [30, 60, 90, 120, 150].map((deg) => ({
-  key: deg,
-  rx: Math.round(EYE_R * Math.sin((deg * Math.PI) / 180) * 10) / 10,
-}));
-/** 위선(가로) — y 오프셋마다 반지름이 줄고, 원근으로 납작해진다 */
-const EYE_PARALLELS = [-50, -25, 0, 25, 50].map((dy) => {
-  const rx = Math.round(Math.sqrt(EYE_R * EYE_R - dy * dy) * 10) / 10;
-  return { key: dy, cy: 100 + dy, rx, ry: Math.round(rx * 0.26 * 10) / 10 };
-});
-
-function EyeArt() {
-  return (
-    <div className={clsx(styles.artFigure, styles.artSphere)}>
-      <span className={styles.glow} />
-      <svg className={styles.artSvg} viewBox="0 0 200 200" aria-hidden focusable="false">
-        <circle
-          className={styles.vizLine}
-          cx="100"
-          cy="100"
-          r={EYE_R}
-          pathLength={1}
-          strokeDasharray="1 1"
-          data-draw="1"
-        />
-        {EYE_MERIDIANS.map((m) => (
-          <ellipse
-            className={styles.vizLineSoft}
-            key={m.key}
-            cx="100"
-            cy="100"
-            rx={m.rx}
-            ry={EYE_R}
-          />
-        ))}
-        {EYE_PARALLELS.map((p) => (
-          <ellipse
-            className={styles.vizLineSoft}
-            key={p.key}
-            cx="100"
-            cy={p.cy}
-            rx={p.rx}
-            ry={p.ry}
-          />
-        ))}
-        {/* 홍채 — 시안에서 구체 좌측에 붙어 있고 광선이 들어온다 */}
-        <ellipse className={styles.vizFace} cx="62" cy="100" rx="17" ry="26" />
-        <circle className={styles.vizCore} cx="62" cy="100" r="8" />
-        <line className={styles.vizScanLine} x1="6" y1="100" x2="62" y2="100" />
-      </svg>
-    </div>
+    /* eslint-disable-next-line @next/next/no-img-element -- 카드 폭에 %로 물려 있어 next/image 의 고정 sizes 계산과 맞지 않는다 */
+    <img
+      className={clsx(styles.artImage, styles[art.className])}
+      src={art.src}
+      alt=""
+      width={art.width}
+      height={art.height}
+      loading="lazy"
+      decoding="async"
+      data-art
+    />
   );
 }
 

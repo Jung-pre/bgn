@@ -10,10 +10,15 @@
   /* 시안 프레임 높이 792px */
   min-height: 49.5rem;
   overflow: hidden;
-  /* 시안 배경은 사진 + 20% 오버레이 + blackbg-30 이다. 사진 에셋이 없어
-     같은 톤의 그라데이션으로 대체한다. 중앙의 옅은 발광은 대표번호 뒤의 글로우. */
+  /* .decor 의 screen 블렌드가 푸터 밖(위 섹션)까지 섞이지 않게 합성 그룹을 닫는다.
+     푸터 자신의 배경은 이 그룹 안에서 칠해지므로 블렌드 대상은 그대로 남는다. */
+  isolation: isolate;
+  /* 시안 배경은 사진 + 20% 오버레이 + blackbg-30 이다. 사진 자체는 에셋이 없어
+     같은 톤의 그라데이션으로 대체하고, 그 위에 실제 에셋인 와이어프레임 라인아트와
+     발광체(.decor)를 얹는다.
+     중앙 글로우는 이제 `sphere.webp` 가 그리므로 여기서 뺐다 — 겹치면 대표번호
+     뒤가 시안보다 두 배로 밝아진다. */
   background:
-    radial-gradient(38% 55% at 50% 34%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 70%),
     radial-gradient(70% 62% at 100% 100%, rgba(178, 198, 220, 0.5), rgba(178, 198, 220, 0) 72%),
     radial-gradient(50% 50% at 0% 100%, rgba(206, 190, 186, 0.28), rgba(206, 190, 186, 0) 70%),
     linear-gradient(160deg, #6e7a97 0%, var(--bg-footer) 55%, #8e9ab2 100%);
@@ -32,6 +37,60 @@
   position: absolute;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: var(--radius-full);
+}
+
+/* --- 배경 에셋 (시안 8:2770) ------------------------------------------------
+   좌표는 전부 시안 프레임(1920×792) 실측을 rem 으로 옮긴 것이다.
+   와이어프레임은 검은 배경 위에 그린 흰 선화라 알파 버전(wire-3/4)을 쓰면
+   블렌드 없이 그대로 얹힌다. 시안에서 선이 배경에 잠겨 있어 opacity 로 낮춘다. */
+
+.decor img {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 대표번호 뒤 발광체. 배경보다 **밝은** 원이라 screen 으로 더한다.
+   시안에서는 원의 경계가 거의 안 보일 만큼 풀어져 있다 — 원본이 또렷한
+   입자 구체라 그대로 얹으면 동그라미가 도드라진다. 크게 흐리고 많이 낮춘다. */
+.glowSphere {
+  left: 28rem; /* 중심 939 - 반지름 490 */
+  top: -8rem;
+  width: 61rem; /* 976 */
+  height: auto;
+  opacity: 0.42;
+  filter: blur(3.5rem);
+  mix-blend-mode: screen;
+}
+
+/* 좌측 병원 건물. 시안에서 선화가 x 66~427 / y 240~650 에 놓인다.
+   원본(1448×1086) 안에서 선화는 x 335~1269 이라 이미지 자체는 왼쪽으로 빠져나간다. */
+.wireBuilding {
+  left: -4.5rem;
+  top: 13rem;
+  width: 36.75rem; /* 588 */
+  height: auto;
+  opacity: 0.55;
+}
+
+/* 우측 도심 + 롯데타워. 타워 첨탑이 시안 (1655, 128) 에 오도록 맞춘 값.
+   오른쪽·아래가 프레임 밖으로 잘리는 것이 시안 그대로다.
+
+   ⚠️ wire-3 은 이름과 달리 **하늘만 알파**이고 지면 아래는 불투명 검정이다.
+   (알파 bbox 가 이미지 전체다 — wire-4 처럼 오려낸 컷이 아니다.)
+   그대로 얹으면 푸터 오른쪽이 검은 판으로 덮인다 → `screen` 으로 검정을 날린다. */
+.wireCity {
+  right: -16.3rem;
+  top: 1.8rem;
+  width: 86.4rem; /* 1383 */
+  height: auto;
+  opacity: 0.45;
+  mix-blend-mode: screen;
+  /* 시안에서 도심은 오른쪽 끝에만 남고 가운데로 갈수록 사라진다.
+     원본은 가운데가 석촌호수라 그대로 두면 하단에 물결 띠가 가로로 남는다. */
+  mask-image: linear-gradient(to right, transparent 0%, #000 48%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 48%);
 }
 
 .ringLarge {
@@ -344,6 +403,36 @@
 }
 
 @media (max-width: 768px) {
+  /* 배경 장식은 1920 기준 실측이라 375 에서는 그대로 쓰면 화면의 4배가 된다.
+     모바일 시안(2:5207)에서도 건물은 좌하단, 도심은 우하단 귀퉁이에만 걸린다.
+     rem 이 아니라 vw 로 두는 이유: 1024 이하는 root 가 16px 고정이라
+     rem 이 화면 폭을 따라가지 않는다. */
+  .glowSphere {
+    left: 50%;
+    top: 12%;
+    width: 150vw;
+    transform: translateX(-50%);
+    filter: blur(2rem);
+  }
+
+  /* 좁은 화면에서는 선화가 본문 글자와 바로 겹친다 — 판독성이 우선이라
+     PC 보다 훨씬 낮은 불투명도로 깐다. */
+  .wireBuilding {
+    left: -10vw;
+    top: auto;
+    bottom: 20%;
+    width: 62vw;
+    opacity: 0.26;
+  }
+
+  .wireCity {
+    right: -32vw;
+    top: auto;
+    bottom: -4%;
+    width: 140vw;
+    opacity: 0.28;
+  }
+
   /* 시안 모바일 2:5207 — SNS 가 상단 중앙, 이하 전부 중앙 정렬 */
   .footer {
     min-height: 53.3125rem; /* 853 */

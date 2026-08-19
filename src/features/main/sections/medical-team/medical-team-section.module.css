@@ -12,8 +12,7 @@
    시안에는 회전도, 축소도, 투명도 감쇠도, 겹침도 없다. 전부 걷어냈다.
    ========================================================================== */
 
-/* 시안 배경은 좌측 연분홍-라벤더 → 우측 하늘색으로 흐르고 우하단에 빛 스월이 있다.
-   스월은 이미지 에셋이라 재현하지 않고, 그라데이션 두 겹으로 톤만 맞춘다.
+/* 시안 배경은 좌측 연분홍-라벤더 → 우측 하늘색으로 흐르고 우측에 파란 웨이브가 지난다.
    분홍/하늘 두 값은 토큰이 없어 2:995 에서 직접 뽑았다. */
 .section {
   position: relative;
@@ -27,6 +26,41 @@
       /* 2:995 좌상단 */ var(--bg-lavender) 45%,
       #dcebfb 100% /* 2:995 우측 */
     );
+}
+
+/**
+ * 웨이브 실사(`/main/team/bg.webp`, 2400×1153).
+ *
+ * 시안 8:868 에서 웨이브는 **우측 절반에서만** 또렷하고 좌측은 분홍-라벤더 민면이다.
+ * 에셋 전체를 덮고 좌측을 마스크로 지워야 위 그라데이션과 이어진다
+ * (배경 이미지를 위 `background` 에 한 겹 더 얹으면 개별 마스크를 걸 수 없다).
+ */
+.section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url("/main/team/bg.webp") 55% 72% / cover no-repeat;
+  opacity: 0.9;
+  /* 좌→우(웨이브는 우측에서만 또렷) + 위→아래(헤더 뒤는 민면) 두 방향을 함께 걸어야
+     시안처럼 "우하단에서 떠오르는" 형태가 된다. 두 마스크의 교집합을 쓴다. */
+  -webkit-mask-image:
+    linear-gradient(100deg, transparent 18%, rgba(0, 0, 0, 0.35) 46%, #000 78%),
+    linear-gradient(180deg, transparent 8%, rgba(0, 0, 0, 0.5) 22%, #000 40%);
+  mask-image:
+    linear-gradient(100deg, transparent 18%, rgba(0, 0, 0, 0.35) 46%, #000 78%),
+    linear-gradient(180deg, transparent 8%, rgba(0, 0, 0, 0.5) 22%, #000 40%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  pointer-events: none;
+}
+
+/* 배경 레이어(::before)가 position 을 가지므로 내용물도 스택 순서를 명시해야 덮이지 않는다 */
+.header,
+.viewport,
+.controls {
+  position: relative;
+  z-index: 1;
 }
 
 .header {
@@ -149,7 +183,8 @@
   width: 100%;
 }
 
-/* 카드 본체 = 인물 사진. 사진 에셋이 아직 없어 그라데이션으로 자리를 잡는다. */
+/* 카드 본체. 시안 8:868 은 흰 카드 위에 누끼 인물이 하단 정렬돼 있고
+   그 뒤에 큰 `Bgn` 워터마크가 깔린다. 아래 레이어 순서가 그대로 그 순서다. */
 .portrait {
   position: relative;
   display: block;
@@ -160,6 +195,62 @@
   background: linear-gradient(180deg, #f8f9fc 0%, #e9eef6 58%, #dde5f0 100%); /* 2:995 카드 */
   box-shadow: var(--shadow-card);
   transition: box-shadow 0.45s ease;
+}
+
+/* 카드보다 넓게 깔리고 좌우가 잘려 나간다(시안에서 양끝 글자가 카드 밖으로 나간다).
+   Belleza(=--font-display-stack)는 산세리프라 시안의 세리프 워터마크와 다르다 →
+   세리프인 Marcellus 를 기울여 쓴다. */
+.watermark {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-marcellus-stack);
+  font-style: italic;
+  font-size: calc(var(--card-w) * 0.4);
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(96, 116, 152, 0.15); /* 8:868 워터마크 — 토큰 없음 */
+  pointer-events: none;
+}
+
+/**
+ * 누끼 인물.
+ *
+ * 원본은 전부 인물이 프레임 **하단에 붙은** 세로 이미지(≈3:5)라 카드(4:5)보다 좁다.
+ * 카드 높이의 108% 로 키우고 19% 를 아래로 흘려보내면 시안 8:868 처럼
+ * 머리 위 여백(카드 높이의 13%)이 남고 하반신은 카드 밖으로 잘린다.
+ * `object-fit: cover` 로는 폭을 채우는 순간 머리가 잘려 쓸 수 없다.
+ */
+.photo {
+  position: absolute;
+  bottom: -19%;
+  left: 50%;
+  width: auto;
+  height: 108%;
+  transform: translateX(-50%);
+  /* 스테이지 포인터 드래그 중에 이미지 기본 드래그가 끼어들면 제스처가 끊긴다 */
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 인물 하반신을 덮어 이름을 얹을 자리를 만든다(시안 8:868 하단 회색 그라데이션).
+   흰 가운 위 흰 글씨가 겹치므로 이름이 없는 카드에서도 톤 통일을 위해 항상 깐다. */
+.scrim {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 52%;
+  background: linear-gradient(
+    180deg,
+    rgba(92, 103, 128, 0) 0%,
+    rgba(92, 103, 128, 0.22) 40%,
+    rgba(84, 94, 118, 0.68) 72%,
+    rgba(72, 82, 106, 0.86) 100%
+  );
+  pointer-events: none;
 }
 
 /* 활성 카드는 파랑→보라 링 2px 하나로만 구분된다(시안에 확대·상승 없음).
@@ -186,16 +277,17 @@
   box-shadow: 0 20px 48px rgba(10, 32, 72, 0.18);
 }
 
-/* 이름은 카드 밖이 아니라 사진 하단에 얹힌다(시안). 밝은 사진 위 검정 글씨라
-   가독성 확보용 스크림을 아래쪽에만 깐다. */
+/* 이름은 카드 밖이 아니라 사진 하단에 얹힌다(시안 8:868). 스크림 위 흰 글씨다.
+   카드 맨 밑이 아니라 바닥에서 8% 쯤 띄운 자리에 놓인다. */
 .caption {
   position: absolute;
   right: 0;
-  bottom: 0;
+  bottom: 8%;
   left: 0;
-  padding: 3.5rem 1rem 1.75rem;
-  background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.72) 62%);
+  padding-inline: 0.75rem;
   text-align: center;
+  /* 스크림이 얕게 걸리는 밝은 가운 위에서도 글자가 살아 있게 */
+  text-shadow: 0 1px 6px rgba(24, 34, 58, 0.45);
 }
 
 .name {
@@ -203,7 +295,7 @@
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-default);
-  color: var(--color-text-strong);
+  color: var(--color-white);
 }
 
 /* 시안은 "김소현 원장" 이 한 줄이다 — 직함이 이름 뒤에 이어 붙는다. */
@@ -211,7 +303,7 @@
   margin-left: 0.35em;
   font-size: var(--fs-18);
   font-weight: var(--weight-regular);
-  color: var(--color-text-strong);
+  color: var(--color-white);
 }
 
 /* 2:995 — 카드 하단 772 → 컨트롤 중심 820 */

@@ -9,8 +9,10 @@
   background: var(--color-white);
 }
 
-/* 시안의 옅은 블루-라벤더 웨이브 — 좌하단이 진하고 우측은 아주 옅다.
-   스크롤을 따라 움직이지 않는 정적 배경이다. */
+/* 시안의 옅은 블루-라벤더 톤 — 좌하단이 진하고 우측은 아주 옅다.
+   스크롤을 따라 움직이지 않는 정적 배경이다.
+   실사 웨이브 텍스처(bg-2.webp)는 아래 `.bgWave` 가 따로 깐다 — 한 장으로는
+   섹션 높이(≈2900px)를 못 덮어서 이 그라데이션이 위·중단을 이어 받는다. */
 .section::before {
   content: "";
   position: absolute;
@@ -22,9 +24,31 @@
     linear-gradient(180deg, rgba(242, 248, 255, 0.6) 0%, rgba(255, 255, 255, 0) 22%);
 }
 
+/**
+ * 시안 8:1858 배경 텍스처 — 흰 웨이브(40%) 위에 파랑↔보라 그라데이션이
+ * `overlay` 로 얹혀 웨이브 골만 라벤더로 물든다(흰 부분은 overlay 결과가 흰색).
+ * 블렌드는 `background-blend-mode` 로 **이 요소 안에서만** 일으킨다.
+ * mix-blend-mode 를 쓰면 뒤에 깔린 타임라인 카피까지 같이 물든다.
+ */
+.bgWave {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 55%;
+  pointer-events: none;
+  background:
+    linear-gradient(270deg, #0072ec 0%, #664bff 100%),
+    url("/main/history/bg-2.webp") center bottom / 120% auto no-repeat;
+  background-blend-mode: overlay, normal;
+  opacity: 0.4;
+}
+
 /* --- 타임라인 ----------------------------------------------------------------- */
 .timeline {
   position: relative;
+  /* 배경 레이어(.bgWave)보다 위에 그려져야 한다 */
+  z-index: 1;
 }
 
 .axis {
@@ -122,10 +146,33 @@
   transform: rotate(var(--tilt-rest));
 }
 
-/* 에셋 도착 전 자리표. 시안 사진은 컬러가 제각각이라 중립 회색으로 둔다 —
-   파란 그라데이션을 깔면 없는 색이 화면을 지배한다. */
-.photoCard[data-asset-placeholder] {
-  background: linear-gradient(150deg, var(--gray-100) 0%, var(--gray-200) 100%);
+/* 사진은 카드를 꽉 채운다(cover). 시안 4프레임 모두 여백 없이 잘려 있다.
+   award/cert 는 원본이 정확히 4:3 이라 사실상 잘리는 부분이 없다. */
+.photoFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/**
+ * 인트로 카드만 구조가 다르다 (Figma 8:1869).
+ * 배경 = 파란 사선 텍스처(bg.webp) + 보라→파랑 옅은 그라데이션,
+ * 그 위에 **누끼 의료진**이 얹힌다. 그래서 사진은 contain 이다 —
+ * cover 로 두면 사람 발목이 잘리고 배경 텍스처가 가려진다.
+ */
+.photoCard[data-variant="intro"] {
+  background:
+    linear-gradient(
+      148.66deg,
+      rgba(152, 131, 255, 0.072) 36.816%,
+      rgba(25, 150, 228, 0.12) 77.596%
+    ),
+    url("/main/history/bg.webp") center / cover no-repeat;
+}
+
+.photoCard[data-variant="intro"] .photoFill {
+  object-fit: contain;
 }
 
 /* --- 텍스트 ------------------------------------------------------------------- */

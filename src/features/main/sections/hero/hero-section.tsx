@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
@@ -9,7 +9,16 @@ import { usePinnedProgress } from "@/features/main/sections/common/use-pinned-pr
 import { useSceneActive } from "@/r3f/use-scene-active";
 import { Marquee } from "@/components/marquee/marquee";
 import type { HeroSectionMessages } from "@/shared/i18n/messages";
-import { HERO_ASSETS, HERO_ASSETS_READY } from "./hero-assets";
+import {
+  HERO_ASSETS,
+  HERO_ASSETS_READY,
+  TOWER_CLOUD_BANDS,
+  TOWER_CLOUD_TOP_OFFSET,
+  TOWER_CLOUDS_TOP,
+  TOWER_LINES,
+  TOWER_STAGE,
+  type TowerSprite,
+} from "./hero-assets";
 import styles from "./hero-section.module.css";
 
 /**
@@ -60,6 +69,34 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const copyTowerRef = useRef<HTMLDivElement>(null);
 
   /**
+   * 타워 씬 패럴랙스 래퍼들. 매 프레임 transform 만 쓰므로 전부 ref 다.
+   * 배열이 아니라 개별 ref 인 이유는 레이어마다 속도가 달라서다(= 깊이감).
+   */
+  const pxParticlesRef = useRef<HTMLDivElement>(null);
+  const pxCloudTopRef = useRef<HTMLDivElement>(null);
+  const pxBandRefs = [
+    useRef<HTMLDivElement>(null),
+    useRef<HTMLDivElement>(null),
+    useRef<HTMLDivElement>(null),
+  ];
+  const pxTowerRef = useRef<HTMLDivElement>(null);
+  const pxLinesRef = useRef<HTMLDivElement>(null);
+
+  /** `prefersReducedMotionSync` 는 SSR 에서 못 부르므로 첫 프레임에 한 번만 캐시한다 */
+  const reducedRef = useRef<boolean | null>(null);
+
+  /**
+   * 타워 레이어 마운트 게이트.
+   *
+   * 타워 씬은 20장 넘는 대형 WebP 합성이라 히어로 첫 화면에서 같이 디코딩하면
+   * 구체가 뜨기도 전에 메인 스레드를 잡아먹는다. 크로스페이드(0.45)보다
+   * 한참 앞선 0.12 에서 **딱 한 번** state 를 뒤집어 마운트한다.
+   * (매 프레임 setState 금지 규칙은 ref 가드로 지킨다)
+   */
+  const [towerMounted, setTowerMounted] = useState(false);
+  const towerMountedRef = useRef(false);
+
+  /**
    * 히어로는 첫 화면이라 "보이면 켜기"로 충분해 보이지만, 여유를 준다.
    * 핀 구간 200vh 동안 캔버스 호스트가 뷰포트 경계에 딱 붙어 움직여서
    * margin 0 이면 경계에서 on/off 가 떨리고, 그때마다 셰이더 프로그램이
@@ -91,6 +128,30 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const ct = copyTowerRef.current;
       if (cs) cs.style.opacity = String(1 - clamp01(t * 1.6));
       if (ct) ct.style.opacity = String(clamp01((t - 0.35) * 2));
+
+      // 타워 에셋을 미리 마운트해 크로스페이드 때 디코딩이 안 걸리게 한다
+      if (!towerMountedRef.current && p > 0.12) {
+        towerMountedRef.current = true;
+        setTowerMounted(true);
+      }
+
+      /**
+       * 패럴랙스 — 타워가 등장한 뒤 구간(0.45~1)을 다시 0~1 로 편다.
+       *
+       * 값은 스테이지 크기 대비 %다. 시안이 정지 이미지 한 장이라 정답이 없어서,
+       * "가까운 것일수록 빨리 / 반대 방향으로도 흐르게" 라는 원칙만 잡았다.
+       *   타워(가장 멀다) < 파티클 < 상단 구름 < 하단 구름 띠 < 광선(가장 가깝다)
+       * 광선만 X 를 반대로 보내야 서로 스쳐 지나가는 게 눈에 보인다.
+       */
+      if (reducedRef.current === null) reducedRef.current = prefersReducedMotionSync();
+      const u = reducedRef.current ? 0 : clamp01((p - FADE_START) / (1 - FADE_START));
+      shift(pxTowerRef.current, 0.6 * u, -1.1 * u);
+      shift(pxParticlesRef.current, 0, 1.8 * u);
+      shift(pxCloudTopRef.current, -2.4 * u, -1.6 * u);
+      shift(pxBandRefs[0]?.current ?? null, 3.6 * u, 2.6 * u);
+      shift(pxBandRefs[1]?.current ?? null, 2.0 * u, 1.4 * u);
+      shift(pxBandRefs[2]?.current ?? null, 2.8 * u, 2.0 * u);
+      shift(pxLinesRef.current, -4.5 * u, 1.0 * u);
     },
     /**
      * ⚠️ 여기에 `isMobile` 을 넣으면 안 된다.
@@ -151,18 +212,100 @@ export function HeroSection({ messages }: HeroSectionProps) {
           </div>
         </div>
 
+        {/* 타워 씬 — Figma 메인_02(8:2877) 1920×920 합성 재현.
+            아래에서 위로: 하늘 → 파티클 텍스처 → 상단 구름 → 하단 구름 띠 → 타워 → 광선.
+            시안에서는 타워/광선이 카피 위에 있지만, 65% 타워가 본문을 덮으면
+            가독성이 떨어져서 카피는 그대로 위(z-content)에 둔다. */}
         <div ref={towerLayerRef} className={styles.towerLayer} aria-hidden>
           <div className={styles.towerSky} />
-          {HERO_ASSETS_READY ? (
+          {HERO_ASSETS_READY && towerMounted ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className={styles.towerImg} src={HERO_ASSETS.tower} alt="" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className={styles.towerTexture} src={HERO_ASSETS.texture} alt="" />
+              <img
+                className={styles.towerSkyImg}
+                src={HERO_ASSETS.sky}
+                alt=""
+                decoding="async"
+                loading="eager"
+              />
+
+              <div className={styles.towerStage}>
+                {/* 파티클 텍스처 — 8:2880 */}
+                <div
+                  ref={pxParticlesRef}
+                  className={clsx(styles.px, styles.softLight, styles.particlesPx)}
+                >
+                  <div className={styles.particlesBox}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className={styles.particlesImg}
+                      src={HERO_ASSETS.particles}
+                      alt=""
+                      decoding="async"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+
+                {/* 상단 구름 — 8:2881 과 그 평행이동 복사본 8:2892 */}
+                <div ref={pxCloudTopRef} className={clsx(styles.px, styles.cloudTop)}>
+                  {TOWER_CLOUDS_TOP.map((s) => (
+                    <TowerSpriteImg key={s.node} sprite={s} />
+                  ))}
+                  {TOWER_CLOUDS_TOP.map((s) => (
+                    <TowerSpriteImg
+                      key={`dup-${s.node}`}
+                      sprite={{
+                        ...s,
+                        x: s.x + TOWER_CLOUD_TOP_OFFSET.x,
+                        y: s.y + TOWER_CLOUD_TOP_OFFSET.y,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* 하단 구름 띠 — 8:2904 의 세 덩어리. 각각 다른 속도로 흐른다 */}
+                {TOWER_CLOUD_BANDS.map((band, i) => (
+                  <div
+                    key={band[0]?.node ?? i}
+                    ref={pxBandRefs[i]}
+                    className={clsx(styles.px, styles.cloudBand)}
+                    data-band={i}
+                  >
+                    {band.map((s) => (
+                      <TowerSpriteImg key={s.node} sprite={s} />
+                    ))}
+                  </div>
+                ))}
+
+                {/* 타워 — 8:2946 */}
+                <div ref={pxTowerRef} className={styles.px}>
+                  <div className={styles.towerCrop}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className={styles.towerPic}
+                      src={HERO_ASSETS.tower}
+                      alt=""
+                      decoding="async"
+                      loading="eager"
+                    />
+                  </div>
+                </div>
+
+                {/* 광선/웨이브 — 8:2949. 시안에서 프레임 마스크로 잘려 있다.
+                    clip 을 패럴랙스 래퍼 바깥에 둬야 잘리는 사각형이 안 움직인다 */}
+                <div className={styles.stageClip}>
+                  <div ref={pxLinesRef} className={styles.px}>
+                    {TOWER_LINES.flatMap((s) =>
+                      Array.from({ length: s.repeat ?? 1 }, (_, i) => (
+                        <TowerSpriteImg key={`${s.node}-${i}`} sprite={s} />
+                      )),
+                    )}
+                  </div>
+                </div>
+              </div>
             </>
-          ) : (
-            <div className={styles.towerPlaceholder} data-asset-placeholder />
-          )}
+          ) : null}
         </div>
 
         {/* ── 카피 ───────────────────────────────────────────────────── */}
@@ -270,3 +413,50 @@ function SplitBrandTitle({
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/** 스테이지 대비 % 로 평행이동. 매 프레임 호출되므로 문자열 조립만 한다. */
+function shift(el: HTMLElement | null, x: number, y: number) {
+  if (el) el.style.transform = `translate3d(${x}%, ${y}%, 0)`;
+}
+
+/** 시안 px → 스테이지 대비 %. 스테이지가 1920×920 비율이라 X/Y 가 같은 배율로 줄어든다. */
+const pct = (value: number, base: number) => `${((value / base) * 100).toFixed(4)}%`;
+
+/**
+ * 타워 씬 스프라이트 한 장.
+ *
+ * 회전은 요소 중심 기준이고, 시안의 컨테이너 박스 중심과 회전 전 박스 중심이
+ * 같으므로 "회전 전 박스 + rotate" 로 그대로 옮겨진다.
+ * 플립은 Figma 가 내준 순서(rotate → scale)를 그대로 유지해야 부호가 맞다.
+ */
+function TowerSpriteImg({ sprite }: { sprite: TowerSprite }) {
+  const transform = [
+    sprite.rotate ? `rotate(${sprite.rotate}deg)` : "",
+    sprite.flipX ? "scaleX(-1)" : "",
+    sprite.flipY ? "scaleY(-1)" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      className={styles.sprite}
+      src={sprite.src}
+      alt=""
+      decoding="async"
+      loading="lazy"
+      data-node={sprite.node}
+      style={{
+        left: pct(sprite.x, TOWER_STAGE.width),
+        top: pct(sprite.y, TOWER_STAGE.height),
+        width: pct(sprite.w, TOWER_STAGE.width),
+        height: pct(sprite.h, TOWER_STAGE.height),
+        ...(transform ? { transform } : null),
+        ...(sprite.opacity === undefined ? null : { opacity: sprite.opacity }),
+        ...(sprite.fit ? { objectFit: sprite.fit } : null),
+        ...(sprite.objectPosition ? { objectPosition: sprite.objectPosition } : null),
+      }}
+    />
+  );
+}

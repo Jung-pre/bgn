@@ -9,15 +9,18 @@ import type { AiStorySectionMessages } from "@/shared/i18n/messages";
 import styles from "./ai-story-section.module.css";
 
 /**
- * AI 브랜드 스토리(영상 탭) — Figma `2:1286` / Container `2:1938`.
+ * AI 브랜드 스토리(영상 탭) — Figma `8:1160` (구 `2:1286`) / Container `2:1938`.
  *
  * 세그먼트 탭 3개 + 대형 비디오 카드 1장(854×484).
  *
- * ## 시안에 없어서 뺀 것
- * 카드 좌상단의 "현재 탭" 칩(cardTag)을 렌더하고 있었는데 시안에는 없다.
- * 시안의 카드는 **한 장의 영상 썸네일**이고 그 위에 카피가 구워져 있다
- * (아이브로우 + 2줄 타이틀, 카드 세로 중앙 · 좌측 정렬 · 좌여백 64).
- * 썸네일 에셋이 아직 없어 그라데이션 자리표 위에 같은 위치로 카피만 얹는다.
+ * ## 썸네일 = `/main/ai/story-card.webp` (854×484 — 카드와 1:1 동일 치수)
+ * 시안의 카드는 **한 장의 영상 썸네일**이고 카피(아이브로우 + 2줄 타이틀)가
+ * 이미지에 **구워져 있다**. 그래서 같은 문구를 DOM 텍스트로 또 얹으면 이중으로
+ * 겹쳐 보인다 → 카피는 `<img alt>` 로만 전달한다. 이미지가 못 뜨면 alt 가
+ * 그 자리에 그대로 노출되므로 정보 손실도 없다.
+ *
+ * 탭 3개인데 썸네일 에셋은 1장뿐이다(에셋 추가 필요 — 보고 참조).
+ * 지금은 세 탭이 같은 썸네일을 공유하고, 교체 크로스페이드만 돈다.
  *
  * ## 역할 분담 (CLAUDE.md "역할 경계")
  *   · GSAP(`useSectionReveal`) — 섹션 진입 등장. 대상은 **스테이지 래퍼**.
@@ -40,9 +43,6 @@ import styles from "./ai-story-section.module.css";
 export interface AiStorySectionProps {
   messages: AiStorySectionMessages;
 }
-
-/** 탭별 카드 배경 프리셋. 교체가 눈에 보이려면 톤이 달라야 한다. */
-const CARD_TONES = ["toneA", "toneB", "toneC"] as const;
 
 export function AiStorySection({ messages }: AiStorySectionProps) {
   const sectionRef = useSectionReveal<HTMLElement>();
@@ -90,8 +90,6 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
     event.preventDefault();
     selectTab(next, true);
   };
-
-  const tone = CARD_TONES[activeTab % CARD_TONES.length] ?? "toneA";
 
   const handlePlay = () => {
     // TODO: 영상 소스가 확정되면 재생 처리.
@@ -160,11 +158,18 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
               reduceMotion ? { duration: 0.2 } : { duration: 0.42, ease: [0.33, 1, 0.68, 1] }
             }
           >
-            {/* TODO: 영상 썸네일(poster) / <video> 로 교체. 현재는 자리표 그라데이션. */}
-            <div className={clsx(styles.cardBg, styles[tone])} aria-hidden />
-
-            <p className={styles.cardEyebrow}>{messages.videoEyebrow}</p>
-            <h2 className={styles.cardTitle}>{messages.videoTitle}</h2>
+            {/* 카피가 구워진 썸네일. 카드(854×484)와 같은 치수라 크롭 없이 딱 맞는다.
+                TODO: 영상 소스가 오면 이 <img> 를 <video poster={...}> 로 바꾼다. */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- 카드 치수(854×484)와 1:1 인 확정 크기 에셋이라 next/image 리사이즈 이점이 없다 */}
+            <img
+              className={styles.cardBg}
+              src="/main/ai/story-card.webp"
+              alt={`${messages.videoEyebrow}. ${messages.videoTitle.replace(/\n/g, " ")}`}
+              width={854}
+              height={484}
+              loading="lazy"
+              decoding="async"
+            />
 
             <button
               type="button"

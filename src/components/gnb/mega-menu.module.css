@@ -41,27 +41,59 @@
 }
 
 /* --- 좌측 브랜드 패널 -------------------------------------------------------- */
+/**
+ * 시안 8:540 — 주간 롯데월드타워 실사(`/main/menu/bg.webp`, 2400×1350) 위에
+ * 블루 오버레이. 사진은 가로컷이라 세로 패널에 맞추려면 타워가 있는 x≈74% 를
+ * 기준으로 잘라야 한다. 대표번호·주소가 얹히는 위아래만 어둡게 눌러 대비를 만든다.
+ *
+ * ⚠️ 배경 이미지는 `.rootOpen` 에서만 건다. 오버레이는 닫혀 있어도 DOM 에 남아 있어서
+ *    `.brandPanel` 에 그냥 걸면 첫 로드에 355KB 를 아무도 안 보는 채로 받는다.
+ *    아래 그라데이션은 항상 깔려 있으므로 이미지가 늦어도 빈 화면이 되지 않는다.
+ */
 .brandPanel {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 4rem 3rem;
-  /* 시안은 롯데월드타워 실사 위 블루 오버레이. 이미지는 나중에 교체. */
   background: var(--gradient-dark-section);
   color: var(--color-white);
   overflow: hidden;
 }
 
+.rootOpen .brandPanel {
+  background:
+    linear-gradient(
+        180deg,
+        rgba(12, 30, 66, 0.5) 0%,
+        rgba(12, 30, 66, 0.14) 34%,
+        rgba(12, 30, 66, 0.46) 66%,
+        rgba(12, 30, 66, 0.82) 100%
+      )
+      center / cover no-repeat,
+    /* 타워가 원본 x≈74% 에 있다 — 세로로 잘릴 때 패널 가운데에 오도록 81% 로 민다 */
+    url("/main/menu/bg.webp") 81% 50% / cover no-repeat,
+    var(--brand-navy);
+}
+
+/* 시안에서 워터마크는 패널 상단이 아니라 **세로 중앙**에 놓이고 폭의 3/4 를 차지한다.
+   Belleza(--font-display-stack)는 산세리프라 시안의 세리프 워터마크와 다르다 → Marcellus. */
 .brandMark {
+  position: absolute;
+  top: 46%;
+  left: 50%;
   margin: 0;
-  font-family: var(--font-display-stack);
-  font-size: var(--fs-display-120);
+  transform: translate(-50%, -50%);
+  font-family: var(--font-marcellus-stack);
+  font-style: italic;
+  font-size: min(10.5vw, 200px);
   line-height: 1;
-  color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.22);
+  pointer-events: none;
 }
 
 .brandContact {
+  position: relative; /* 절대배치된 워터마크(.brandMark) 위로 올린다 */
   display: flex;
   flex-direction: column;
   gap: var(--gap-md);
