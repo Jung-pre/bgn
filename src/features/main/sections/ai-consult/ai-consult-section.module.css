@@ -94,15 +94,8 @@
 }
 
 /* 2:1216 + 2:1210(Group 2432) — 형광펜 밑줄이 아니라 옅은 블루 박스 + 좌우 세로 바 */
-.titleMark {
-  display: inline-flex;
-  align-items: center;
-  align-self: stretch;
-  padding-inline: 0.25rem;
-  border-inline: 2px solid var(--primary-500);
-  background: var(--primary-100);
-  color: var(--primary-700); /* 2:1217 #0c3ca2 */
-}
+/* 마커는 globals.css 의 공용 `.title-mark` 로 옮겼다 — 세 섹션이 같은 모티프라
+   한 군데서만 관리한다(점 위치가 좌우 비대칭이라 복붙하면 반드시 어긋난다). */
 
 .desc {
   margin: 0;

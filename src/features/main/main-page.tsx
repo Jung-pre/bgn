@@ -81,8 +81,11 @@ export function MainPage({ dict }: MainPageProps) {
   return (
     <main className={styles.root}>
       <HeroSection messages={dict.heroSection} />
-      <BrandFilmSection />
+      {/* 시안 PC 플로우(8:282) 의 y 좌표 순서를 그대로 따른다.
+          8:868 BGN 의료진(y=3680) → 8:961 브랜드 영상(y=4649) → 8:962 AI 시스템(y=5729).
+          한동안 영상이 의료진 앞에 있었는데 시안과 뒤바뀐 것이었다. */}
       <MedicalTeamSection messages={dict.medicalTeamSection} />
+      <BrandFilmSection />
       <AiSystemSection messages={dict.aiSystemSection} />
       <AiConsultSection messages={dict.aiConsultSection} />
       <AiStorySection messages={dict.aiStorySection} />

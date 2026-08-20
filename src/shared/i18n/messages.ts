@@ -50,8 +50,7 @@ export interface DoctorMessages {
   title: string;
   /**
    * 누끼 인물 사진(WebP). Figma 원본에서 추출해 `public/main/team/` 에 넣었다.
-   * 이름 ↔ 얼굴 대응은 시안 `8:868` 카드에서 직접 확인한 것이다(추측 아님).
-   * 아직 이름을 못 읽은 3명은 `doctor-06/07/08` 로 임시 배정돼 있다.
+   * 이름 ↔ 얼굴 대응은 전부 확인된 것이다(추측 아님) — 아래 `doctors` 주석 참고.
    */
   photo: string;
 }
@@ -195,6 +194,8 @@ export interface GnbMessages {
   menuOpen: string;
   menuClose: string;
   languageLabel: string;
+  /** 우하단 퀵메뉴 토글 원 안에 들어가는 라벨 (시안 `2:2403`) */
+  quickMenu: string;
   quickActions: { id: string; label: string }[];
   chatbotBubble: string;
 }
@@ -222,6 +223,7 @@ const ko: Dictionary = {
     menuOpen: "전체 메뉴 열기",
     menuClose: "전체 메뉴 닫기",
     languageLabel: "언어 선택",
+    quickMenu: "퀵메뉴",
     quickActions: [
       { id: "naver", label: "네이버예약" },
       { id: "event", label: "이벤트" },
@@ -250,28 +252,36 @@ const ko: Dictionary = {
     //
     // 배열 순서는 **시안 초기 상태를 그대로 재현하도록** 맞췄다.
     // 캐러셀은 activeIndex 0 에서 시작해 0번을 가운데 두고 좌우로 순환 배치하므로
-    // (use-cross-carousel.ts `signedOffset`), 시안 2:1016 의
+    // (use-cross-carousel.ts `signedOffset`), 시안 `8:868` 의
     // 김소현 · 이수민 · [박세광] · 김정완 · 한정엽 배열을 맞추려면
     // 박세광이 0, 왼쪽 두 명이 배열 끝(6·7)으로 가야 한다.
     // 카드 지그재그 레인(index 홀짝)도 이 순서일 때만 시안과 일치한다.
     //
-    // 시안에 이름이 적힌 의료진은 5명뿐이다(나머지 카드는 같은 얼굴의 자리표시용
-    // 복제였다). 3·4·5번은 원본을 받기 전까지 빈 문자열로 둔다.
     /*
-      이름 ↔ 얼굴 대응은 시안 `8:868` 카드에서 직접 읽었다.
-      김소현=묶은머리 / 이수민=긴머리 / 박세광=넥타이 고령 / 김정완=옆가르마
-      (김정완은 가운 이름표 "원장 김정…"으로 2차 확인) / 한정엽=짧은머리 정면.
-      이름을 못 읽은 3명은 `doctor-06/07/08` 로 두고 시안 다른 상태에서 확인 필요.
+      ## 이름 ↔ 얼굴 대응 근거
+      시안 `8:868` 은 캐러셀 초기 상태라 **5명만 이름이 보인다**(나머지 3장은
+      프레임 밖으로 잘려 있다). 그래서 한동안 3명을 빈 문자열로 뒀는데,
+      화면에는 이름 없는 카드로 그대로 나왔다.
+      나머지 3명은 병원 공식 의료진 페이지(bgneye.com)에서 확인했다.
+      잠실점 소속이 정확히 8명이고 시안 도트 수와 일치한다.
+
+      이름을 순서만 보고 끼워 맞추면 얼굴이 바뀔 수 있어서(의료 정보라 치명적),
+      **원본 사진의 픽셀 크기로 대조**했다. Figma 에서 뽑은 파일과 병원 페이지의
+      원본이 같은 소스라 크기가 그대로 일치한다:
+        송윤중 577×958 = song-yunjung.webp 577×958
+        김민경 470×780 = kim-minkyung.webp 470×780
+        이연호 597×1010 → 남은 한 장(lee-yeonho.webp). 사진도 육안 대조했다.
+      앞의 5명은 시안 카드에 이름이 찍혀 있어 그대로 읽었다.
     */
     doctors: [
-      { name: "박세광", title: "대표원장", photo: "/main/team/park-segwang.webp" }, // 2:1041
-      { name: "김정완", title: "원장", photo: "/main/team/kim-jeongwan.webp" }, // 2:1047
-      { name: "한정엽", title: "원장", photo: "/main/team/han-jeongyeop.webp" }, // 2:1054
-      { name: "", title: "", photo: "/main/team/doctor-06.webp" },
-      { name: "", title: "", photo: "/main/team/doctor-07.webp" },
-      { name: "", title: "", photo: "/main/team/doctor-08.webp" },
-      { name: "김소현", title: "원장", photo: "/main/team/kim-sohyun.webp" }, // 2:1028
-      { name: "이수민", title: "원장", photo: "/main/team/lee-sumin.webp" }, // 2:1035
+      { name: "박세광", title: "대표원장", photo: "/main/team/park-segwang.webp" },
+      { name: "김정완", title: "원장", photo: "/main/team/kim-jeongwan.webp" },
+      { name: "한정엽", title: "원장", photo: "/main/team/han-jeongyeop.webp" },
+      { name: "송윤중", title: "원장", photo: "/main/team/song-yunjung.webp" },
+      { name: "김민경", title: "원장", photo: "/main/team/kim-minkyung.webp" },
+      { name: "이연호", title: "원장", photo: "/main/team/lee-yeonho.webp" },
+      { name: "김소현", title: "원장", photo: "/main/team/kim-sohyun.webp" },
+      { name: "이수민", title: "원장", photo: "/main/team/lee-sumin.webp" },
     ],
   },
 

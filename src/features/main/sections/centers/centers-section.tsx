@@ -166,8 +166,7 @@ export function CentersSection({ messages }: CentersSectionProps) {
                    있으므로 AT 에서 빼도 정보가 사라지지 않는다. */
                 aria-hidden={collapsed || undefined}
               >
-                <Link
-                  href={center.href}
+                <div
                   className={styles.card}
                   data-tone={photo?.tone}
                   style={
@@ -176,18 +175,6 @@ export function CentersSection({ messages }: CentersSectionProps) {
                       "--tex-pos": texture.pos,
                     } as CSSProperties
                   }
-                  aria-current={i === activeIndex ? "true" : undefined}
-                  tabIndex={collapsed ? -1 : undefined}
-                  /* 키보드 tab 이동만으로도 카드가 펼쳐져야 내용을 읽을 수 있다 */
-                  onFocus={() => select(i)}
-                  /* 1탭 = 펼치기, 2탭 = 이동. 포인터 종류와 무관하게 같은 규칙이라
-                     마우스/터치/키보드가 전부 동일하게 동작한다. */
-                  onClick={(e) => {
-                    if (i !== activeIndex) {
-                      e.preventDefault();
-                      select(i);
-                    }
-                  }}
                 >
                   {/* 확장(1120) 상태의 배경 사진 + 좌측 워시 (Figma 8:5199~8:5229).
                       카드 링크가 이미 센터명을 읽어주므로 사진은 순수 장식이다. */}
@@ -227,19 +214,49 @@ export function CentersSection({ messages }: CentersSectionProps) {
                     <ArrowDetailIcon />
                   </span>
 
-                  {/* Figma 2:1984 — 펼친 카드 위에 뜨는 96px 유리 `+` */}
-                  <span className={styles.plus} aria-hidden>
-                    <svg viewBox="0 0 48 48" focusable="false">
-                      <path
-                        d="M24 10v28M10 24h28"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </span>
-                </Link>
+                  {/**
+                   * 역할 분리 — 이게 이 컴포넌트의 핵심 규칙이다.
+                   *
+                   * 예전에는 카드 전체가 하나의 `<Link>` 였고 "1탭 펼치기 / 2탭 이동"
+                   * 이었다. 그런데 펼쳐진 뒤에는 카드 아무 데나 눌러도 페이지가 넘어가서,
+                   * 사진을 보려고 클릭했다가 이동해 버린다. 시안이 `+` 를 크게 그려 둔
+                   * 이유가 있다 — **이동 버튼은 `+` 다.**
+                   *
+                   *   접힌 카드  → 카드 전체가 "펼치기" 버튼
+                   *   펼친 카드  → `+` 만 상세로 가는 링크, 나머지는 아무 동작 없음
+                   *
+                   * 두 요소가 배타적으로만 렌더되므로 같은 자리에서 포커스가 겹치지 않는다.
+                   */}
+                  {expanded ? (
+                    <Link
+                      href={center.href}
+                      className={styles.plus}
+                      aria-label={`${center.name} 자세히 보기`}
+                      tabIndex={collapsed ? -1 : undefined}
+                    >
+                      <svg viewBox="0 0 48 48" aria-hidden focusable="false">
+                        <path
+                          d="M24 10v28M10 24h28"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.selectHit}
+                      aria-label={`${center.name} 펼치기`}
+                      aria-expanded={false}
+                      tabIndex={collapsed ? -1 : undefined}
+                      /* 키보드 tab 이동만으로도 카드가 펼쳐져야 내용을 읽을 수 있다 */
+                      onFocus={() => select(i)}
+                      onClick={() => select(i)}
+                    />
+                  )}
+                </div>
               </li>
             );
           })}

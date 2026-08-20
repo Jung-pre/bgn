@@ -4,7 +4,11 @@ import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
-import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
+import {
+  prefersReducedMotionSync,
+  useIsMobileLayout,
+  usePrefersReducedMotion,
+} from "@/shared/lib/use-media-query";
 import { usePinnedProgress } from "@/features/main/sections/common/use-pinned-progress";
 import { useSceneActive } from "@/r3f/use-scene-active";
 import { Marquee } from "@/components/marquee/marquee";
@@ -81,6 +85,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
   ];
   const pxTowerRef = useRef<HTMLDivElement>(null);
   const pxLinesRef = useRef<HTMLDivElement>(null);
+  const sheenRef = useRef<HTMLDivElement>(null);
 
   /** `prefersReducedMotionSync` 는 SSR 에서 못 부르므로 첫 프레임에 한 번만 캐시한다 */
   const reducedRef = useRef<boolean | null>(null);
@@ -192,6 +197,77 @@ export function HeroSection({ messages }: HeroSectionProps) {
     { scope: sectionRef },
   );
 
+  /**
+   * 실크 띠 아이들 모션.
+   *
+   * ## 왜 셰이더가 아니라 이미지인가
+   * 한동안 이 자리를 R3F 셰이더 리본으로 그렸는데, 시안의 실크가 가진
+   * "가닥의 굵기·밀도·색 얼룩"을 절차적으로 재현하는 데 실패했다. 시안 PNG 는
+   * 이미 그 정보를 전부 갖고 있다. **그림은 그대로 쓰고 움직임만 붙이는 게**
+   * 결과가 낫다.
+   *
+   * ## 어떻게 움직이나
+   * 1. 띠마다 다른 주기로 아주 느리게 떠다닌다(drift). 주기를 서로 나눠떨어지지
+   *    않게 잡아야 넷이 한 덩어리로 출렁이지 않는다.
+   * 2. 같은 띠를 한 겹 더 얹고 **그라디언트 마스크를 옆으로 흘려** 광택을 만든다.
+   *    빛이 실크를 타고 지나가는 인상이 여기서 나온다.
+   *
+   * 둘 다 GPU 합성만 쓰므로(transform / mask-position) 레이아웃을 건드리지 않는다.
+   */
+  useGSAP(
+    () => {
+      if (!towerMounted) return;
+      if (prefersReducedMotionSync()) return;
+
+      const drifts = gsap.utils.toArray<HTMLElement>("[data-drift]");
+      /* 띠마다 다른 진폭·주기. 소수점을 어긋뜨려 최소공배수를 길게 만든다. */
+      const PLAN = [
+        { x: 1.1, y: -0.9, r: 0.35, s: 1.012, d: 17.3 },
+        { x: -1.4, y: 0.7, r: -0.28, s: 1.016, d: 23.1 },
+        { x: 0.9, y: 1.2, r: 0.22, s: 1.01, d: 19.7 },
+        { x: -0.8, y: -1.1, r: -0.34, s: 1.014, d: 26.5 },
+        { x: 1.3, y: 0.6, r: 0.3, s: 1.011, d: 21.2 },
+        { x: -1.0, y: -0.7, r: -0.25, s: 1.013, d: 29.4 },
+      ] as const;
+
+      for (const [i, el] of drifts.entries()) {
+        const k = PLAN[i % PLAN.length];
+        if (!k) continue;
+        gsap.to(el, {
+          /* % 단위 — 뷰포트가 커져도 같은 비율로 흔들린다 */
+          xPercent: k.x,
+          yPercent: k.y,
+          rotation: k.r,
+          scale: k.s,
+          duration: k.d,
+          ease: "sine.inOut",
+          repeat: -1,
+          yoyo: true,
+          /* 시작 위상을 어긋뜨린다. 없으면 전부 같은 순간에 방향을 바꾼다. */
+          delay: -i * 3.7,
+        });
+      }
+
+      const sheen = sheenRef.current;
+      if (!sheen) return;
+      /* 마스크 위치를 CSS 변수로 흘린다. `repeatDelay` 로 뜸을 들여야
+         "가끔 빛이 지나간다"가 되지, 계속 돌면 그냥 배경 루프로 보인다. */
+      gsap.fromTo(
+        sheen,
+        { "--sheen": 130 },
+        {
+          "--sheen": -30,
+          duration: 4.2,
+          ease: "sine.inOut",
+          repeat: -1,
+          repeatDelay: 3.4,
+          delay: 1.2,
+        },
+      );
+    },
+    { scope: sectionRef, dependencies: [towerMounted] },
+  );
+
   const sphereSlide = messages.slides[0];
   const towerSlide = messages.slides[1] ?? messages.slides[0];
 
@@ -293,12 +369,30 @@ export function HeroSection({ messages }: HeroSectionProps) {
                 </div>
 
                 {/* 광선/웨이브 — 8:2949. 시안에서 프레임 마스크로 잘려 있다.
-                    clip 을 패럴랙스 래퍼 바깥에 둬야 잘리는 사각형이 안 움직인다 */}
+                    clip 을 패럴랙스 래퍼 바깥에 둬야 잘리는 사각형이 안 움직인다.
+
+                    셰이더 리본을 쓸 수 있으면 정지 PNG 대신 캔버스를 올린다.
+                    둘을 겹치면 같은 그림이 두 장 보이므로 **배타적으로** 렌더한다. */}
                 <div className={styles.stageClip}>
                   <div ref={pxLinesRef} className={styles.px}>
+                    {TOWER_LINES.flatMap((s, li) =>
+                      Array.from({ length: s.repeat ?? 1 }, (_, i) => (
+                        <TowerSpriteImg
+                          key={`${s.node}-${i}`}
+                          sprite={s}
+                          drift={li * 2 + i}
+                        />
+                      )),
+                    )}
+                  </div>
+
+                  {/* 광택 — 같은 띠를 한 겹 더 얹고 **움직이는 그라디언트 마스크**로
+                      가늘게 오려낸다. 빛이 실크를 타고 지나가는 것처럼 보인다.
+                      원본 위에 얹으므로 plus-lighter(정확한 덧셈)를 쓴다. */}
+                  <div ref={sheenRef} className={styles.lineSheen} aria-hidden>
                     {TOWER_LINES.flatMap((s) =>
                       Array.from({ length: s.repeat ?? 1 }, (_, i) => (
-                        <TowerSpriteImg key={`${s.node}-${i}`} sprite={s} />
+                        <TowerSpriteImg key={`sheen-${s.node}-${i}`} sprite={s} />
                       )),
                     )}
                   </div>
@@ -429,7 +523,7 @@ const pct = (value: number, base: number) => `${((value / base) * 100).toFixed(4
  * 같으므로 "회전 전 박스 + rotate" 로 그대로 옮겨진다.
  * 플립은 Figma 가 내준 순서(rotate → scale)를 그대로 유지해야 부호가 맞다.
  */
-function TowerSpriteImg({ sprite }: { sprite: TowerSprite }) {
+function TowerSpriteImg({ sprite, drift }: { sprite: TowerSprite; drift?: number }) {
   const transform = [
     sprite.rotate ? `rotate(${sprite.rotate}deg)` : "",
     sprite.flipX ? "scaleX(-1)" : "",
@@ -438,7 +532,14 @@ function TowerSpriteImg({ sprite }: { sprite: TowerSprite }) {
     .filter(Boolean)
     .join(" ");
 
-  return (
+  const box = {
+    left: pct(sprite.x, TOWER_STAGE.width),
+    top: pct(sprite.y, TOWER_STAGE.height),
+    width: pct(sprite.w, TOWER_STAGE.width),
+    height: pct(sprite.h, TOWER_STAGE.height),
+  };
+
+  const img = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       className={styles.sprite}
@@ -448,15 +549,27 @@ function TowerSpriteImg({ sprite }: { sprite: TowerSprite }) {
       loading="lazy"
       data-node={sprite.node}
       style={{
-        left: pct(sprite.x, TOWER_STAGE.width),
-        top: pct(sprite.y, TOWER_STAGE.height),
-        width: pct(sprite.w, TOWER_STAGE.width),
-        height: pct(sprite.h, TOWER_STAGE.height),
+        ...(drift === undefined ? box : { inset: 0, width: "100%", height: "100%" }),
         ...(transform ? { transform } : null),
         ...(sprite.opacity === undefined ? null : { opacity: sprite.opacity }),
         ...(sprite.fit ? { objectFit: sprite.fit } : null),
         ...(sprite.objectPosition ? { objectPosition: sprite.objectPosition } : null),
       }}
     />
+  );
+
+  if (drift === undefined) return img;
+
+  /**
+   * 드리프트 래퍼.
+   *
+   * 스프라이트 자신의 `transform` 에는 시안의 rotate/flip 이 이미 들어 있다.
+   * 거기에 애니메이션을 덧쓰면 시안 배치가 깨지므로 **바깥에 한 겹 더** 두고
+   * 그 래퍼만 움직인다. 회전 중심이 두 박스 모두 같아서 부호도 어긋나지 않는다.
+   */
+  return (
+    <div className={styles.lineDrift} data-drift={drift} style={box}>
+      {img}
+    </div>
   );
 }

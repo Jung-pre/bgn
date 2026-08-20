@@ -183,7 +183,7 @@ function renderWithMark(text: string, marker?: string) {
   return (
     <>
       {before}
-      <span className={styles.titleMark}>{marker}</span>
+      <span className="title-mark">{marker}</span>
       {rest.join(marker)}
     </>
   );

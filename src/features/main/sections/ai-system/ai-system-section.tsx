@@ -274,7 +274,7 @@ function renderWithMark(title: string, marker?: string) {
   return (
     <>
       {before}
-      <span className={styles.titleMark} data-deco>
+      <span className="title-mark" data-deco>
         {marker}
       </span>
       {rest.join(marker)}

@@ -1,6 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Belleza, Marcellus } from "next/font/google";
 import "pretendard/dist/web/static/pretendard.css";
+/* 영문 포인트 폰트는 **자가 호스팅**한다(@fontsource). `next/font/google` 이 아니다.
+   ① 빌드 타임에 fonts.googleapis.com 을 때리므로 폐쇄망·CI 에서 빌드가 통째로 깨진다
+      (실제로 이 프로젝트 CI 환경에서 그 이유로 빌드가 실패했다)
+   ② 런타임 서드파티 요청이 사라져 LCP 와 개인정보 양쪽에 낫다
+   ③ 두 폰트 모두 400 단일 웨이트라 서브셋 최적화 이점도 거의 없다 */
+import "@fontsource/belleza/400.css";
+import "@fontsource/marcellus/400.css";
 import "./globals.css";
 
 /**
@@ -19,20 +25,6 @@ import "./globals.css";
  * Belleza 는 Regular 400 단일 웨이트만 존재한다. 볼드가 필요하면
  * 디자이너에게 다른 폰트를 요청할 것 — 합성 볼드는 쓰지 않는다.
  */
-const belleza = Belleza({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-belleza",
-  display: "swap",
-});
-
-const marcellus = Marcellus({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-marcellus",
-  display: "swap",
-});
-
 export const metadata: Metadata = {
   title: { default: "BGN 밝은눈안과 잠실", template: "%s | BGN 밝은눈안과 잠실" },
   description: "세상을 선명하게 — BGN 밝은눈안과 잠실",
@@ -47,7 +39,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={`${belleza.variable} ${marcellus.variable}`}>
+    <html lang="ko">
       <body>{children}</body>
     </html>
   );

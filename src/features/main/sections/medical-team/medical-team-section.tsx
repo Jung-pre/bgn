@@ -41,8 +41,10 @@ function renderBoxedTitle(title: string) {
   if (at < 0) return title;
   return (
     <>
-      {title.slice(0, at)}
-      <span className={styles.titleBox}>{title.slice(at + 1)}</span>
+      {/* 공백을 포함해 자른다. 예전엔 공백을 버리고 마커에 margin 으로 벌렸는데,
+          공용 마커로 바꾸면서 그 margin 이 사라져 "BGN의료진" 으로 붙어 버렸다. */}
+      {title.slice(0, at + 1)}
+      <span className="title-mark">{title.slice(at + 1)}</span>
     </>
   );
 }
@@ -122,8 +124,8 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
                         <img
                           className={styles.photo}
                           src={doctor.photo}
-                          /* 이름이 없는 카드(doctor-06/07/08)는 부를 이름이 없다.
-                             빈 alt 로 장식 처리하고 버튼의 aria-label 이 대신 읽힌다. */
+                          /* 이름이 비어 있으면 부를 이름이 없다. 빈 alt 로 장식 처리하고
+                             버튼의 aria-label 이 대신 읽힌다. (지금은 8명 모두 이름이 있다) */
                           alt={doctor.name ? `${doctor.name} ${doctor.title}`.trim() : ""}
                           loading="lazy"
                           decoding="async"

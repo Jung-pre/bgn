@@ -1,0 +1,105 @@
+/* ==========================================================================
+   언어 선택 드롭다운 — Figma 8:367 실측
+   카드 120×164 / radius 8 / 행 41 / 국기 22 / 라벨 15
+   ========================================================================== */
+
+/**
+ * ⚠️ `position: static` 이 의도다.
+ *    시안에서 카드의 우측 끝은 지구본이 아니라 **유틸 클러스터 우측 끝**(=햄버거)에
+ *    맞춰져 있다. 부모(`.utils` / 메가메뉴 topBar)가 relative 를 갖고,
+ *    `.menu` 는 그 기준으로 `right: 0` 을 잡는다.
+ */
+.root {
+  display: flex;
+}
+
+.trigger {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  color: var(--gray-800);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.trigger:hover,
+.triggerOpen {
+  color: var(--primary-500);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1;
+  min-width: 120px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--color-white);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px 0 rgba(16, 106, 170, 0.16);
+  /**
+   * ⚠️ `visibility` 로 숨기면 안 된다.
+   *    열리는 순간 첫 항목에 포커스를 주는데, visibility 트랜지션이 시작되는 t=0 의
+   *    계산값은 아직 `hidden` 이라 `focus()` 가 조용히 무시된다(키보드로 못 연다).
+   *    닫힘 상태의 포커스/스크린리더 차단은 `inert` + `tabIndex=-1` 이 담당한다.
+   */
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.menuOpen {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 41px;
+  padding-inline: 14px;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-800);
+  white-space: nowrap;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: var(--primary-50);
+  color: var(--primary-500);
+}
+
+.itemActive {
+  color: var(--primary-500);
+  font-weight: var(--weight-semibold);
+}
+
+/* 메가메뉴 topBar 안에서도 동일하게 쓰이므로 위치 규칙은 부모가 정한다 */
+@media (max-width: 768px) {
+  .menu {
+    top: calc(100% + 8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .item,
+  .trigger {
+    transition: none;
+  }
+}

@@ -53,9 +53,19 @@ import {
  */
 
 /** 데스크톱 / 모바일 파티클 수. 모바일은 픽셀도 적고 발열이 바로 체감된다. */
+/**
+ * 파티클 수.
+ *
+ * 시안 구체는 **개별 점이 안 보이는 고운 가루**처럼 읽힌다. 4만 개로는 점 하나하나가
+ * 분간돼 "점 구름"이 되고 시안의 진주빛 막이 안 나온다. 개수를 3배로 올리는 대신
+ * 점 크기를 절반으로 줄여야 한다 — 크기를 그대로 두고 개수만 늘리면 흰 덩어리가 된다.
+ *
+ * 12만 점이라도 셰이더가 단순해서(정점 15줄 / 프래그먼트 12줄) 레이어당 드로우콜 1회다.
+ * 모바일은 픽셀도 적고 발열이 바로 체감되므로 1/4 로 내린다.
+ */
 const COUNTS = {
-  desktop: { land: 42000, shell: 26000, halo: 6000 },
-  mobile: { land: 14000, shell: 8500, halo: 2400 },
+  desktop: { land: 120000, shell: 78000, halo: 16000 },
+  mobile: { land: 26000, shell: 16000, halo: 4500 },
 } as const;
 
 /** 지축 기울기 23.4°(rad). 정확히 기울여야 "지구"로 읽힌다. */
@@ -294,47 +304,56 @@ function Globe({
   });
 
   return (
-    <group ref={groupRef} rotation={[0, FOCUS_ROTATION_Y, AXIAL_TILT]} scale={fitScale}>
-      <PointLayer
-        cloud={halo}
-        color="#ffffff"
-        size={0.03}
-        opacity={0.45 * intensity}
-        instant={reduced}
-        pointerRef={push}
-        pushScale={interactive ? 1.2 : 0}
-      />
-      <PointLayer
-        cloud={shell}
-        color="#eef4ff"
-        size={0.024}
-        opacity={0.75 * intensity}
-        instant={reduced}
-        pointerRef={push}
-        pushScale={interactive ? 1 : 0}
-      />
-      <PointLayer
-        cloud={land}
-        color="#ffffff"
-        size={0.03}
-        opacity={0.95 * intensity}
-        instant={reduced}
-        pointerRef={push}
-        pushScale={interactive ? 0.85 : 0}
-      />
+    <>
+      {/* 회전 그룹 밖 — 껍질의 산란광이라 구체와 같이 돌면 안 된다 */}
+      <group scale={fitScale}>
+        <GlobeHaze intensity={intensity} instant={reduced} />
+      </group>
+      <group ref={groupRef} rotation={[0, FOCUS_ROTATION_Y, AXIAL_TILT]} scale={fitScale}>
+        <PointLayer
+          cloud={halo}
+          color="#ffffff"
+          size={0.03}
+          opacity={0.55 * intensity}
+          instant={reduced}
+          tint={1.0}
+          pointerRef={push}
+          pushScale={interactive ? 1.2 : 0}
+        />
+        <PointLayer
+          cloud={shell}
+          color="#eef4ff"
+          size={0.024}
+          opacity={0.95 * intensity}
+          instant={reduced}
+          tint={1.0}
+          pointerRef={push}
+          pushScale={interactive ? 1 : 0}
+        />
+        <PointLayer
+          cloud={land}
+          color="#ffffff"
+          size={0.03}
+          opacity={1.0 * intensity}
+          instant={reduced}
+          tint={0.7}
+          pointerRef={push}
+          pushScale={interactive ? 0.85 : 0}
+        />
 
-      {/* 코어 글로우 — 매 프레임 카메라를 향하도록 돌린다(빌보드).
+        {/* 코어 글로우 — 매 프레임 카메라를 향하도록 돌린다(빌보드).
           drei `<Billboard>` 를 쓰지 않은 이유: 이건 회전 그룹의 자식이라
           Billboard 가 부모 회전을 상쇄하는 과정에서 quaternion 이 한 프레임 늦는다.
           클로징에서는 시안에 없으므로 아예 렌더하지 않는다(투명하게 두면 드로우콜만 남는다). */}
-      {showCore ? (
-        <mesh ref={coreRef} position={corePosition} renderOrder={-1}>
-          {/* 시안에서 파란 코어는 구체 지름의 40% 정도다. falloff 여유까지 1.2R. */}
-          <planeGeometry args={[GLOBE_RADIUS * 1.2, GLOBE_RADIUS * 1.2]} />
-          <CoreGlowMaterial />
-        </mesh>
-      ) : null}
-    </group>
+        {showCore ? (
+          <mesh ref={coreRef} position={corePosition} renderOrder={-1}>
+            {/* 시안에서 파란 코어는 구체 지름의 40% 정도다. falloff 여유까지 1.2R. */}
+            <planeGeometry args={[GLOBE_RADIUS * 0.85, GLOBE_RADIUS * 0.85]} />
+            <CoreGlowMaterial />
+          </mesh>
+        ) : null}
+      </group>
+    </>
   );
 }
 
@@ -396,6 +415,7 @@ const POINT_VERTEX = /* glsl */ `
   uniform float uPush;        // NDC 단위 최대 밀림량. 0 이면 비활성
   uniform float uPushRadius;  // 영향 반경 (aspect 보정된 NDC)
   varying float vScale;
+  varying vec2 vScreen;
 
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
@@ -422,19 +442,55 @@ const POINT_VERTEX = /* glsl */ `
     // 밀려난 입자를 살짝 키워 "쓸려 나간다"는 인상을 준다.
     gl_PointSize = uSize * (1.0 + grow * 0.5) * (uHeight * 0.5) / max(0.001, -mv.z);
     vScale = aScale;
+
+    /* 파스텔 이리데선스용 화면 좌표. 구체의 **로컬** 좌표가 아니라 NDC 를 쓴다 —
+       시안의 색 번짐은 지구에 칠해진 무늬가 아니라 화면 위에 걸린 빛이라
+       구체가 회전해도 색이 따라 돌면 안 된다. */
+    vScreen = clip.w > 0.0 ? clip.xy / clip.w : vec2(0.0);
   }
 `;
 
+/**
+ * 시안(`2:416`)의 구체는 **순백이 아니다.**
+ * 좌하단이 살구·분홍, 가운데 위가 라벤더, 우측이 하늘빛으로 번지는 파스텔 무지개다.
+ * 흰 파티클만 뿌리면 아무리 밀도를 올려도 "회색 점 구름"으로 읽힌다.
+ *
+ * 그래서 화면 좌표(`vScreen`)로 색 램프를 태운다. 로컬 좌표가 아닌 이유는
+ * 정점 셰이더 주석 참고 — 색이 구체를 따라 돌면 안 된다.
+ */
 const POINT_FRAGMENT = /* glsl */ `
   uniform vec3 uColor;
   uniform float uOpacity;
+  uniform float uTint;
   varying float vScale;
+  varying vec2 vScreen;
+
+  /* 시안 2:416 픽셀 실측. 이전 값은 채도가 너무 낮아 흰 점 구름으로 보였다. */
+  const vec3 WARM = vec3(1.00, 0.78, 0.76); // 살구·분홍 — 좌하단
+  const vec3 LAV  = vec3(0.84, 0.79, 1.00); // 라벤더 — 좌상단
+  const vec3 COOL = vec3(0.72, 0.88, 1.00); // 하늘 — 우측
+
   void main() {
     // 기본 gl_Point 는 사각형이다. 3px 짜리 사각형 2만 개는 격자무늬로 읽힌다.
     float d = length(gl_PointCoord - 0.5);
     float a = smoothstep(0.5, 0.08, d);
     if (a < 0.01) discard;
-    gl_FragColor = vec4(uColor, a * vScale * uOpacity);
+
+    /* 가로로 살구/라벤더 → 하늘, 세로로 살구 ↔ 라벤더.
+       두 축을 곱하지 않고 순차로 섞어야 중간에 탁한 회색이 안 생긴다. */
+    float x = vScreen.x * 0.5 + 0.5;
+    float y = vScreen.y * 0.5 + 0.5;
+    vec3 left = mix(WARM, LAV, smoothstep(0.15, 0.85, y));
+    vec3 tint = mix(left, COOL, smoothstep(0.30, 0.95, x));
+
+    /* ⚠️ 밝기를 정규화한다 — 가장 밝은 채널을 1.0 으로 끌어올린다.
+       그냥 곱하면 세 채널이 전부 1 미만이라 **색만 입는 게 아니라 어두워진다.**
+       가산 블렌딩에서는 그 감소가 곧 "파티클이 옅어짐"이라, 정규화 전에는
+       구체가 배경에 묻혀 거의 안 보였다. 색상만 옮기고 광량은 유지한다. */
+    tint /= max(max(tint.r, tint.g), tint.b);
+
+    vec3 col = mix(uColor, uColor * tint, uTint);
+    gl_FragColor = vec4(col, a * vScale * uOpacity);
   }
 `;
 
@@ -444,6 +500,7 @@ function PointLayer({
   size,
   opacity,
   instant,
+  tint,
   pointerRef,
   pushScale,
 }: {
@@ -458,6 +515,11 @@ function PointLayer({
   opacity: number;
   /** 동작 줄이기 — 페이드인 없이 처음부터 완성된 상태로 그린다 */
   instant: boolean;
+  /**
+   * 파스텔 이리데선스 세기 0~1.
+   * 육지는 시안에서도 가장 희므로 낮게, 바다·헤일로는 색이 많이 스미므로 높게 준다.
+   */
+  tint: number;
   /** 부모가 매 프레임 갱신하는 커서 상태. state 로 두면 60fps 리렌더가 된다. */
   pointerRef: RefObject<PointerPush>;
   /**
@@ -491,12 +553,13 @@ function PointLayer({
           uAspect: { value: 1 },
           uPush: { value: 0 },
           uPushRadius: { value: PUSH_RADIUS },
+          uTint: { value: tint },
         },
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       }),
-    [color, size, opacity, instant],
+    [color, size, opacity, instant, tint],
   );
 
   // useMemo 로 만든 객체는 R3F 가 자동 dispose 해 주지 않는다.
@@ -564,11 +627,124 @@ const CORE_FRAGMENT = /* glsl */ `
     float core = pow(max(0.0, 1.0 - d * 2.6), 2.0);
     float halo = pow(max(0.0, 1.0 - d), 2.4);
     vec3 c = mix(uOuter, uInner, core);
-    float a = (halo * 0.26 + core * 0.55) * uOpacity;
+    float a = (halo * 0.18 + core * 0.42) * uOpacity;
     if (a < 0.004) discard;
     gl_FragColor = vec4(c, a);
   }
 `;
+
+/* ==========================================================================
+   껍질 발광층 (헤이즈)
+   ========================================================================== */
+
+/**
+ * 시안 구체가 "점 구름"이 아니라 **진주빛 막**으로 보이는 진짜 이유.
+ *
+ * 파티클만으로는 아무리 개수를 늘려도 점 사이의 배경이 비쳐 성글게 읽힌다.
+ * 시안에는 점 밑에 **얇은 껍질이 빛을 산란시키는 은은한 판**이 깔려 있고,
+ * 특히 가장자리(limb)가 밝다. 그게 구체의 부피감을 만든다.
+ *
+ * ## 왜 구 메시가 아니라 카메라를 향한 원반인가
+ * 얇은 껍질을 통과하는 시선의 길이는 중심에서 최소, 가장자리에서 최대다.
+ * 그 광학 두께가 정확히 `1 / sqrt(1 - r²)` 이라서(r = 중심으로부터의 정규화 거리)
+ * **원반 하나에 이 식을 그대로 넣으면** 구를 세워 두고 반투명 셰이딩하는 것과
+ * 같은 그림이 나온다. 정점 12만 개짜리 구를 하나 더 그릴 이유가 없다.
+ *
+ * ## 회전 그룹 **밖**에 두는 이유
+ * 이건 대륙 무늬가 아니라 껍질의 산란광이다. 구체가 돌 때 같이 돌면 안 된다.
+ */
+const HAZE_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  varying vec2 vScreen;
+  void main() {
+    vUv = uv;
+    vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vScreen = clip.w > 0.0 ? clip.xy / clip.w : vec2(0.0);
+    gl_Position = clip;
+  }
+`;
+
+const HAZE_FRAGMENT = /* glsl */ `
+  uniform float uOpacity;
+  varying vec2 vUv;
+  varying vec2 vScreen;
+
+  const vec3 WARM = vec3(1.00, 0.78, 0.76);
+  const vec3 LAV  = vec3(0.84, 0.79, 1.00);
+  const vec3 COOL = vec3(0.72, 0.88, 1.00);
+
+  void main() {
+    float r = length(vUv - 0.5) * 2.0;
+    if (r > 1.0) discard;
+
+    /* 얇은 껍질의 광학 두께. 가장자리에서 발산하므로 상한을 씌운다. */
+    float shell = 1.0 / sqrt(max(0.030, 1.0 - r * r));
+
+    /*
+      ⚠️ shell 값을 그대로 곱하면 안 된다.
+      중심에서도 값이 1 이라 **원반 전체가 균일하게 밝아지고**, 그 위에 얹은
+      가산 파티클이 포화 근처로 밀려 대비를 통째로 잃는다. 실제로 그렇게 만들었더니
+      구체가 "뿌연 원반"이 됐다.
+
+      1.02 를 빼서 중심은 0 에 붙이고 **가장자리(limb)만 남긴다.** 여기에 아주 옅은
+      상수(0.05)를 더해 안쪽의 진주빛 바닥을 만든다 — 시안의 부피감이 이 조합이다.
+    */
+    float a = max(0.0, shell - 1.02) * 0.16 + 0.09;
+    a = min(a, 0.62);
+
+    /* 가장자리 1픽셀에서 계단이 보이지 않게 살짝 접어 준다 */
+    a *= smoothstep(1.0, 0.955, r);
+
+    /* 파티클과 같은 램프를 쓴다 — 두 레이어의 색이 어긋나면 막이 아니라
+       "색 다른 원반이 덧대진 것"으로 보인다. */
+    float x = vScreen.x * 0.5 + 0.5;
+    float y = vScreen.y * 0.5 + 0.5;
+    vec3 left = mix(WARM, LAV, smoothstep(0.15, 0.85, y));
+    vec3 tint = mix(left, COOL, smoothstep(0.30, 0.95, x));
+    tint /= max(max(tint.r, tint.g), tint.b);
+
+    if (a < 0.003) discard;
+    gl_FragColor = vec4(tint, a * uOpacity);
+  }
+`;
+
+function GlobeHaze({ intensity, instant }: { intensity: number; instant: boolean }) {
+  const matRef = useRef<THREE.ShaderMaterial>(null);
+  const fade = useRef(instant ? 1 : 0);
+
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: HAZE_VERTEX,
+        fragmentShader: HAZE_FRAGMENT,
+        uniforms: { uOpacity: { value: instant ? intensity : 0 } },
+        transparent: true,
+        depthWrite: false,
+        /* 파티클과 같은 가산. 배경이 파스텔이라 이 층이 곧 "빛"이 된다. */
+        blending: THREE.AdditiveBlending,
+      }),
+    [intensity, instant],
+  );
+
+  useEffect(() => () => material.dispose(), [material]);
+
+  useFrame((_state, delta) => {
+    const m = matRef.current;
+    if (!m || instant) return;
+    if (fade.current < 1) fade.current = Math.min(1, fade.current + delta / 1.1);
+    const o = m.uniforms.uOpacity;
+    if (o) o.value = fade.current * intensity;
+  });
+
+  return (
+    /* 파티클 껍질(GLOBE_RADIUS)보다 아주 조금 안쪽. 같은 반지름이면 가장자리에서
+       헤이즈가 파티클 밖으로 삐져나와 테두리가 두 겹으로 보인다. */
+    <mesh renderOrder={-2} frustumCulled={false}>
+      <planeGeometry args={[GLOBE_RADIUS * 1.97, GLOBE_RADIUS * 1.97]} />
+      <primitive ref={matRef} object={material} attach="material" />
+    </mesh>
+  );
+}
 
 function CoreGlowMaterial() {
   const material = useMemo(
@@ -578,8 +754,10 @@ function CoreGlowMaterial() {
         fragmentShader: CORE_FRAGMENT,
         uniforms: {
           // globals.css --primary-300 / --primary-500
-          uInner: { value: new THREE.Color("#cfe6ff") },
-          uOuter: { value: new THREE.Color("#0072ec") },
+          /* 시안의 코어는 **작고 흰빛에 가까운 시안**이다. primary-500 을 그대로 쓰면
+             보라빛 덩어리가 되어 시안보다 훨씬 무겁다(실제로 그렇게 보였다). */
+          uInner: { value: new THREE.Color("#ffffff") },
+          uOuter: { value: new THREE.Color("#4aa8f0") },
           uOpacity: { value: 0 },
         },
         transparent: true,

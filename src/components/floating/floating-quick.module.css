@@ -1,14 +1,37 @@
 /* ==========================================================================
+   퀵메뉴 — 치수는 전부 Figma 실측이다.
+     · 닫힘  `2:2403` : 토글 80 / 마스코트 80 / 세로 간격 8 / 말풍선은 마스코트 왼쪽
+     · 열림  `2:665`  : 버튼 72, 토글 중심 기준 좌표는 tsx 의 FAN_OFFSET
+     · 모바일 `2:3412`: 바 335×60, 항목 54×48, 아이콘 20, 마스코트 FAB 60
+   ========================================================================== */
+
+/* 브랜드 그라데이션 원본: Figma radial(#8D79FF → #0072EC), 원점이 좌상단 모서리다.
+   토큰(--primary-sub-500 / --primary-500)이 정확히 같은 두 끝값이라 토큰을 쓴다.
+   중간 스톱은 시안 그대로 두 색의 보간이라 생략해도 육안 차이가 없다. */
+.fanRoot,
+.bottomBar {
+  --quick-brand-gradient: radial-gradient(
+    120% 120% at 0% 0%,
+    var(--primary-sub-500) 20%,
+    var(--primary-500) 100%
+  );
+}
+
+/* ==========================================================================
    PC — 우하단 팬아웃
    ========================================================================== */
+
+/* 시안 1920 기준 right 80 / bottom 32. 1920 미만에서는 vw 로 줄어들되
+   40px 아래로는 내려가지 않게 잡았다(프로젝트의 clamp 스케일링 관례). */
 .fanRoot {
   position: fixed;
-  right: 2.5rem;
-  bottom: 2.5rem;
+  right: clamp(40px, 4.1667vw, 80px);
+  bottom: clamp(24px, 1.6667vw, 32px);
   z-index: var(--z-quickfab);
   display: flex;
+  flex-direction: column;
   align-items: flex-end;
-  gap: 0.75rem;
+  gap: 8px;
   /* GNB 와 같은 곡선·길이로 사라져야 두 요소가 따로 노는 느낌이 안 든다 */
   transition: opacity 0.35s ease;
 }
@@ -23,15 +46,182 @@
   pointer-events: none;
 }
 
+/* 팬 좌표의 원점. 토글과 같은 크기라 `left/top 50%` 가 곧 토글 중심이다 */
+.fanArea {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.fanList {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 닫힘 상태에서는 클릭도 먹으면 안 된다. 포커스 차단은 tsx 의 `inert` 가 맡는다 */
+.fanList[inert] {
+  pointer-events: none;
+}
+
+.fanItem {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 72px;
+  /* 토글 중심에 정확히 겹쳐 둔 뒤 offset 만큼 민다 */
+  margin: -36px 0 0 -36px;
+  transform: translate3d(0, 0, 0) scale(0.4);
+  opacity: 0;
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.4, 0.64, 1),
+    opacity 0.24s ease;
+  /* 닫힐 때는 펼침의 역순으로 빨려 들어가야 자연스럽다 */
+  transition-delay: calc((3 - var(--fan-i)) * 40ms);
+}
+
+.fanRoot[data-open] .fanItem {
+  transform: translate3d(var(--fan-x), var(--fan-y), 0) scale(1);
+  opacity: 1;
+  transition-delay: calc(var(--fan-i) * 50ms);
+}
+
+.fanButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-full);
+  /* 시안 실측: drop-shadow(2.885px 3.846px 7.212px rgba(0,0,0,0.15)) */
+  box-shadow: 2.885px 3.846px 7.212px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease;
+}
+
+.fanButton:hover {
+  transform: scale(1.06);
+}
+
+.fanIcon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+.fanLabel {
+  font-size: var(--fs-13);
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+  letter-spacing: -0.65px;
+  white-space: nowrap;
+}
+
+/* ── 버튼별 브랜드 컬러 (Figma `2:665` 각 프레임의 fill 원본) ─────────────
+   병원 CI 토큰이 아니라 외부 서비스 CI 라 하드코딩한다. 출처는 각 주석. */
+
+/* 카카오 옐로 — I2:665;658:4422 linear-gradient(135deg,#FFF3C9 10.42%,#F9E000 50.23%)
+   카카오 가이드상 심볼은 검정이라 라벨도 #131313 (시안 값 그대로) */
+.theme_kakao {
+  background-image: linear-gradient(135deg, #fff3c9 10.42%, #f9e000 50.23%);
+  color: #131313;
+}
+
+/* 네이버 그린 — I2:665;658:4428 radial(#79E9AB → #07BC66), 원점 좌상단 */
+.theme_naver {
+  background-image: radial-gradient(120% 120% at 0% 0%, #79e9ab 20%, #07bc66 100%);
+  color: var(--color-white);
+}
+
+/* 이벤트 퍼플 — I2:665;658:4431 radial(#B987FF → #673DFF), 원점 좌상단 */
+.theme_event {
+  background-image: radial-gradient(120% 120% at 0% 0%, #b987ff 20%, #9062ff 60%, #673dff 100%);
+  color: var(--color-white);
+}
+
+/* 오시는 길 — I2:665;658:4411. 브랜드 그라데이션과 같은 두 끝값이라 토큰 재사용 */
+.theme_map {
+  background-image: var(--quick-brand-gradient);
+  color: var(--color-white);
+}
+
+/* ── 토글 ─────────────────────────────────────────────────────────────── */
+.fanToggle {
+  position: relative;
+  /* 팬 항목이 이 원 뒤에서 나와야 해서 stacking 을 한 단 올린다 */
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 80px;
+  height: 80px;
+  padding-top: 4px;
+  border-radius: var(--radius-full);
+  background-image: var(--quick-brand-gradient);
+  color: var(--color-white);
+  /* 시안 실측: 2px 2px 12px rgba(126,156,190,0.2) */
+  box-shadow: 2px 2px 12px rgba(126, 156, 190, 0.2);
+  transition:
+    background-color 0.3s ease,
+    transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* 열림 상태는 흰 원 + 회색 × 다 (시안 I2:665;658:4462) */
+.fanRoot[data-open] .fanToggle {
+  background-image: none;
+  background-color: var(--color-white);
+  color: var(--gray-500);
+}
+
+.toggleMark {
+  width: 40px;
+  height: 24px;
+  flex: none;
+}
+
+.toggleLabel {
+  font-size: var(--fs-13);
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+  letter-spacing: -0.65px;
+}
+
+.toggleClose {
+  width: 40px;
+  height: 40px;
+}
+
+/* ── 말풍선 + 마스코트 ─────────────────────────────────────────────────── */
+.chatRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 시안: whitebg-90 + backdrop-blur 6, 테두리 gray-100, 글자는 그라데이션 클립 */
 .bubble {
   margin: 0;
-  padding: 0.5rem 0.9rem;
-  background: var(--brand-primary);
-  color: var(--color-white);
-  font-size: var(--fs-16);
+  padding: 10px 16px;
+  background: var(--whitebg-90);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--gray-100);
   border-radius: var(--radius-full);
+  font-size: var(--fs-13);
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+  letter-spacing: -0.65px;
   white-space: nowrap;
-  box-shadow: var(--shadow-pill);
+  background-image: linear-gradient(90deg, var(--primary-sub-500), var(--primary-500));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
   transition:
     opacity 0.25s ease,
     transform 0.25s ease;
@@ -39,101 +229,64 @@
 
 .bubbleHidden {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateX(6px);
   pointer-events: none;
 }
 
-.fanList {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  width: 3.75rem;
-  height: 3.75rem;
-}
-
-.fanItem {
-  position: absolute;
-  inset: 0;
-  /* 닫힘 상태: 토글 버튼 뒤에 겹쳐 숨어 있다 */
-  transform: rotate(0deg) translateX(0) rotate(0deg) scale(0.4);
-  opacity: 0;
-  transition:
-    transform 0.42s cubic-bezier(0.34, 1.4, 0.64, 1),
-    opacity 0.28s ease;
-  transition-delay: calc((3 - var(--i)) * 40ms);
-}
-
-/* 열림: 각도만큼 회전한 뒤 반지름만큼 밀고, 다시 역회전해 아이콘을 세운다 */
-.fanListOpen .fanItem {
-  transform: rotate(var(--angle)) translateX(-7.5rem) rotate(calc(-1 * var(--angle))) scale(1);
-  opacity: 1;
-  transition-delay: calc(var(--i) * 55ms);
-}
-
-.fanButton {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  border-radius: var(--radius-full);
-  background: var(--color-white);
-  box-shadow: var(--shadow-card);
-  font-size: var(--fs-13);
-  font-weight: var(--weight-semibold);
-  color: var(--brand-navy);
-  text-align: center;
-  line-height: 1.2;
-}
-
-.fanLabel {
-  padding: 0 0.25rem;
-  word-break: keep-all;
-}
-
-.fanToggle {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 3.75rem;
-  height: 3.75rem;
-  border-radius: var(--radius-full);
-  background: var(--gradient-cta);
-  color: var(--color-white);
-  font-family: var(--font-display-stack);
-  font-size: var(--fs-16);
-  font-weight: var(--weight-bold);
-  box-shadow: var(--shadow-card);
+.mascotButton {
+  display: block;
+  width: 80px;
+  height: 80px;
+  flex: none;
+  /* 시안이 원본을 확대해 잘라 쓰므로 80×80 밖은 잘라 낸다.
+     시안의 클립 영역은 정사각이다 — 원형으로 깎으면 마스코트 지느러미가 잘린다. */
+  overflow: hidden;
   transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-.fanToggle[aria-expanded="true"] {
-  transform: rotate(90deg);
+.mascotButton:hover {
+  transform: translateY(-4px);
+}
+
+/* 시안은 원본을 110.08% 로 키우고 좌 -5.04% / 상 -3.16% 만큼 밀어 여백을 잘라낸다 */
+.mascotImage {
+  width: 110.08%;
+  height: 110.08%;
+  margin-left: -5.04%;
+  margin-top: -3.16%;
+  object-fit: contain;
 }
 
 /* ==========================================================================
-   모바일 — 하단 고정 바 (시안 실측: 높이 72, 좌우 20, 하단 15)
+   모바일 — 하단 고정 바 (Figma `2:3412` 실측: 335×60, 좌우 거터 20, 하단 21)
    ========================================================================== */
 .bottomBar {
   position: fixed;
   left: var(--mobile-gutter);
   right: var(--mobile-gutter);
-  /* 홈 인디케이터 회피 — 시안의 하단 15px 여백이 이 용도 */
-  bottom: calc(15px + env(safe-area-inset-bottom, 0px));
+  /* 홈 인디케이터 회피 — 시안의 하단 21px 여백이 이 용도 */
+  bottom: calc(21px + env(safe-area-inset-bottom, 0px));
   z-index: var(--z-bottombar);
+  /* 토큰이 시안 실측(60)과 어긋나 있어 여기서 박아 뒀었다. 토큰을 60 으로 고쳤으니 되돌린다. */
   height: var(--mobile-bottombar-height);
-  background: var(--color-white);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
+  padding: 8px 12px;
+  background: var(--whitebg-90);
+  backdrop-filter: blur(25px);
+  border: 1px solid var(--color-white);
+  border-radius: var(--radius-sm);
+  /* 시안 실측: 1px 2px 8px rgba(16,106,170,0.12) */
+  box-shadow: 1px 2px 8px rgba(16, 106, 170, 0.12);
   transition: opacity 0.35s ease;
 }
 
+/* 마스코트 FAB 이 바 위로 8px 튀어나온다 — grid 로 폭을 시안대로 고정한다.
+   (space-between 로 5등분하면 좌/우 짝의 4px 간격이 무너진다) */
 .bottomList {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: center;
+  grid-template-columns: 54px 54px 1fr 54px 54px;
+  column-gap: 4px;
+  align-items: end;
+  justify-items: center;
   height: 100%;
   margin: 0;
   padding: 0;
@@ -144,48 +297,88 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  width: 100%;
+  justify-content: center;
+  gap: 4px;
+  width: 54px;
+  height: 100%;
+  color: var(--gray-900);
 }
 
 .bottomIcon {
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--gray-100);
+  width: 20px;
+  height: 20px;
+  flex: none;
 }
 
 .bottomLabel {
-  font-size: 10px;
-  color: var(--color-text-muted);
+  font-size: var(--fs-13);
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+  letter-spacing: -0.65px;
   white-space: nowrap;
 }
 
+/* 그리드 1fr 칸을 차지하는 자리표시자. FAB 자체는 아래에서 바 기준으로 띄운다 */
 .bottomCenter {
-  display: grid;
-  place-items: center;
+  width: 100%;
 }
 
-/* 중앙 챗봇 FAB — 바 위로 돌출 (시안 지름 62) */
-.chatFab {
+/* 중앙 마스코트 FAB — 바 위로 돌출 (시안 지름 60, 흰 테두리 4).
+   그리드 흐름에 두면 60px 이 행 높이를 밀어 올려 바 **아래**로 삐져나간다.
+   그래서 바(position: fixed)를 기준으로 절대 배치해 위로만 튀어나오게 한다. */
+.mascotFab {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
-  margin-top: -28px;
+  width: 60px;
+  height: 60px;
+  overflow: hidden;
+  border: 4px solid var(--color-white);
   border-radius: var(--radius-full);
-  background: var(--gradient-cta);
-  color: var(--color-white);
-  font-family: var(--font-display-stack);
-  font-size: 13px;
-  font-weight: var(--weight-bold);
-  box-shadow: var(--shadow-card);
+  background-image: var(--quick-brand-gradient);
+  /* 시안 실측: 0 2px 6px rgba(0,0,0,0.06) */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.mascotFab .mascotImage {
+  width: 40px;
+  height: 40px;
+  margin: 0;
+}
+
+/* 전역 리셋에 focus 스타일이 없다. 원형 컨트롤이라 링도 원형으로 맞춰 준다 */
+.fanButton:focus-visible,
+.fanToggle:focus-visible,
+.mascotFab:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 3px;
+  border-radius: var(--radius-full);
+}
+
+.mascotButton:focus-visible,
+.bottomItem:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* 펼침도 모션이다 — 위치는 그대로 두고 트랜지션만 끊는다 */
+  .fanRoot,
   .fanItem,
+  .fanButton,
   .fanToggle,
-  .bubble {
+  .bubble,
+  .mascotButton,
+  .bottomBar {
     transition: none;
+  }
+
+  .fanButton:hover,
+  .mascotButton:hover {
+    transform: none;
   }
 }

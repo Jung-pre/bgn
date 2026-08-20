@@ -4,18 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
-import { NAV_TREE } from "@/shared/config/nav";
-import { localeLabels, locales, type Locale } from "@/shared/config/i18n";
+import type { Locale } from "@/shared/config/i18n";
 import { useIsMobileLayout } from "@/shared/lib/use-media-query";
 import type { GnbMessages } from "@/shared/i18n/messages";
+import { GNB_INLINE_NAV } from "./gnb-nav";
+import { BurgerIcon, CloseIcon } from "./icons";
+import { LocaleMenu } from "./locale-menu";
 import { MegaMenu } from "./mega-menu";
 import styles from "./gnb.module.css";
 
 /**
- * 플로팅 pill GNB.
+ * 플로팅 pill GNB — 시안 `8:283` / `8:367` / `8:3025`.
  *
  * 시안 특징 (일반적인 sticky 헤더와 다른 점):
- *  - 화면 상단에 **붙지 않는다.** 좌우/상단에 여백을 두고 떠 있는 캡슐(radius 큼, 화이트 solid).
+ *  - 화면 상단에 **붙지 않는다.** 좌우 40 / 상단 24 여백을 두고 떠 있는 캡슐.
  *  - 배경 위에 떠 있으므로 다크 섹션(Web blog)에서도 그대로 흰색이다 →
  *    shin 처럼 섹션 톤에 따라 색을 바꾸는 로직이 **필요 없다.**
  *  - PC 에도 햄버거가 있다. 인라인 8메뉴 + 전체 메가메뉴 병존 구조.
@@ -35,11 +37,9 @@ export interface GnbProps {
 export function Gnb({ locale, messages }: GnbProps) {
   const pathname = usePathname();
   const isMobile = useIsMobileLayout();
-  const headerRef = useRef<HTMLElement>(null);
 
   const [isHidden, setIsHidden] = useState(false);
   const [isMegaOpen, setIsMegaOpen] = useState(false);
-  const [isLocaleOpen, setIsLocaleOpen] = useState(false);
   const [openDepth1, setOpenDepth1] = useState<string | null>(null);
 
   const lastYRef = useRef(0);
@@ -84,18 +84,16 @@ export function Gnb({ locale, messages }: GnbProps) {
   if (lastKey !== currentKey) {
     setLastKey(currentKey);
     setIsMegaOpen(false);
-    setIsLocaleOpen(false);
     setOpenDepth1(null);
   }
 
   /**
-   * 포커스가 헤더 밖으로 나갈 때만 닫는다.
+   * 포커스가 헤더 밖으로 나갈 때만 1뎁스 드롭다운을 닫는다.
    * `onMouseLeave` 만 쓰면 키보드 사용자가 드롭다운을 못 벗어난다.
    */
   const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
       setOpenDepth1(null);
-      setIsLocaleOpen(false);
     }
   };
 
@@ -104,9 +102,10 @@ export function Gnb({ locale, messages }: GnbProps) {
   return (
     <>
       <header
-        ref={headerRef}
         className={clsx(styles.header, isHidden && styles.headerHidden)}
         onBlur={handleBlur}
+        /* 메가메뉴가 열리면 오버레이가 헤더를 덮는다 — 뒤로 탭이 새지 않게 비활성화 */
+        inert={isMegaOpen}
       >
         <div className={styles.pill}>
           <Link href={`/${locale}`} className={styles.logo} aria-label="BGN 밝은눈안과">
@@ -116,10 +115,10 @@ export function Gnb({ locale, messages }: GnbProps) {
             <span className={styles.logoText}>밝은눈안과</span>
           </Link>
 
-          {/* PC 인라인 네비 — 768 이하에서는 CSS 로 숨긴다 */}
+          {/* PC 인라인 네비 — 1024 이하에서는 CSS 로 숨긴다 */}
           <nav className={styles.nav} aria-label="주 메뉴">
             <ul className={styles.navList}>
-              {NAV_TREE.map((item) => {
+              {GNB_INLINE_NAV.map((item) => {
                 const open = openDepth1 === item.href;
                 return (
                   <li
@@ -130,17 +129,24 @@ export function Gnb({ locale, messages }: GnbProps) {
                   >
                     <Link
                       href={withLocale(item.href)}
-                      className={styles.navLink}
+                      className={clsx(styles.navLink, open && styles.navLinkOpen)}
                       aria-expanded={item.children ? open : undefined}
                       onFocus={() => setOpenDepth1(item.children ? item.href : null)}
                     >
                       {item.label[locale]}
                     </Link>
                     {item.children ? (
-                      <ul className={clsx(styles.dropdown, open && styles.dropdownOpen)}>
+                      <ul
+                        className={clsx(styles.dropdown, open && styles.dropdownOpen)}
+                        inert={!open}
+                      >
                         {item.children.map((child) => (
                           <li key={child.href}>
-                            <Link href={withLocale(child.href)} className={styles.dropdownLink}>
+                            <Link
+                              href={withLocale(child.href)}
+                              className={styles.dropdownLink}
+                              tabIndex={open ? 0 : -1}
+                            >
                               {child.label[locale]}
                             </Link>
                           </li>
@@ -153,7 +159,7 @@ export function Gnb({ locale, messages }: GnbProps) {
             </ul>
           </nav>
 
-          <div className={styles.utils}>
+          <div className={clsx(styles.utils, isMegaOpen && styles.utilsHidden)}>
             <Link href={withLocale("/login")} className={styles.utilLink}>
               {messages.login}
             </Link>
@@ -162,30 +168,7 @@ export function Gnb({ locale, messages }: GnbProps) {
               {messages.signup}
             </Link>
 
-            <div className={styles.localeWrap}>
-              <button
-                type="button"
-                className={styles.iconButton}
-                aria-label={messages.languageLabel}
-                aria-expanded={isLocaleOpen}
-                onClick={() => setIsLocaleOpen((v) => !v)}
-              >
-                <GlobeIcon />
-              </button>
-              <ul className={clsx(styles.localeList, isLocaleOpen && styles.localeListOpen)}>
-                {locales.map((l) => (
-                  <li key={l}>
-                    <Link
-                      href={`/${l}`}
-                      className={clsx(styles.localeItem, l === locale && styles.localeItemActive)}
-                      lang={l}
-                    >
-                      {localeLabels[l]}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <LocaleMenu locale={locale} label={messages.languageLabel} />
 
             <button
               type="button"
@@ -194,7 +177,7 @@ export function Gnb({ locale, messages }: GnbProps) {
               aria-expanded={isMegaOpen}
               onClick={() => setIsMegaOpen((v) => !v)}
             >
-              <BurgerIcon open={isMegaOpen} />
+              {isMegaOpen ? <CloseIcon /> : <BurgerIcon />}
             </button>
           </div>
         </div>
@@ -205,42 +188,10 @@ export function Gnb({ locale, messages }: GnbProps) {
         open={isMegaOpen}
         onClose={() => setIsMegaOpen(false)}
         closeLabel={messages.menuClose}
+        loginLabel={messages.login}
+        signupLabel={messages.signup}
+        languageLabel={messages.languageLabel}
       />
     </>
-  );
-}
-
-function GlobeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function BurgerIcon({ open }: { open: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden>
-      {open ? (
-        <path
-          d="M5 5l14 14M19 5L5 19"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-      ) : (
-        <path
-          d="M4 7h16M4 12h16M4 17h16"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-      )}
-    </svg>
   );
 }
