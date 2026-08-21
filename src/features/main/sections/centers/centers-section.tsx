@@ -130,7 +130,13 @@ export function CentersSection({ messages }: CentersSectionProps) {
   const windowed = !isMobile;
 
   return (
-    <section ref={sectionRef} className={styles.section} aria-labelledby="centers-title">
+    <section
+      ref={sectionRef}
+      className={clsx(styles.section, "blend-top")}
+      aria-labelledby="centers-title"
+      /* 앞 섹션(AI 브랜드 스토리) 끝 색 실측값 */
+      style={{ "--blend-from": "rgb(226, 239, 254)" } as CSSProperties}
+    >
       {/* 시안에는 헤더가 없다. 문서 개요용으로만 남긴다. */}
       <h2 id="centers-title" className="sr-only">
         {messages.title}

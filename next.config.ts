@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+/**
+ * 로컬 포트는 **3100** (`package.json --port` + `.env PORT`).
+ * Next 기본 3000 으로 되돌리지 말 것 — 다른 프로젝트와 충돌한다.
+ */
 const nextConfig: NextConfig = {
   /** Docker 단독 실행용 standalone 번들. 배포 방식이 다르면 지워도 됨. */
   output: "standalone",

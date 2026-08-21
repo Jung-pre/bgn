@@ -71,7 +71,76 @@
   transform-origin: 50% 0;
 }
 
+/** 사진이 빠진 자리 — 그리드 1번 칸을 지키는 역할만 한다 */
+.photoSlot {
+  display: block;
+  /* 카드 높이만큼은 차지해야 행 높이가 시안과 같다 */
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  max-width: 40rem;
+  justify-self: end;
+}
+
+/* --- 물레방아 ----------------------------------------------------------------- */
+
+/**
+ * 바퀴가 사는 열 — 타임라인 왼쪽 절반(축까지, column-gap 절반만큼 뺀다).
+ * 타임라인 전체 높이를 덮어야 그 안의 `sticky` 가 섹션 끝까지 붙어 있는다.
+ */
+.wheelColumn {
+  position: absolute;
+  left: 0;
+  /* 섹션 패딩까지 덮어야 마지막 시대에서 sticky 가 먼저 풀리지 않는다 */
+  top: calc(var(--gap-section) * -1);
+  bottom: calc(var(--gap-section) * -1);
+  width: calc(50% - 3.5rem);
+  pointer-events: none;
+  /* ⚠️ 바퀴가 DOM 상 `.eras` 뒤에 있어서 기본값이면 카피 위를 덮는다.
+     이웃 살은 활성보다 오른쪽(x = RX·(1−cos θ))으로 물러나 축을 넘기 때문에
+     반드시 카피 **아래**에 깔려야 읽힌다. */
+  z-index: 0;
+}
+
+.wheel {
+  position: sticky;
+  top: 0;
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  /* 짧을수록 원근이 강해 살이 심하게 찌그러진다 */
+  perspective: 700px;
+  /* 소실점을 오른쪽 위로 밀어 둔다 — 원의 중심이 그쪽이라, 뒤로 물러나는 살이
+     궤도를 따라 소실점으로 빨려 들어가면서 원근이 물리적으로 맞아떨어진다. */
+  perspective-origin: 62% 42%;
+  transform-style: preserve-3d;
+}
+
+/** 살 한 장. 위치·회전은 전부 JS(use-history-reveal)가 매 프레임 쓴다. */
+.wheelItem {
+  position: absolute;
+  width: min(40rem, 100%);
+  aspect-ratio: 4 / 3;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+@media (max-width: 768px) {
+  /* 좁은 화면에서는 바퀴가 텍스트를 덮는다. 열을 전체 폭으로 펴고 반지름을 줄인다
+     (반지름은 JS 가 뷰포트 높이에서 계산하므로 여기선 폭만 손댄다). */
+  .wheelColumn {
+    width: 100%;
+    opacity: 0.35;
+  }
+  .wheelItem {
+    width: min(22rem, 76%);
+  }
+}
+
 .eras {
+  /* 바퀴(.wheelColumn, z-index 0)보다 위 — 이웃 살이 넘어와도 카피가 이긴다 */
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -131,19 +200,42 @@
   "모양이 시안과 다르다"는 피드백의 가장 큰 원인이었다.
   기울기 방향도 네 프레임 모두 **같은 방향(시계)** 이다. 세트마다 교차시키면
   시안에 없는 지그재그가 생긴다.
-  정지 각도는 `--tilt-rest` 한 곳에서만 정한다 — CSS 가 초기값으로 쓰고
-  JS(use-history-reveal)가 같은 값을 읽어 scrub 의 도착점으로 쓴다.
+  ⚠️ 지금은 카드가 시대별 `<li>` 를 떠나 물레방아(.wheelColumn)로 모였다.
+  기울기는 CSS 가 아니라 바퀴의 스크럽이 전담한다 — 아래 `--tilt-rest*` 는
+  0 을 지키는 게 역할이다(활성 살은 반듯해야 한다).
 */
 .photoCard {
   position: absolute;
   inset: 0;
-  --tilt-rest: 4deg;
+  /**
+   * ## 카드의 **정지 자세는 0 이다** — 활성 살은 반듯한 직사각형이어야 한다
+   *
+   * 한 번 여기에 Z 6° · Y 14° · X 12° 를 넣어 "어느 살도 정면으로 서지 않게"
+   * 만들어 봤다(레퍼런스 목업이 그렇다). 결과는 정반대였다 — 지금 읽고 있는
+   * 시대의 사진이 계속 비뚤어져 있으니 **정면에 섰다는 느낌 자체가 사라진다.**
+   * 이 모션의 보상은 "돌다가 딱 반듯하게 선다"는 그 순간이고, 그 순간을 위해
+   * 정지 자세는 반드시 0 이어야 한다.
+   *
+   * 기울기는 전부 바퀴 쪽(use-history-reveal)이 스크롤에 물려서 만든다.
+   * 활성(θ=0)에서 정확히 0 이고, 떠나거나 들어오는 살에서만 붙는다.
+   * 그래서 이 세 변수는 **0 을 지키는 게 역할**이다. 값을 넣으면 활성 살까지
+   * 같이 틀어진다.
+   */
+  --tilt-rest: 0deg; /* Z */
+  --tilt-rest-y: 0deg; /* Y */
+  --tilt-rest-x: 0deg; /* X */
+  /** 카드마다 소실점을 따로 갖는 편이 독립된 판으로 읽힌다 */
+  /* 짧을수록 원근이 강해 판이 심하게 찌그러진다. 1400 은 너무 밋밋했다. */
+  --tilt-persp: 700px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-card);
   /* `rotate:` 단축 속성이 아니라 transform 이어야 한다 —
      GSAP 은 transform 을 쓰므로 rotate 속성으로 두면 두 각도가 합산된다. */
-  transform: rotate(var(--tilt-rest));
+  transform: perspective(var(--tilt-persp)) rotateX(var(--tilt-rest-x))
+    rotateY(var(--tilt-rest-y)) rotateZ(var(--tilt-rest));
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
 
 /* 사진은 카드를 꽉 채운다(cover). 시안 4프레임 모두 여백 없이 잘려 있다.
@@ -283,6 +375,13 @@
 
 /* --- 모바일 — 1시대 = 1블록 세로 스택 ---------------------------------------- */
 @media (max-width: 768px) {
+  /* 좁은 화면에서 Y 회전이 크면 카드가 홀쭉해져 사진이 안 읽힌다 */
+  .photoCard {
+    --tilt-rest-y: 4deg;
+    --tilt-rest-x: 0deg;
+    --tilt-persp: 800px;
+  }
+
   /* 축은 왼쪽 끝으로. 0.375rem = 노드(0.75rem)의 중심 */
   .axis {
     left: 0.375rem;

@@ -193,3 +193,145 @@ export function lonLatToVector(lon: number, lat: number): [number, number, numbe
  * 경도 φ 를 정면에 두려면 −φ 를 걸어야 한다.
  */
 export const FOCUS_ROTATION_Y = -FOCUS_LON * DEG;
+
+/* ==========================================================================
+   결(flow line) — 시안 구체의 "지문 무늬"
+   ========================================================================== */
+
+/**
+ * 구면 위 접선 벡터장. 여러 소용돌이 축을 겹쳐 지문 같은 소용돌이를 만든다.
+ *
+ * 균등 난수 껍질만으로는 시안의 화려함이 안 나온다. 시안 구체를 보면 입자가
+ * **곡선 띠를 따라 줄지어** 있다(등고선/지문 무늬). 그건 분포가 아니라 **흐름**이라
+ * 난수로는 못 만들고 벡터장을 따라 걸어야 한다.
+ *
+ * `cross(axis, p)` 는 axis 를 중심으로 도는 접선이다. 여기에 다른 축과의 내적으로
+ * 만든 사인파를 곱해 띠를 만들고, 축을 여러 개 겹쳐 소용돌이가 갈라지게 한다.
+ */
+function flowTangent(p: readonly [number, number, number], out: [number, number, number]) {
+  const [x, y, z] = p;
+  // 축 3개(무리수 방향이라 패턴이 반복되지 않는다)
+  const a1: [number, number, number] = [0.577, 0.577, 0.577];
+  const a2: [number, number, number] = [-0.707, 0.5, 0.5];
+  const a3: [number, number, number] = [0.267, -0.802, 0.535];
+
+  const d2 = x * a2[0] + y * a2[1] + z * a2[2];
+  const d3 = x * a3[0] + y * a3[1] + z * a3[2];
+
+  // cross(a1, p) — a1 축 회전 접선
+  const c1x = a1[1] * z - a1[2] * y;
+  const c1y = a1[2] * x - a1[0] * z;
+  const c1z = a1[0] * y - a1[1] * x;
+  // cross(a2, p)
+  const c2x = a2[1] * z - a2[2] * y;
+  const c2y = a2[2] * x - a2[0] * z;
+  const c2z = a2[0] * y - a2[1] * x;
+
+  const w1 = Math.sin(d2 * 7.4) * 0.95 + 0.3;
+  const w2 = Math.cos(d3 * 5.2) * 0.85;
+
+  let tx = c1x * w1 + c2x * w2;
+  let ty = c1y * w1 + c2y * w2;
+  let tz = c1z * w1 + c2z * w2;
+
+  // 접평면으로 투영(수치오차로 구면을 벗어나는 걸 막는다)
+  const dp = tx * x + ty * y + tz * z;
+  tx -= x * dp;
+  ty -= y * dp;
+  tz -= z * dp;
+
+  const len = Math.hypot(tx, ty, tz) || 1;
+  out[0] = tx / len;
+  out[1] = ty / len;
+  out[2] = tz / len;
+}
+
+/**
+ * 결 입자 — 스트림라인을 따라 점을 늘어놓는다.
+ * `lines` 개의 선을 각각 `count / lines` 걸음씩 걷는다.
+ */
+export function makeFlowPoints(count: number, seed: number, lines = 420): PointCloud {
+  const rand = mulberry32(seed);
+  const positions = new Float32Array(count * 3);
+  const scales = new Float32Array(count);
+  const dir: [number, number, number] = [0, 0, 0];
+  const tan: [number, number, number] = [0, 0, 0];
+
+  const perLine = Math.max(2, Math.floor(count / lines));
+  /**
+   * ⚠️ 스텝이 곧 **점 사이 간격**이다. 0.024rad 로 두면 화면에서 점 간격이 8px 이라
+   * 선이 아니라 그냥 흩뿌린 점으로 읽힌다(실제로 그렇게 만들어서 무늬가 안 보였다).
+   * 0.007 이면 ~2px 라 점들이 이어져 **실 한 올**이 된다.
+   */
+  const step = 0.007;
+  let i = 0;
+
+  for (let l = 0; l < lines && i < count; l += 1) {
+    randomDirection(rand, dir);
+    /* 선마다 밝기를 다르게 — 균일하면 격자처럼 보인다 */
+    const lineScale = 0.22 + rand() * 0.4;
+    for (let j = 0; j < perLine && i < count; j += 1) {
+      flowTangent(dir, tan);
+      dir[0] += tan[0] * step;
+      dir[1] += tan[1] * step;
+      dir[2] += tan[2] * step;
+      const inv = 1 / (Math.hypot(dir[0], dir[1], dir[2]) || 1);
+      dir[0] *= inv;
+      dir[1] *= inv;
+      dir[2] *= inv;
+
+      const r = GLOBE_RADIUS * (1 + (rand() - 0.5) * 0.01);
+      positions[i * 3] = dir[0] * r;
+      positions[i * 3 + 1] = dir[1] * r;
+      positions[i * 3 + 2] = dir[2] * r;
+      scales[i] = lineScale;
+      i += 1;
+    }
+  }
+  return { positions, scales };
+}
+
+/**
+ * 궤도 링 — 구 바깥을 도는 점선 고리. 시안에 3~4 개 보인다.
+ * 원을 그린 뒤 임의의 3D 자세로 돌린다(로드리게스 회전).
+ */
+export function makeOrbitPoints(count: number, seed: number, rings = 3): PointCloud {
+  const rand = mulberry32(seed);
+  const positions = new Float32Array(count * 3);
+  const scales = new Float32Array(count);
+  const axis: [number, number, number] = [0, 0, 0];
+  const perRing = Math.max(2, Math.floor(count / rings));
+  let i = 0;
+
+  for (let k = 0; k < rings && i < count; k += 1) {
+    randomDirection(rand, axis);
+    const radius = GLOBE_RADIUS * (1.08 + rand() * 0.3);
+    // 축에 수직인 기저 두 개
+    const helper: [number, number, number] =
+      Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+    let ux = axis[1] * helper[2] - axis[2] * helper[1];
+    let uy = axis[2] * helper[0] - axis[0] * helper[2];
+    let uz = axis[0] * helper[1] - axis[1] * helper[0];
+    const ul = Math.hypot(ux, uy, uz) || 1;
+    ux /= ul;
+    uy /= ul;
+    uz /= ul;
+    const vx = axis[1] * uz - axis[2] * uy;
+    const vy = axis[2] * ux - axis[0] * uz;
+    const vz = axis[0] * uy - axis[1] * ux;
+
+    for (let j = 0; j < perRing && i < count; j += 1) {
+      /* 균등 간격 + 흔들기. 완전 균등이면 점선이 기계적으로 보인다 */
+      const a = ((j + rand() * 0.6) / perRing) * Math.PI * 2;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      const rr = radius * (1 + (rand() - 0.5) * 0.02);
+      positions[i * 3] = (ux * c + vx * s) * rr;
+      positions[i * 3 + 1] = (uy * c + vy * s) * rr;
+      positions[i * 3 + 2] = (uz * c + vz * s) * rr;
+      scales[i] = 0.3 + rand() * 0.5;
+      i += 1;
+    }
+  }
+  return { positions, scales };
+}

@@ -12,6 +12,7 @@ import {
   GLOBE_RADIUS,
   lonLatToVector,
   makeHaloPoints,
+  makeOrbitPoints,
   makeLandPoints,
   makeShellPoints,
   type PointCloud,
@@ -64,8 +65,15 @@ import {
  * 모바일은 픽셀도 적고 발열이 바로 체감되므로 1/4 로 내린다.
  */
 const COUNTS = {
-  desktop: { land: 120000, shell: 78000, halo: 16000 },
-  mobile: { land: 26000, shell: 16000, halo: 4500 },
+  /**
+   * 한때 여기에 결(flow — 벡터장을 따라 걷는 지문 무늬)을 넣었다가 뺐다.
+   * 무늬 자체는 만들어졌지만 **구체의 성격이 바뀌었다** — 균등한 빛 구름이던 게
+   * 빗질된 실타래가 되면서 원래의 정갈함을 잃었다. 화려함은 무늬가 아니라
+   * **색과 빛**으로 올리는 쪽이 맞다(아래 POINT_FRAGMENT 의 팔레트).
+   * 궤도 고리(orbit)만 남긴다 — 이건 구체를 안 건드리고 바깥에 장식만 더한다.
+   */
+  desktop: { land: 120000, shell: 78000, halo: 16000, orbit: 5200 },
+  mobile: { land: 26000, shell: 16000, halo: 4500, orbit: 1600 },
 } as const;
 
 /** 지축 기울기 23.4°(rad). 정확히 기울여야 "지구"로 읽힌다. */
@@ -174,6 +182,7 @@ function Globe({
 
   const land = useMemo(() => makeLandPoints(counts.land, 0x1a5eed), [counts.land]);
   const shell = useMemo(() => makeShellPoints(counts.shell, 0x2b17e5), [counts.shell]);
+  const orbit = useMemo(() => makeOrbitPoints(counts.orbit, 0x1d5b3f, 4), [counts.orbit]);
   const halo = useMemo(() => makeHaloPoints(counts.halo, 0x3c0ffe), [counts.halo]);
 
   /** 코어 글로우의 로컬 위치 — 한반도 방향, 껍질 안쪽 */
@@ -336,9 +345,21 @@ function Globe({
           size={0.03}
           opacity={1.0 * intensity}
           instant={reduced}
-          tint={0.7}
+          tint={1.0}
           pointerRef={push}
           pushScale={interactive ? 0.85 : 0}
+        />
+
+        {/* 궤도 고리 — 구 바깥을 도는 점선. 시안에 3~4 개 보인다 */}
+        <PointLayer
+          cloud={orbit}
+          color="#ffffff"
+          size={0.022}
+          opacity={0.7 * intensity}
+          instant={reduced}
+          tint={0.9}
+          pointerRef={push}
+          pushScale={interactive ? 1.4 : 0}
         />
 
         {/* 코어 글로우 — 매 프레임 카메라를 향하도록 돌린다(빌보드).
@@ -465,10 +486,19 @@ const POINT_FRAGMENT = /* glsl */ `
   varying float vScale;
   varying vec2 vScreen;
 
-  /* 시안 2:416 픽셀 실측. 이전 값은 채도가 너무 낮아 흰 점 구름으로 보였다. */
-  const vec3 WARM = vec3(1.00, 0.78, 0.76); // 살구·분홍 — 좌하단
-  const vec3 LAV  = vec3(0.84, 0.79, 1.00); // 라벤더 — 좌상단
-  const vec3 COOL = vec3(0.72, 0.88, 1.00); // 하늘 — 우측
+  /**
+   * 시안 2:416 픽셀 실측 팔레트.
+   *
+   * 원래 3색(살구/라벤더/하늘)이었는데 정규화를 거치면 거의 흰빛으로 수렴해서
+   * "화려하지 않다"는 지적을 받았다. **무늬를 더하는 대신 색을 늘렸다** —
+   * 금빛과 민트를 끼워 스펙트럼을 넓히고 채도를 한 단계씩 올렸다.
+   * 구체의 형태(균등한 빛 구름)는 그대로 두는 게 핵심이다.
+   */
+  const vec3 WARM = vec3(1.00, 0.58, 0.62); // 로즈 — 좌하단
+  const vec3 GOLD = vec3(1.00, 0.80, 0.62); // 금빛 — 좌중단
+  const vec3 LAV  = vec3(0.74, 0.62, 1.00); // 라벤더 — 좌상단
+  const vec3 COOL = vec3(0.58, 0.80, 1.00); // 하늘 — 우측
+  const vec3 MINT = vec3(0.66, 1.00, 0.92); // 민트 — 우측 끝만 살짝
 
   void main() {
     // 기본 gl_Point 는 사각형이다. 3px 짜리 사각형 2만 개는 격자무늬로 읽힌다.
@@ -480,16 +510,34 @@ const POINT_FRAGMENT = /* glsl */ `
        두 축을 곱하지 않고 순차로 섞어야 중간에 탁한 회색이 안 생긴다. */
     float x = vScreen.x * 0.5 + 0.5;
     float y = vScreen.y * 0.5 + 0.5;
-    vec3 left = mix(WARM, LAV, smoothstep(0.15, 0.85, y));
-    vec3 tint = mix(left, COOL, smoothstep(0.30, 0.95, x));
+    /* 세로로 살구 → 금빛 → 라벤더, 가로로 그 결과 → 하늘 → (끝에만) 민트.
+       두 축을 곱하지 않고 순차로 섞어야 중간에 탁한 회색이 안 생긴다. */
+    /* 시안 구체는 **따뜻한 쪽이 주인공**이다 — 분홍·라벤더가 화면의 2/3 를 먹고
+       하늘색은 오른쪽 끝에만 걸친다. 예전엔 가로 그라디언트를 0.28 부터 하늘로
+       넘겨서 구체 전체가 파랗게 읽혔다(“우리건 너무 약하다”의 실체). */
+    vec3 left = mix(mix(WARM, GOLD, smoothstep(0.02, 0.38, y)), LAV, smoothstep(0.34, 0.90, y));
+    vec3 tint = mix(left, COOL, smoothstep(0.58, 1.00, x));
+    tint = mix(tint, MINT, smoothstep(0.88, 1.00, x) * 0.35);
 
     /* ⚠️ 밝기를 정규화한다 — 가장 밝은 채널을 1.0 으로 끌어올린다.
        그냥 곱하면 세 채널이 전부 1 미만이라 **색만 입는 게 아니라 어두워진다.**
        가산 블렌딩에서는 그 감소가 곧 "파티클이 옅어짐"이라, 정규화 전에는
        구체가 배경에 묻혀 거의 안 보였다. 색상만 옮기고 광량은 유지한다. */
-    tint /= max(max(tint.r, tint.g), tint.b);
+    /* ⚠️ 최대 채널을 1.0 으로 끌어올리면 광량은 지키지만 **채도가 같이 날아간다**.
+       (1,0.58,0.62) 를 그대로 두면 예쁜 로즈인데 정규화하면 그대로고, 반대로
+       (0.74,0.62,1.0) 같은 건 1.0 으로 올라가며 옅어진다. 절반만 정규화해서
+       광량 손실은 줄이되 색은 남긴다 — 가산 블렌딩이라 완전히 안 나누면 어두워진다. */
+    float mx = max(max(tint.r, tint.g), tint.b);
+    tint /= mix(1.0, mx, 0.55);
 
     vec3 col = mix(uColor, uColor * tint, uTint);
+
+    /* 림 라이트 — 실루엣 가까울수록 밝다. 시안 구체는 가장자리에 흰 테가 도는데,
+       그게 "구"로 읽히게 만드는 핵심이다. vScreen 이 NDC 라 원점에서의 거리가
+       곧 실루엣까지의 거리다(구체가 화면 중앙에 있으므로). */
+    float rim = smoothstep(0.42, 0.95, length(vScreen));
+    col *= 1.0 + rim * 0.5;
+
     gl_FragColor = vec4(col, a * vScale * uOpacity);
   }
 `;
@@ -701,7 +749,12 @@ const HAZE_FRAGMENT = /* glsl */ `
     float y = vScreen.y * 0.5 + 0.5;
     vec3 left = mix(WARM, LAV, smoothstep(0.15, 0.85, y));
     vec3 tint = mix(left, COOL, smoothstep(0.30, 0.95, x));
-    tint /= max(max(tint.r, tint.g), tint.b);
+    /* ⚠️ 최대 채널을 1.0 으로 끌어올리면 광량은 지키지만 **채도가 같이 날아간다**.
+       (1,0.58,0.62) 를 그대로 두면 예쁜 로즈인데 정규화하면 그대로고, 반대로
+       (0.74,0.62,1.0) 같은 건 1.0 으로 올라가며 옅어진다. 절반만 정규화해서
+       광량 손실은 줄이되 색은 남긴다 — 가산 블렌딩이라 완전히 안 나누면 어두워진다. */
+    float mx = max(max(tint.r, tint.g), tint.b);
+    tint /= mix(1.0, mx, 0.55);
 
     if (a < 0.003) discard;
     gl_FragColor = vec4(tint, a * uOpacity);

@@ -19,6 +19,31 @@
   overflow: hidden;
 }
 
+/**
+ * 하단 정착 그라디언트.
+ *
+ * 핀이 풀리면 100vh 짜리 셸이 위로 빠져나가는데, 그동안 히어로 그림이 다음 섹션의
+ * 평평한 라벤더 블록에 **직선으로 잘려** 보인다(도시 스카이라인 밑동, 왼쪽 점묘가
+ * 특히 티가 난다). 핀 구조상 슬라이드아웃 자체는 피할 수 없으므로,
+ * 마지막 ~110px 을 다음 섹션 톤으로 녹여서 "잘린 것"이 아니라 "가라앉는 것"으로 만든다.
+ *
+ * 색은 의료진 섹션 좌상단(#f6ecf4)에 맞췄다 — 실측한 히어로 바닥 픽셀이
+ * rgb(223~245) 대라 색 이동이 거의 없어서 띠로 보이지 않는다.
+ *
+ * z-index 는 배경 레이어 위 / 카피 아래. 카피와 Scroll 인디케이터는 덮지 않는다.
+ */
+.pinShell::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 110px;
+  z-index: calc(var(--z-content) - 1);
+  background: linear-gradient(180deg, rgba(246, 236, 244, 0) 0%, rgba(246, 236, 244, 0.92) 100%);
+  pointer-events: none;
+}
+
 /* --- 배경 레이어 -------------------------------------------------------------
    opacity / transform 은 JS 가 매 프레임 인라인으로 쓴다.
    여기에 transition 을 걸면 scrub 과 싸우므로 넣지 않는다. */
@@ -372,6 +397,11 @@
 
 /* --- 반응형 ------------------------------------------------------------------ */
 @media (max-width: 768px) {
+  /* 짧은 화면에서 110px 은 화면의 13% 라 너무 두껍다 */
+  .pinShell::after {
+    height: 64px;
+  }
+
   .inner {
     padding-inline: var(--mobile-gutter);
   }
@@ -475,7 +505,22 @@
  * 합성 그룹을 하나도 만들지 않는다. `will-change` 도 걸지 않는다(같은 이유).
  */
 .lineSheen {
-  --sheen: 130;
+  /**
+   * `--sheen` = 마스크의 가로 위치(%). **0~100 을 벗어나면 안 된다.**
+   *
+   * `mask-position` 의 퍼센트는 `offset = p × (요소크기 − 마스크크기)` 로 풀린다.
+   * 마스크가 240% 이므로 offset = p × (1 − 2.4) = −1.4p (요소 폭 단위)다.
+   *   p = 130% → 박스 [−1.82, +0.58]  → **오른쪽 모서리가 화면 58% 지점에 걸린다**
+   *   p = −30% → 박스 [+0.42, +2.82]  → 왼쪽 모서리가 화면 42% 지점에 걸린다
+   * `mask-repeat: no-repeat` 라 박스 바깥은 알파 0이고, 그 경계가 곧 **직선 컷**이다.
+   * 실제로 빛줄기 끝이 사선으로 뚝 잘려 보였다.
+   * p 를 0~100 으로 가두면 박스는 [−1.4, 0]~[0, 2.4] 라 모서리가 항상 화면 밖이다.
+   *
+   * 대신 밝은 띠를 그라디언트 **가운데(44~56%)** 로 옮겨야 한다. 예전처럼 8~20% 에
+   * 두면 띠가 박스 왼쪽 끝에 붙어 있어서, p 를 0~100 으로 제한하는 순간 화면
+   * 오른쪽 절반을 아예 지나가지 못한다.
+   */
+  --sheen: 100;
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -484,18 +529,22 @@
   -webkit-mask-image: linear-gradient(
     104deg,
     transparent 0%,
-    rgba(0, 0, 0, 0.35) 8%,
-    #000 14%,
-    rgba(0, 0, 0, 0.35) 20%,
-    transparent 28%
+    transparent 38%,
+    rgba(0, 0, 0, 0.35) 44%,
+    #000 50%,
+    rgba(0, 0, 0, 0.35) 56%,
+    transparent 62%,
+    transparent 100%
   );
   mask-image: linear-gradient(
     104deg,
     transparent 0%,
-    rgba(0, 0, 0, 0.35) 8%,
-    #000 14%,
-    rgba(0, 0, 0, 0.35) 20%,
-    transparent 28%
+    transparent 38%,
+    rgba(0, 0, 0, 0.35) 44%,
+    #000 50%,
+    rgba(0, 0, 0, 0.35) 56%,
+    transparent 62%,
+    transparent 100%
   );
   -webkit-mask-size: 240% 240%;
   mask-size: 240% 240%;

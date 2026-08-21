@@ -71,6 +71,40 @@
   pointer-events: none;
 }
 
+/**
+ * 앞/뒤 섹션 톤 베일.
+ *
+ * 불투명도는 스크롤 진행도가 직접 쓴다(`brand-film-section.tsx` 의 `apply`).
+ * 폭죽 캔버스보다 뒤에 두면 불티만 남아 떠다녀서 어색하다 — 맨 위에 둔다.
+ */
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+/* 정지 폴백(영상/동작 줄이기)에서는 진행도가 없다. 가장자리만 부드럽게. */
+.section[data-composite="false"] .pinShell::before,
+.section[data-composite="false"] .pinShell::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 160px;
+  z-index: 3;
+  pointer-events: none;
+}
+.section[data-composite="false"] .pinShell::before {
+  top: 0;
+  background: linear-gradient(180deg, rgb(217, 224, 244) 0%, rgba(217, 224, 244, 0) 100%);
+}
+.section[data-composite="false"] .pinShell::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgb(248, 248, 249) 0%, rgba(248, 248, 249, 0) 100%);
+}
+
 .video {
   position: absolute;
   inset: 0;

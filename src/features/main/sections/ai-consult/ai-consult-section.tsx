@@ -69,8 +69,10 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
   return (
     <section
       ref={sectionRef}
-      className={clsx(styles.section, expanded && styles.sectionExpanded)}
+      className={clsx(styles.section, expanded && styles.sectionExpanded, "blend-top")}
       aria-labelledby="consult-title"
+      /* 앞 섹션(AI 정밀 검사 시스템) 끝 색 실측값 — 경계 이음매를 지운다 */
+      style={{ "--blend-from": "rgb(232, 240, 251)" } as React.CSSProperties}
     >
       {/* 8:1078 하단 도트 메시 웨이브 — `/main/ai/bg.webp`. 장식이라 CSS 배경으로 깐다
           (DOM <img> 로 두면 alt="" 요소가 하나 더 늘 뿐 얻는 게 없다). */}

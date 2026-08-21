@@ -69,6 +69,24 @@ const CUE = {
   typoIn: [0.32, 0.66],
   /** 폭죽이 터지는 지점들 */
   bursts: [0.16, 0.27, 0.4, 0.55],
+  /**
+   * 앞뒤 섹션과 잇는 크로스페이드 구간.
+   *
+   * 이 섹션만 어두운 시네마틱 컷이라 경계에서 색이 그대로 튄다 — 실측 색차가
+   * 의료진→브랜드필름 238, 브랜드필름→AI시스템 201 이었다(다른 경계는 9~33).
+   * 히어로가 구체→타워를 크로스페이드하듯, 여기도 **앞 섹션 톤으로 시작해서
+   * 뒤 섹션 톤으로 끝낸다.** 구간을 짧게(12%) 잡아야 폭죽·타이포 연출을 안 먹는다.
+   */
+  veilIn: 0.12,
+  veilOut: 0.88,
+} as const;
+
+/** 이웃 섹션에서 실측한 톤. 여기서 시작하고 여기서 끝난다. */
+const NEIGHBOR_TONE = {
+  /** 의료진 섹션 끝 */
+  prev: "217, 224, 244",
+  /** AI 정밀 검사 시스템 섹션 시작 */
+  next: "248, 248, 249",
 } as const;
 
 /** 0~1 로 정규화하고 클램프 */
@@ -87,6 +105,8 @@ export function BrandFilmSection() {
   const sparkRef = useRef<HTMLDivElement>(null);
   const typoRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const veilInRef = useRef<HTMLDivElement>(null);
+  const veilOutRef = useRef<HTMLDivElement>(null);
   const fwRef = useRef<Fireworks | null>(null);
   /** 잔불을 켤지 — 진행도가 첫 폭죽을 지나면 1 */
   const twinkleRef = useRef(0);
@@ -200,6 +220,13 @@ export function BrandFilmSection() {
           typo.style.filter = `blur(${((1 - t) * 26).toFixed(2)}px) brightness(${(0.8 + 0.6 * t).toFixed(3)})`;
         }
 
+        /* 앞뒤 섹션과의 크로스페이드. p=0 이면 앞 섹션 톤이 화면을 덮고 있다가
+           걷히고, p=1 이면 뒤 섹션 톤으로 덮인 채 끝난다 → 경계에서 색이 안 튄다. */
+        const vIn = veilInRef.current;
+        if (vIn) vIn.style.opacity = (1 - easeOut(span(p, 0, CUE.veilIn))).toFixed(3);
+        const vOut = veilOutRef.current;
+        if (vOut) vOut.style.opacity = easeOut(span(p, CUE.veilOut, 1)).toFixed(3);
+
         /* 폭죽 — 진행도가 큐를 **넘어설 때 한 번만** 터진다.
            매 프레임 터뜨리면 스크롤을 멈춘 자리에서 무한히 터진다. */
         const fw = fwRef.current;
@@ -290,6 +317,20 @@ export function BrandFilmSection() {
             </div>
             {/* eslint-enable @next/next/no-img-element */}
             <canvas ref={canvasRef} className={styles.fireworks} aria-hidden />
+
+            {/* 앞/뒤 섹션 톤 베일. 캔버스보다 위라서 폭죽까지 함께 걷힌다. */}
+            <div
+              ref={veilInRef}
+              className={styles.veil}
+              style={{ background: `rgb(${NEIGHBOR_TONE.prev})` }}
+              aria-hidden
+            />
+            <div
+              ref={veilOutRef}
+              className={styles.veil}
+              style={{ background: `rgb(${NEIGHBOR_TONE.next})`, opacity: 0 }}
+              aria-hidden
+            />
           </>
         ) : (
           <VideoSlot

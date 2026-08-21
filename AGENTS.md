@@ -8,6 +8,8 @@ before writing any code. Heed deprecation notices.
 
 ## 이 레포에서 지켜야 할 것
 
+- **로컬 포트는 3100.** `package.json` 의 `next dev`/`next start` 에서 `--port 3100` 을
+  지우거나 3000 으로 되돌리지 말 것. 다른 프로젝트와 3000 이 겹친다.
 - 커밋 전 `npm run typecheck && npm run lint` 통과.
 - 3D 를 건드렸으면 `npm run build && npm run analyze:chunk` 까지. 진입 청크가 오염되면
   스크립트가 exit 1 로 실패한다.

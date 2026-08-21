@@ -252,11 +252,13 @@ export function HeroSection({ messages }: HeroSectionProps) {
       if (!sheen) return;
       /* 마스크 위치를 CSS 변수로 흘린다. `repeatDelay` 로 뜸을 들여야
          "가끔 빛이 지나간다"가 되지, 계속 돌면 그냥 배경 루프로 보인다. */
+      /* 0~100 밖으로 나가면 마스크 박스 모서리가 화면에 들어와 빛줄기가
+         직선으로 잘린다 — 근거는 `.lineSheen` 주석 참고. 범위를 넘기지 말 것. */
       gsap.fromTo(
         sheen,
-        { "--sheen": 130 },
+        { "--sheen": 100 },
         {
-          "--sheen": -30,
+          "--sheen": 0,
           duration: 4.2,
           ease: "sine.inOut",
           repeat: -1,

@@ -418,6 +418,30 @@ button {
   translate: 50% 50%;
 }
 
+/**
+ * 섹션 경계 이음매 지우개.
+ *
+ * 섹션마다 배경이 달라서 경계에 **직선 이음매**가 생긴다. 실측 색차(ΔE)로 재보면:
+ *   히어로→의료진 9 / 의료진→브랜드필름 238 / 브랜드필름→AI시스템 201
+ *   AI시스템→AI상담 27 / AI상담→AI스토리 30 / AI스토리→센터 33
+ * 200 대 두 곳(어두운 브랜드필름 앞뒤)은 진행도 크로스페이드로 따로 처리했고
+ * (`brand-film-section.tsx` 의 veil), 30 안팎인 나머지는 이 유틸로 지운다.
+ *
+ * 쓰는 법: 섹션에 `.blend-top` 을 주고 `--blend-from` 에 **앞 섹션의 끝 색**을 넣는다.
+ * 색은 눈대중 말고 경계 픽셀을 재서 넣을 것 — 어긋나면 이음매가 오히려 두 개가 된다.
+ */
+.blend-top::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--blend-height, 140px);
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, var(--blend-from) 0%, transparent 100%);
+}
+
 /* --- 반응형 줄바꿈 유틸 ------------------------------------------------------- */
 .pc-only {
   display: inline;

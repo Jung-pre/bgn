@@ -10,6 +10,8 @@
    ========================================================================== */
 
 .section {
+  /* `.blend-top::before` 가 절대 배치라 기준이 필요하다 */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;

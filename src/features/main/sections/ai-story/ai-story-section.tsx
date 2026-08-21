@@ -99,7 +99,13 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
   };
 
   return (
-    <section ref={sectionRef} className={styles.section} aria-label="BGN AI 브랜드 스토리">
+    <section
+      ref={sectionRef}
+      className={clsx(styles.section, "blend-top")}
+      aria-label="BGN AI 브랜드 스토리"
+      /* 앞 섹션(AI 상담 신청) 끝 색 실측값 */
+      style={{ "--blend-from": "rgb(253, 254, 255)" } as React.CSSProperties}
+    >
       <div
         ref={tabStripRef}
         className={styles.tabs}

@@ -166,6 +166,8 @@ PDF 에는 없고 Figma 주석에만 있던 내용이라, 이걸 안 보고 만�
 
 ## 함정 목록
 
+- **dev/start 포트는 3100.** `--port 3100` 과 `.env` 의 `PORT=3100` 을 3000 으로
+  되돌리지 말 것. 같은 PC 의 다른 Next 프로젝트와 충돌한다.
 - `position: sticky` 대신 GSAP `pin` 을 쓴다. sticky 는 조상 `overflow:hidden` 에 죽는다.
   이 사이트는 pin 섹션이 3개(브랜드필름/히스토리/웹블로그)라 특히 치명적이다.
 - reduced-motion 을 early-return 으로 처리하지 말 것. `settleReducedMotion()` 으로

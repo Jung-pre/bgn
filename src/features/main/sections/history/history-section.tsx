@@ -75,6 +75,19 @@ const ERA_PHOTOS: { src: string; alt: string }[] = [
   },
 ];
 
+/**
+ * 바퀴에 박히는 사진 5장 — 인트로 1 + 시대 4.
+ * 텍스트 행 수(인트로 + 시대 4)와 1:1 이라 `a`(활성 인덱스)가 그대로 살 번호가 된다.
+ */
+const WHEEL_PHOTOS: { src: string; alt: string; variant?: "intro" }[] = [
+  {
+    src: "/main/history/group-2.webp",
+    alt: "BGN 밝은눈안과 의료진 단체 사진",
+    variant: "intro",
+  },
+  ...ERA_PHOTOS,
+];
+
 export function HistorySection({ messages }: HistorySectionProps) {
   const sectionRef = useHistoryReveal<HTMLElement>();
   const eras = messages.eras;
@@ -97,28 +110,9 @@ export function HistorySection({ messages }: HistorySectionProps) {
           {/* 인트로 — 시안 2:1989. 시대 세트와 같은 3단 그리드다.
               시안에서 이 행의 노드는 이미 활성(파란 점)이라 상태를 고정해 둔다 */}
           <div className={styles.era} data-visible="true">
-            <div className={styles.photoFrame}>
-              {/* Figma 8:1869 — 카드(640×480 r24)가 세 겹이다:
-                  ① 파란 사선 배경(bg.webp) ② 보라→파랑 옅은 그라데이션
-                  ③ **누끼** 의료진(group-2.webp, object-contain).
-                  ①②는 CSS 배경으로, ③만 img 로 얹는다. 인트로 카드만 기울기가 크다(≈9°) */}
-              <div
-                className={styles.photoCard}
-                data-variant="intro"
-                style={{ "--tilt-rest": "9deg" } as CSSProperties}
-                data-history-photo
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- 카드 크기에 맞춘
-                    누끼 PNG(WebP)라 리사이즈 이점이 없다 */}
-                <img
-                  className={styles.photoFill}
-                  src="/main/history/group-2.webp"
-                  alt="BGN 밝은눈안과 의료진 단체 사진"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-            </div>
+            {/* 사진은 바퀴(.wheelColumn)로 빠졌지만 **그리드 첫 칸은 남겨야 한다.**
+                안 남기면 노드가 1번 칸으로 올라와 카피가 축 왼쪽으로 밀린다. */}
+            <span className={styles.photoSlot} aria-hidden />
 
             <span className={styles.node} aria-hidden />
 
@@ -132,22 +126,7 @@ export function HistorySection({ messages }: HistorySectionProps) {
           <ol className={styles.eras}>
             {eras.map((era, i) => (
               <li key={era.period} className={styles.era} data-history-set>
-                {/* 이미지 카드 — 텍스트와 같은 li 안이라 항상 함께 흐른다.
-                    사진은 연혁의 근거라 장식이 아니다 → 실제 alt 를 준다. */}
-                <div className={styles.photoFrame}>
-                  <div className={styles.photoCard} data-history-photo>
-                    {ERA_PHOTOS[i] ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- 위와 같은 이유
-                      <img
-                        className={styles.photoFill}
-                        src={ERA_PHOTOS[i].src}
-                        alt={ERA_PHOTOS[i].alt}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : null}
-                  </div>
-                </div>
+                <span className={styles.photoSlot} aria-hidden />
 
                 <span className={styles.node} aria-hidden />
 
@@ -171,6 +150,38 @@ export function HistorySection({ messages }: HistorySectionProps) {
               </li>
             ))}
           </ol>
+
+          {/**
+           * ## 물레방아 — 사진 5장이 **하나의 원**에 박혀 함께 돈다
+           *
+           * 처음엔 사진을 각 시대 `<li>` 안에 두고 지나갈 때마다 따로 기울였다.
+           * 그런데 레퍼런스는 판들이 제각각 도는 게 아니라 **한 바퀴의 살**이라,
+           * 앞 판이 올라가면 뒤 판이 아래에서 따라 올라온다. 그러려면 다섯 장이
+           * 같은 컨테이너에 있어야 해서 사진을 여기로 모았다.
+           *
+           * 세로 열 전체를 덮는 절대 배치 컬럼 안에서 `sticky` 로 고정한다.
+           * GSAP `pin` 을 쓰지 않는 이유: pin 은 pin-spacer 를 만들고, 이 프로젝트에서
+           * 그게 겹쳐 쌓여 섹션이 통째로 밀린 적이 있다(히어로/모바일). sticky 는
+           * 스페이서를 만들지 않아 그 사고가 구조적으로 불가능하다.
+           */}
+          <div className={styles.wheelColumn} aria-hidden>
+            <div className={styles.wheel} data-history-wheel>
+              {WHEEL_PHOTOS.map((photo) => (
+                <div key={photo.src} className={styles.wheelItem} data-history-spoke>
+                  <div className={styles.photoCard} data-variant={photo.variant}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- 카드 크기에 맞춘 컷이라 리사이즈 이점이 없다 */}
+                    <img
+                      className={styles.photoFill}
+                      src={photo.src}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>
