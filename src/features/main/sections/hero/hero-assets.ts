@@ -6,7 +6,7 @@
  * (`npm run analyze:chunk` 가 이걸 잡는다)
  *
  * ## 왜 좌표가 코드에 있는가
- * `public/main/hero/*.webp` 는 Figma **업로드 원본**이다. 시안에서 걸린
+ * `public/main/img_01_*.webp` 는 Figma **업로드 원본**이다. 시안에서 걸린
  * 크롭·회전·플립·블렌드·투명도가 파일에는 남아 있지 않아서, 그 합성 정보를
  * 여기서 다시 들고 있어야 한다. 숫자는 전부
  * fileKey `2xzudppVSWEHbxVdzofgn3` / 타워 씬 프레임 `8:2877`(1920×920) 기준
@@ -30,14 +30,16 @@
 
 export const HERO_ASSETS = {
   /** 프레임 fill 로 깔린 하늘. 그라데이션이라 풀블리드 cover 로 늘려도 안 깨진다 */
-  sky: "/main/hero/bg-1.webp",
+  sky: "/main/img_01_bg01.webp",
   /** 8:2880 — soft-light 50% 로 깔리는 파티클 텍스처 */
-  particles: "/main/hero/particles.webp",
+  particles: "/main/img_01_particles01.webp",
   /** 8:2948 — 롯데타워 + 스카이라인 (알파) */
-  tower: "/main/hero/tower.webp",
+  tower: "/main/img_01_tower01.webp",
+  /** 8:759 — 타워 뒤에 크게 깔리는 `BGn` 워드마크 워터마크 (흰색 50% + blur 2) */
+  watermark: "/main/img_01_watermark01.svg",
 } as const;
 
-/** 파일이 `public/main/hero/` 에 모두 들어와 있다. */
+/** 파일이 `public/main/` 에 모두 들어와 있다. */
 export const HERO_ASSETS_READY = true;
 
 /** 시안 좌표계 — 메인_02(8:2877) 프레임 크기. 모든 스프라이트 좌표의 기준. */
@@ -65,10 +67,10 @@ export interface TowerSprite {
 }
 
 const CLOUD = [
-  "/main/hero/cloud-1.webp",
-  "/main/hero/cloud-2.webp",
-  "/main/hero/cloud-3.webp",
-  "/main/hero/cloud-4.webp",
+  "/main/img_01_cloud01.webp",
+  "/main/img_01_cloud02.webp",
+  "/main/img_01_cloud03.webp",
+  "/main/img_01_cloud04.webp",
 ] as const;
 
 /**
@@ -129,6 +131,25 @@ export const TOWER_CLOUDS_TOP: readonly TowerSprite[] = [
 
 /** 8:2892 = 8:2881 의 평행이동 복사본 (시안 px) */
 export const TOWER_CLOUD_TOP_OFFSET = { x: -55.31, y: 2 } as const;
+
+/**
+ * `BGn` 워터마크 (8:759) — 타워 뒤, 상단 구름과 하단 구름 띠 **사이**에 깔린다.
+ *
+ * 시안에서는 vector 노드 하나이고 흰색 `fill-opacity 0.5` 에 `feGaussianBlur 2` 가
+ * 걸려 있다. SVG 를 그대로 뽑아 `img_01_watermark01.svg` 로 넣었으므로 색·블러는
+ * 파일이 갖고 있고 여기서는 좌표만 잡는다.
+ *
+ * 노드 박스는 374×225 @ (1447, 235) 인데, 블러가 번지는 만큼
+ * (`inset -1.78% -1.07%`) 실제 그림은 382×233 @ (1443, 231) 이다. 그 값을 쓴다.
+ */
+export const TOWER_WATERMARK: TowerSprite = {
+  node: "8:759",
+  src: "/main/img_01_watermark01.svg",
+  x: 1443,
+  y: 231,
+  w: 382,
+  h: 233,
+};
 
 /**
  * 하단 구름 띠 (8:2904) — 세 덩어리.
@@ -211,7 +232,7 @@ export const TOWER_CLOUD_BANDS: readonly (readonly TowerSprite[])[] = [
 export const TOWER_LINES: readonly (TowerSprite & { repeat?: number })[] = [
   {
     node: "8:2952",
-    src: "/main/hero/line-3.webp",
+    src: "/main/img_01_line03.webp",
     x: -234.81,
     y: 352.4,
     w: 3566.9,
@@ -221,7 +242,7 @@ export const TOWER_LINES: readonly (TowerSprite & { repeat?: number })[] = [
   },
   {
     node: "8:2955",
-    src: "/main/hero/line-1.webp",
+    src: "/main/img_01_line01.webp",
     x: 378.72,
     y: 531.07,
     w: 1705.02,
@@ -232,7 +253,7 @@ export const TOWER_LINES: readonly (TowerSprite & { repeat?: number })[] = [
   },
   {
     node: "8:2956",
-    src: "/main/hero/line-2.webp",
+    src: "/main/img_01_line02.webp",
     x: 98.22,
     y: 325.3,
     w: 2584.15,
@@ -244,7 +265,7 @@ export const TOWER_LINES: readonly (TowerSprite & { repeat?: number })[] = [
   },
   {
     node: "8:2957",
-    src: "/main/hero/line-9.webp",
+    src: "/main/img_01_line09.webp",
     x: 450.46,
     y: 544.84,
     w: 2212.91,

@@ -39,7 +39,7 @@
   pointer-events: none;
   background:
     linear-gradient(270deg, #0072ec 0%, #664bff 100%),
-    url("/main/history/bg-2.webp") center bottom / 120% auto no-repeat;
+    url("/main/img_08_bg02.webp") center bottom / 120% auto no-repeat;
   background-blend-mode: overlay, normal;
   opacity: 0.4;
 }
@@ -71,7 +71,7 @@
   transform-origin: 50% 0;
 }
 
-/** 사진이 빠진 자리 — 그리드 1번 칸을 지키는 역할만 한다 */
+/** PC: 사진이 빠진 자리 — 그리드 1번 칸을 지키는 역할만 한다 */
 .photoSlot {
   display: block;
   /* 카드 높이만큼은 차지해야 행 높이가 시안과 같다 */
@@ -79,6 +79,11 @@
   width: 100%;
   max-width: 40rem;
   justify-self: end;
+}
+
+/* PC 에서 사진은 물레방아가 그린다. 이 칸은 자리만 지킨다 */
+.slotPhoto {
+  display: none;
 }
 
 /* --- 물레방아 ----------------------------------------------------------------- */
@@ -232,8 +237,8 @@
   box-shadow: var(--shadow-card);
   /* `rotate:` 단축 속성이 아니라 transform 이어야 한다 —
      GSAP 은 transform 을 쓰므로 rotate 속성으로 두면 두 각도가 합산된다. */
-  transform: perspective(var(--tilt-persp)) rotateX(var(--tilt-rest-x))
-    rotateY(var(--tilt-rest-y)) rotateZ(var(--tilt-rest));
+  transform: perspective(var(--tilt-persp)) rotateX(var(--tilt-rest-x)) rotateY(var(--tilt-rest-y))
+    rotateZ(var(--tilt-rest));
   transform-style: preserve-3d;
   backface-visibility: hidden;
 }
@@ -260,7 +265,7 @@
       rgba(152, 131, 255, 0.072) 36.816%,
       rgba(25, 150, 228, 0.12) 77.596%
     ),
-    url("/main/history/bg.webp") center / cover no-repeat;
+    url("/main/img_08_bg01.webp") center / cover no-repeat;
 }
 
 .photoCard[data-variant="intro"] .photoFill {
@@ -277,42 +282,77 @@
   min-width: 0;
 }
 
-/* 연도 — 시안에서 유일하게 초대형 영문 장식체. 타이틀 바로 위에 붙는다 */
+/**
+ * 연도 — 시안 `2:2065` dev 값: Belleza Regular **108px** / lh 1.25 /
+ * 자간 +2.16px(+0.02em) / **opacity 0.2**. 채움은 이미지 background-clip:text
+ * 인데 0.2 까지 눌러 놔서 단색이든 그라데이션이든 눈으로 구분되지 않는다 —
+ * 브랜드 블루 그라데이션으로 대체한다.
+ *
+ * 위치: 연도 글자상자(y 300, h 135)가 본문 블록(y 403)과 **32px 겹친다**.
+ * 즉 아래 여백이 음수(-32/108 = -0.296em)다. 겹치기를 빼면 연도가 붕 뜬다.
+ */
 .period {
-  margin: 0 0 0.04em;
+  margin: 0 0 -0.296em;
   font-family: var(--font-display-stack);
-  font-size: var(--fs-display-80);
+  font-size: var(--fs-display-108);
   font-weight: var(--weight-regular);
-  line-height: 1;
+  line-height: 1.25;
   letter-spacing: 0.02em;
-  color: var(--primary-200);
+  background: linear-gradient(90deg, var(--primary-700) 0%, var(--primary-500) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  opacity: 0.2;
 }
 
+/**
+ * 전역 `[lang|="en"]` 규칙이 영문 포인트 자간(+1%)으로 덮어쓴다.
+ * 시안 2:2065 는 **+2%**(+2.16px @108) 라 특이도를 한 칸 올려 되돌린다.
+ */
+:global(.locale-root[data-locale]) .copy .period[lang] {
+  letter-spacing: 0.02em;
+}
+
+/**
+ * 시대 제목 — 시안 `2:2068` 은 인트로 헤드라인과 **같은** 스타일이다
+ * (`pc/title/title 1` = Pretendard Bold 42 / lh 1.5 / -3%, #171717).
+ * 예전 주석의 "실측 32px" 는 오독이었다 — dev 모드 값으로 재확인했다.
+ * 색도 네이비(#0a2048)가 아니라 뉴트럴 그레이 900(#171717) 이다.
+ */
 .eraTitle {
-  margin: 0 0 var(--gap-xs);
-  /* 시안 실측 32px (headline 2). 42px 은 인트로 헤드라인 전용이다 */
-  font-size: var(--fs-32);
+  /* 2:2067 gap 4px */
+  margin: 0 0 4px;
+  font-size: var(--fs-42);
   font-weight: var(--weight-bold);
-  line-height: var(--leading-tight);
+  line-height: var(--leading-normal);
   letter-spacing: var(--tracking-default);
-  color: var(--color-text-strong);
+  color: var(--gray-900);
 }
 
-/* 인트로 헤드라인 — 시안 2:1989. 세트와 같은 그리드 칸에 들어간다 */
+/**
+ * 인트로 헤드라인 — 시안 `2:1990`. `pc/title/title 1` = Pretendard Bold 42 /
+ * lh **1.5** / -3% / **#171717**. 시대 제목과 완전히 같은 스타일이다.
+ */
 .introTitle {
   margin: 0;
   font-size: var(--fs-42);
   font-weight: var(--weight-bold);
-  line-height: var(--leading-snug);
+  line-height: var(--leading-normal);
   letter-spacing: var(--tracking-default);
-  color: var(--color-text-strong);
-  white-space: pre-line;
+  color: var(--gray-900);
 }
 
-/* 전역 `.marker` 의 background-size 를 변수화해 GSAP 이 좌→우 wipe 할 수 있게 한다.
-   기본값 100% — JS 가 안 돌아가도 마커는 정상적으로 보인다. */
-.introTitle :global(.marker) {
-  background-size: var(--marker-wipe, 100%) 0.45em;
+/**
+ * 한 줄 = 한 개의 wipe 대상.
+ *
+ * 두 줄을 `white-space: pre-line` 한 덩어리로 두고 통째 클립하면 두 줄이
+ * **동시에** 열려 커튼처럼 보인다. 시안 주석(2:1990)은 "왼쪽에서 오른쪽
+ * 방향으로 텍스트 생성" 이라 줄 단위로 끊어야 그렇게 읽힌다.
+ */
+.titleLine {
+  display: block;
+  /* JS 가 안 돌아가도 글자는 다 보여야 한다 */
+  clip-path: inset(0 0 0 0);
 }
 
 /*
@@ -322,13 +362,16 @@
 */
 .quote {
   display: table; /* 내용 폭에 맞춰 줄어들면서 줄바꿈도 허용된다 */
-  margin: 0 0 var(--gap-md);
-  padding: 0.35em 0.7em;
+  /* 2:2066 gap 32px — 인용 박스와 체크리스트 사이 */
+  margin: 0 0 32px;
+  /* 2:2069 실측 padding : top 8 / bottom 4 / inline 8. **모서리는 각지다** */
+  padding: 8px 8px 4px;
   background: var(--primary-100);
-  border-radius: var(--radius-sm);
   font-size: var(--fs-18);
   line-height: var(--leading-normal);
-  color: var(--color-text-body);
+  letter-spacing: -0.05em;
+  /* 2:2070 — 인용도 발화자도 전부 primary-700 한 색이다 */
+  color: var(--primary-700);
 }
 
 .quote p {
@@ -338,24 +381,27 @@
 
 .quote cite {
   font-style: normal;
-  color: var(--color-text-muted);
+  color: inherit;
 }
 
+/* 2:2071 — 행 간격 12px */
 .points {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* 2:2076 — `pc/title/title 4` 20 / lh 1.5 / -3% / #525252. 아이콘 28 + 간격 8 */
 .points li {
   position: relative;
-  padding-left: 2rem;
-  font-size: var(--fs-18);
+  padding-left: 36px;
+  font-size: var(--fs-20);
   line-height: var(--leading-normal);
-  color: var(--color-text-body);
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-600);
 }
 
 /* 파란 원형 **체크** — 시안 반복 모티프. 이전 구현의 링(도넛)은 시안에 없다.
@@ -364,13 +410,31 @@
   content: "";
   position: absolute;
   left: 0;
-  top: 0.22em;
-  width: 1.25rem;
-  height: 1.25rem;
+  /* 아이콘 28 / 줄상자 30 → 위아래 1px */
+  top: 1px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-full);
-  background: var(--brand-primary)
+  /* 2:2073 은 단색이 아니라 좌상단 라벤더 → 우하단 브랜드블루 방사 그라데이션 */
+  background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.6 6.2 4.9 8.5 9.4 3.9' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
-    center / 100% no-repeat;
+      center / 20px no-repeat,
+    radial-gradient(
+      100% 100% at 0% 0%,
+      #8d79ff 20%,
+      #6a78fa 40%,
+      #4776f6 60%,
+      #2374f1 80%,
+      #0072ec 100%
+    );
+}
+
+/* 태블릿 — 연도(vw 비례)만 먼저 작아져 제목과의 비율이 시안과 달라진다.
+   겹침을 절반 정도로 줄여야 두 줄이 붙어 보이지 않는다. */
+@media (max-width: 1280px) {
+  .period {
+    margin-bottom: -0.14em;
+  }
 }
 
 /* --- 모바일 — 1시대 = 1블록 세로 스택 ---------------------------------------- */
@@ -400,14 +464,51 @@
     top: 0.75rem;
   }
 
-  .photoFrame {
-    justify-self: auto;
+  /**
+   * 물레방아는 PC 전용이다 — 1단 레이아웃에서는 카피와 자리를 다투고,
+   * sticky(화면 중앙 고정)와 일반 흐름이라 스크롤 축까지 어긋난다.
+   * 모바일은 원래 그리드 자리에 사진을 그대로 놓는다.
+   */
+  .wheelColumn {
+    display: none;
+  }
+
+  .photoSlot {
+    aspect-ratio: auto;
     max-width: none;
+    justify-self: auto;
+  }
+
+  .slotPhoto {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
     margin-bottom: var(--gap-md);
+    border-radius: var(--radius-lg);
+    object-fit: cover;
+  }
+
+  /* 인트로는 누끼 컷이라 cover 로 자르면 발목이 잘린다 — PC 카드와 같은 처리 */
+  .slotPhoto[data-variant="intro"] {
+    object-fit: contain;
+    background:
+      linear-gradient(
+        148.66deg,
+        rgba(152, 131, 255, 0.072) 36.816%,
+        rgba(25, 150, 228, 0.12) 77.596%
+      ),
+      url("/main/img_08_bg01.webp") center / cover no-repeat;
   }
 
   .eraTitle {
     font-size: var(--fs-26);
+  }
+
+  /* 연도와 제목의 겹침(-0.296em)은 108/42 비율에서 나온 값이다. 좁은 폭에서는
+     연도만 clamp 하한(44px)에 먼저 걸려 비율이 줄어드는데, 겹침을 그대로 두면
+     연도 아랫배가 제목에 닿는다. */
+  .period {
+    margin-bottom: -0.05em;
   }
 }
 

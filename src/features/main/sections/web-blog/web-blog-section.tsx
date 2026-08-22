@@ -91,7 +91,7 @@ const WATERMARK = "BGN AI Web blog";
  * 이미 쓰고 있어 바로 옆 카드와 같은 사진이 두 번 나온다.
  * → 시안에서 마지막 카드에 쓰인 접수 사인 컷(post-4)으로 돌린다.
  */
-const BRAND_IMAGE = "/main/blog/post-4.webp";
+const BRAND_IMAGE = "/main/img_09_post04.webp";
 
 /**
  * 썸네일 폭 = `.thumb` 40rem. root font-size 가 뷰포트 비례(1920→16px)라
@@ -267,7 +267,7 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
       <VideoSlot
         decorative
         className={styles.bgVideo}
-        poster="/main/blog/bg.webp"
+        poster="/main/img_09_bg01.webp"
         rootMargin="400px 0px"
       />
       {/* ② Figma 2:2401 — 색상블러. blur 75 + 블루 0.2 오버레이 */}
@@ -356,21 +356,33 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
 /* --- 타일 장식 4종 -------------------------------------------------------------
    시안 2:2457 / 2:2550 / 2:2634 / 2:2739 순서. 전부 가는 흰 선의 아웃라인이다.
    회전 각도는 상수 배열로 미리 계산한다(렌더마다 같은 값이어야 한다). */
+
+/**
+ * ⚠️ `Math.sin/cos` 결과를 **반드시 반올림**해서 쓴다.
+ *
+ * ECMAScript 는 삼각함수의 정확도를 강제하지 않는다. 그래서 서버(Node)와
+ * 브라우저(V8)가 **마지막 자리에서 갈릴 수 있다** — 실제로 이 파일의 꽃잎 좌표가
+ *   서버 `cy="35.277568135664545"` / 클라이언트 `cy={35.27756813566455}`
+ * 로 어긋나 **하이드레이션 불일치 경고**를 매 페이지 로드마다 띄우고 있었다.
+ * 소수 3자리면 100 단위 viewBox 에서 0.001% 오차라 눈에 보이지 않는다.
+ */
+const round3 = (v: number) => Math.round(v * 1000) / 1000;
+
 const BURST_RAYS = Array.from({ length: 16 }, (_, i) => {
   const angle = (i * Math.PI) / 8;
   const inner = i % 2 === 0 ? 6 : 10;
   const outer = i % 2 === 0 ? 48 : 34;
   return {
-    x1: 50 + Math.cos(angle) * inner,
-    y1: 50 + Math.sin(angle) * inner,
-    x2: 50 + Math.cos(angle) * outer,
-    y2: 50 + Math.sin(angle) * outer,
+    x1: round3(50 + Math.cos(angle) * inner),
+    y1: round3(50 + Math.sin(angle) * inner),
+    x2: round3(50 + Math.cos(angle) * outer),
+    y2: round3(50 + Math.sin(angle) * outer),
   };
 });
 
 const PETALS = Array.from({ length: 6 }, (_, i) => {
   const angle = (i * Math.PI) / 3;
-  return { cx: 50 + Math.cos(angle) * 17, cy: 50 + Math.sin(angle) * 17 };
+  return { cx: round3(50 + Math.cos(angle) * 17), cy: round3(50 + Math.sin(angle) * 17) };
 });
 
 /**

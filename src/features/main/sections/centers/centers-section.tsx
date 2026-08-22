@@ -69,7 +69,7 @@ const CENTER_PHOTO: Record<string, { src?: string; position: string; tone?: "dar
 };
 
 /**
- * 축소 카드 실크 텍스처의 크롭 — 시안은 같은 실크 원본(`/main/centers/bg.webp`)을
+ * 축소 카드 실크 텍스처의 크롭 — 시안은 같은 실크 원본(`/main/img_07_bg01.webp`)을
  * 카드마다 다르게 잘라 color-burn 으로 얹어서 결이 전부 다르다.
  * 실측: 스마일 `8:5169` = 426%×128% / x 69%, 백내장 `8:5163` = 382%×111% / x 50%,
  *       시력교정 `8:5181` = cover.

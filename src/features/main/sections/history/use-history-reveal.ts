@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { gsap, ScrollTrigger, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
+import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 
 /**
@@ -53,8 +53,12 @@ export function useHistoryReveal<T extends HTMLElement>() {
       const section = sectionRef.current;
       if (!section) return;
 
-      const headline = section.querySelector<HTMLElement>("[data-history-headline]");
-      const marker = section.querySelector<HTMLElement>("[data-history-marker]");
+      /* 인트로 헤드라인은 **줄 단위** 로 쪼개져 있다(`renderTitleLines`).
+         한 덩어리로 클립하면 두 줄이 동시에 열려 커튼처럼 보인다. */
+      const introLines = gsap.utils.toArray<HTMLElement>(
+        "#history-title [data-history-line]",
+        section,
+      );
       const axisFill = section.querySelector<HTMLElement>("[data-history-axis-fill]");
       const axisHost = section.querySelector<HTMLElement>("[data-history-axis-host]");
       const sets = gsap.utils.toArray<HTMLElement>("[data-history-set]", section);
@@ -65,8 +69,13 @@ export function useHistoryReveal<T extends HTMLElement>() {
        * 반드시 최종 상태를 직접 확정하고 인라인 스타일을 지운다.
        */
       if (prefersReducedMotionSync()) {
-        if (headline) gsap.set(headline, { autoAlpha: 1, clearProps: "clipPath,opacity" });
-        if (marker) gsap.set(marker, { "--marker-wipe": "100%" });
+        gsap.set(introLines, { clearProps: "clipPath" });
+        gsap.set(gsap.utils.toArray<HTMLElement>("[data-history-line]", section), {
+          clearProps: "clipPath",
+        });
+        gsap.set(gsap.utils.toArray<HTMLElement>("[data-history-point]", section), {
+          clearProps: "opacity,transform",
+        });
         if (axisFill) gsap.set(axisFill, { scaleY: 1 });
         settleReducedMotion(sets);
         /* 동작 줄이기: 바퀴를 돌리지 않고 첫 살만 정면에 세운다.
@@ -89,29 +98,27 @@ export function useHistoryReveal<T extends HTMLElement>() {
       // Figma 주석(2:1990) "진입시 왼쪽에서 오른쪽 방향으로 텍스트 생성되며
       // 함께 꾸밈요소 배치". 글자를 쪼개는 대신 clip-path 와이프를 쓴다 —
       // 한국어 조합형 글자를 span 으로 쪼개면 줄바꿈·자간이 깨진다.
-      if (headline) {
-        const intro = gsap.timeline({
-          scrollTrigger: { trigger: headline, start: "top 85%", once: true },
-          defaults: { ease: "power3.out" },
-        });
-
-        intro.fromTo(
-          headline,
+      //
+      // **줄마다 따로** 연다. 두 줄을 한 번에 클립하면 오른쪽 끝까지 같은
+      // 속도로 밀려 "생성"이 아니라 커튼이 된다. 0.28s 어긋내면 첫 줄이
+      // 거의 다 열린 뒤 둘째 줄이 시작해 글이 이어 써지는 것처럼 읽힌다.
+      //
+      // 꾸밈요소(선택 커서 마크)는 첫 줄 안에 있으므로 와이프가 지나가면서
+      // 그대로 드러난다 = 주석의 "함께 배치". 따로 트윈을 걸면 오히려 두 번
+      // 등장하는 것처럼 보인다.
+      if (introLines.length > 0) {
+        gsap.fromTo(
+          introLines,
           { clipPath: "inset(0 100% 0 0)" },
-          { clipPath: "inset(0 0% 0 0)", duration: 1.1 },
-          0,
+          {
+            clipPath: "inset(0 0% 0 0)",
+            duration: 0.9,
+            ease: "power3.out",
+            stagger: 0.28,
+            clearProps: "clipPath",
+            scrollTrigger: { trigger: introLines[0], start: "top 85%", once: true },
+          },
         );
-
-        // 형광 마커도 좌→우 wipe. globals.css 가 권장하는 방식대로
-        // background-size 를 CSS 변수로 트윈한다(전역 파일은 건드리지 않는다).
-        if (marker) {
-          intro.fromTo(
-            marker,
-            { "--marker-wipe": "0%" },
-            { "--marker-wipe": "100%", duration: 0.45, ease: "power2.out" },
-            0.7,
-          );
-        }
       }
 
       // ── ② 시대 세트: 하단 진입 시 fade-up ─────────────────────────────
@@ -135,6 +142,50 @@ export function useHistoryReveal<T extends HTMLElement>() {
           // 노드 활성화는 클래스가 아니라 속성으로 — CSS 모듈 해시 이름을
           // JS 로 넘기지 않아도 되고, 리렌더도 없다.
           .set(el, { attr: { "data-visible": "true" } }, 0.2);
+
+        /**
+         * 세트 안의 카피도 인트로와 **같은 좌→우 생성**으로 맞춘다.
+         * 섹션 전체가 하나의 모션 어휘를 쓰게 하려는 것이다 — 인트로만
+         * 와이프고 시대는 그냥 페이드면 같은 섹션으로 안 읽힌다.
+         *
+         * 연도(.period)는 CSS 로 `opacity: .2` 를 갖고 있다. 그래서 여기서
+         * **투명도는 절대 건드리지 않고** clip-path 만 쓴다 — autoAlpha 를
+         * 걸면 0.2 가 1 로 덮여 연도가 시안보다 5배 진해진다.
+         */
+        const lines = gsap.utils.toArray<HTMLElement>("[data-history-line]", el);
+        if (lines.length > 0) {
+          gsap.fromTo(
+            lines,
+            { clipPath: "inset(0 100% 0 0)" },
+            {
+              clipPath: "inset(0 0% 0 0)",
+              duration: 0.8,
+              ease: "power3.out",
+              stagger: 0.12,
+              clearProps: "clipPath",
+              scrollTrigger: { trigger: el, start: "top 82%", once: true },
+            },
+          );
+        }
+
+        /* 성과 항목은 체크가 하나씩 찍히는 리듬이라 와이프보다 낫다 */
+        const points = gsap.utils.toArray<HTMLElement>("[data-history-point]", el);
+        if (points.length > 0) {
+          gsap.fromTo(
+            points,
+            { autoAlpha: 0, x: -14 },
+            {
+              autoAlpha: 1,
+              x: 0,
+              duration: 0.5,
+              ease: "power2.out",
+              stagger: 0.09,
+              delay: 0.35,
+              clearProps: "opacity,visibility,transform",
+              scrollTrigger: { trigger: el, start: "top 82%", once: true },
+            },
+          );
+        }
       });
 
       // ── ③ 물레방아: 사진 5장이 하나의 원에 박혀 함께 돈다 ─────────────
@@ -177,8 +228,9 @@ export function useHistoryReveal<T extends HTMLElement>() {
           const P_SIN = Math.sin(PHASE);
           /* 화면에서 정원이므로 반지름은 축마다 다르지 않다. 세로가 병목이라 vh 기준.
              레퍼런스는 R = 0.52·프레임높이였는데 그 프레임은 세로로 긴 창이었다.
-             1440×900 에서 0.44vh 면 이웃이 위 −215 / 아래 +459 로 실측 비율과 같다. */
-          const R = window.innerHeight * 0.44;
+             1440×900 에서 0.5vh 면 이웃이 위 −244 / 아래 +521 로 실측 비율과 같다.
+             0.44 로 뒀을 때 전환 중간(a=0.5, 살이 ψ=±36°)에 카드가 89px 겹쳤다. */
+          const R = window.innerHeight * 0.5;
           /* z 는 살짝만. 원근 축소가 scale 위에 또 곱해져 이웃이 과하게 작아진다 */
           const DEPTH = window.innerHeight * 0.18;
 
@@ -213,16 +265,37 @@ export function useHistoryReveal<T extends HTMLElement>() {
             const g = leaving ? 1 : 0.45;
 
             /**
-             * 도식·영상 모두 카드는 사실상 2~3장만 보인다. 살 5개 중 뒤쪽 2장
-             * (ψ=±144°)은 빠져야 한다. `visibility` 만으로 끊으면 스크럽 중에 툭
-             * 튀므로 사라지기 전에 opacity 가 먼저 0 이 되도록 램프를 깐다.
-             * depth: 정면 1.00 / 이웃 0.65 / 뒤쪽 0.10
+             * ## 화면에는 **최대 3장**만 — 네 번째가 겹침의 원인이었다
+             *
+             * 램프가 `(depth − 0.22) / 0.34` 일 때 ψ=±108° 짜리 네 번째 살이
+             * fade 0.37 로 아직 보였다. 얘가 아래에서 올라오며 활성 카드와 세로로
+             * 89px 겹쳤다(1440×900, 전환 중간에서 실측). 눈에 보이는데 자리는
+             * 없는 살이라 그냥 지우는 게 맞다.
+             *
+             * 들어오는 살은 이웃(ψ=−72°)까지 보이고, 떠나는 살은 더 일찍 끈다.
+             * 궤도 y 가 −0.54R 뿐이라 지난 장이 활성 카드 윗변을 뚫고 남는다.
+             * depth 0.70 에서 fade=0 → 이웃 자리(0.654)에 도착하기 전에 사라진다.
+             *
+             * 바퀴는 원이라 마지막 시대(a≈n-1)에서 인트로(i=0)가 한 바퀴 돌아
+             * 아래에서 다시 올라온다. 다음 섹션을 뚫는 그 장은 시대가 아니라서 끈다.
+             * 선형 거리로만 이웃을 인정한다 — 순환 이웃은 없다.
              */
-            const fade = gsap.utils.clamp(0, 1, (depth - 0.22) / 0.34);
+            const wrapped = Math.abs(a - i) > 1.25;
+            const fade = wrapped
+              ? 0
+              : gsap.utils.clamp(0, 1, (depth - (leaving ? 0.7 : 0.45)) / (leaving ? 0.18 : 0.2));
+
+            /**
+             * 정원 궤도만으로는 지난 장이 활성과 ~100px 겹친다(카드 반높이 합 > 0.54R).
+             * swing 에 비례해 더 위로 밀어, 빠져나가며 화면 밖으로 보낸다.
+             * 활성(swing=0)은 그대로다.
+             */
+            const yOrbit = R * (Math.sin(ang) - P_SIN);
+            const lift = leaving ? window.innerHeight * 0.32 * Math.abs(swing) : 0;
 
             gsap.set(el, {
               x: R * (Math.cos(ang) - P_COS),
-              y: R * (Math.sin(ang) - P_SIN),
+              y: yOrbit - lift,
               z: DEPTH * (Math.cos(psi) - 1) * g,
               /**
                * ## 각도는 **여기가 유일한 출처**이고, 활성(ψ=0)에서 정확히 0 이다.
@@ -260,11 +333,17 @@ export function useHistoryReveal<T extends HTMLElement>() {
             end: "bottom bottom",
             scrub: 0.6,
             invalidateOnRefresh: true,
+            /**
+             * 창 높이가 바뀌면 R 이 달라지므로 다시 배치해야 한다.
+             * ⚠️ 예전엔 `ScrollTrigger.addEventListener("refresh", …)` 를 썼는데
+             * 그건 **전역 리스너라 useGSAP 컨텍스트가 정리하지 못한다** — 라우트를
+             * 오갈 때마다 하나씩 쌓여서 refresh 한 번에 place() 가 여러 번 돌았다.
+             * 트리거 자체의 콜백으로 옮기면 트윈이 죽을 때 같이 죽는다.
+             */
+            onRefresh: (self) => place(self.progress),
           },
         });
         place(0);
-        /* 창 높이가 바뀌면 반지름이 달라진다 — 다시 배치한다 */
-        ScrollTrigger.addEventListener("refresh", () => place(state.p));
       }
 
       // ── ④ 중앙 축이 스크롤을 따라 그려진다 ────────────────────────────

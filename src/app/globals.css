@@ -146,12 +146,28 @@
   --fs-24: clamp(18px, 1.25vw, 24px);
 
   /* 디스플레이 크기 — 히어로 등에서 쓰는 **변수 밖** 커스텀 사이즈.
-     Figma 텍스트 스타일 체계는 42px 이 최대다. 그보다 큰 건 전부
-     개별 지정이므로 여기에 따로 모아둔다. (히어로 B/G/N 글자 높이 144 → ≈120px) */
-  --fs-display-120: clamp(48px, 6.25vw, 120px);
+     Figma 텍스트 스타일 체계는 42px 이 최대다. 그보다 큰 건 전부 개별 지정이다.
+     ⚠️ min/max 는 **PC·모바일 시안 양쪽 실측**이다. 임의 축소가 아니므로
+        한쪽만 바꾸지 말 것.
+
+       구체 씬  세계를 향한 / 의 도약    96 ↔ 48   (2:3794 / 2:3796)
+       구체 씬  BGN                    120 ↔ 64   (2:3796 — 모바일은 단색 네이비)
+       타워 씬  세상을 선명하게           42 ↔ 26   (8:795 / 2:3381)
+       타워 씬  BGN                    160 ↔ 96   (8:797 / 2:3383)
+       타워 씬  밝은눈안과               138 ↔ 72   (8:801 / 2:3387)
+       마퀴                            108 ↔ 44   (2:411)
+
+     예전에 구체 씬을 92 로 두고 있었는데 주석에 적힌 실측(96)과도 어긋난 값이었다. */
+  --fs-display-120: clamp(64px, 6.25vw, 120px);
   --fs-display-108: clamp(44px, 5.625vw, 108px); /* 마퀴 — Figma 2:411 */
-  --fs-display-92: clamp(40px, 4.7917vw, 92px);
+  --fs-display-96: clamp(48px, 5vw, 96px);
   --fs-display-80: clamp(38px, 4.1667vw, 80px);
+
+  /* 타워 씬 전용 — Figma 8:794(PC) / 2:3380(MO) 실측.
+     구체 씬과 크기 체계가 완전히 달라서 display 스케일과 섞지 않는다. */
+  --fs-hero-eyebrow: clamp(26px, 2.1875vw, 42px);
+  --fs-hero-brand: clamp(96px, 8.3333vw, 160px);
+  --fs-hero-name: clamp(72px, 7.1875vw, 138px);
 
   --weight-regular: 400;
   --weight-medium: 500;
@@ -303,7 +319,16 @@ button {
 .locale-root[data-locale] {
   font-family: var(--font-pretendard-stack);
 }
-.locale-root[data-locale="ko"] [lang|="en"] {
+/**
+ * ⚠️ `data-font="body"` 로 빠져나갈 수 있다.
+ *
+ * 시안의 히어로 `BGN` 은 영문이지만 **Pretendard** 다
+ * (8:797 = Pretendard Bold 160 / 2:3796 = Pretendard ExtraBold 64).
+ * 이 규칙이 무조건 걸리면서 히어로 브랜드 토큰이 Belleza 로 나가고
+ * 자간까지 +1% 로 뒤집혀 있었다. Belleza 는 아이브로우·로고타입 같은
+ * "영문 포인트"(eng - point 1/2) 에만 쓴다.
+ */
+.locale-root[data-locale="ko"] [lang|="en"]:not([data-font="body"]) {
   font-family: var(--font-display-stack);
   letter-spacing: var(--tracking-eng);
 }
@@ -384,7 +409,20 @@ button {
   display: inline-flex;
   align-items: center;
   align-self: stretch;
-  padding-inline: 0.25rem;
+  /* 시안은 px 고정이다(2:1007 / 2:1997 둘 다 px-4). rem 으로 두면 루트가
+     뷰포트 비례로 줄어드는 이 프로젝트에서 1440 일 때 3px 이 된다. */
+  padding-inline: 4px;
+  /**
+   * 상자 높이 = **56px**. 시안에서 마크는 글자 줄상자와 별개로 항상 56 이다
+   * (2:1000 = 116×56 / 2:1993 = 255×56, 둘 다 42px 헤드라인 위).
+   * 42×1.333 = 56 이라 em 비율로 적어 둔다.
+   *
+   * ⚠️ `height` 로 박으면 안 된다. inline-flex + `align-items: center` 라
+   * 높이를 고정하면 글자가 상자 안에서 다시 가운데로 밀리고, inline-flex 의
+   * baseline 이 곧 그 글자의 baseline 이라 **마크 안 글자만 내려앉는다.**
+   * line-height 로 주면 baseline 은 바깥 글자와 그대로 공유한다.
+   */
+  line-height: 1.333;
   border-inline: 2px solid var(--primary-500);
   background: var(--primary-100);
   color: var(--primary-700);
@@ -392,30 +430,32 @@ button {
   transform-origin: 0% 50%;
 }
 
+/**
+ * 모서리 점 — 시안 SVG 실측은 **r = 1.5(지름 3px)** 다. 0.28em(=11.8px, 10 로
+ * 캡)으로 두면 4배 가까이 커져서 "선택 커서"가 아니라 핸들 달린 상자로 읽힌다.
+ * 바(2px)·패딩(4px)과 같은 계열의 고정 px 이다.
+ */
 .title-mark::before,
 .title-mark::after {
   content: "";
   position: absolute;
-  width: 0.28em;
-  height: 0.28em;
-  max-width: 10px;
-  max-height: 10px;
+  width: 3px;
+  height: 3px;
   border-radius: var(--radius-full);
   background: var(--primary-500);
 }
 
-/* 왼쪽 바 — 점은 위 */
+/* 왼쪽 바 — 점은 **위**. 절대 배치 기준이 padding box 라 바(2px)만큼 밖으로 뺀다.
+   시안에서 점의 왼쪽 끝은 바의 왼쪽 끝과, 위쪽 끝은 상자 위 모서리와 맞닿는다. */
 .title-mark::before {
-  left: 0;
+  left: -2px;
   top: 0;
-  translate: -50% -50%;
 }
 
-/* 오른쪽 바 — 점은 아래 */
+/* 오른쪽 바 — 점은 **아래** (좌우 비대칭이 이 모티프의 핵심이다) */
 .title-mark::after {
-  right: 0;
+  right: -2px;
   bottom: 0;
-  translate: 50% 50%;
 }
 
 /**

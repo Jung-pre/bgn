@@ -13,6 +13,26 @@ export interface SectionRevealOptions {
 }
 
 /**
+ * `.title-mark`(파란 박스 + 좌우 바) 좌→우 wipe.
+ * scaleX 로 키우면 글자까지 눌리므로 clip-path 만 쓴다. 의료진·AI 시스템·상담 신청이 같다.
+ */
+export const TITLE_MARK_WIPE = {
+  from: "inset(0 100% 0 0)",
+  to: "inset(0 0% 0 0)",
+  duration: 0.7,
+  at: 0.25,
+} as const;
+
+export function queryTitleMarks(root: ParentNode) {
+  return gsap.utils.toArray<HTMLElement>(".title-mark", root);
+}
+
+export function settleTitleMarks(marks: HTMLElement[]) {
+  if (marks.length === 0) return;
+  gsap.set(marks, { clipPath: "none", clearProps: "clipPath" });
+}
+
+/**
  * 섹션 진입 reveal — 이 프로젝트의 기본 등장 모션.
  *
  * 사용:
@@ -40,9 +60,11 @@ export function useSectionReveal<T extends HTMLElement>(options: SectionRevealOp
 
       const marked = section.querySelectorAll("[data-reveal-item]");
       const targets: ArrayLike<Element> = marked.length > 0 ? marked : [section];
+      const marks = queryTitleMarks(section);
 
       if (prefersReducedMotionSync()) {
         settleReducedMotion(targets as unknown as gsap.TweenTarget);
+        settleTitleMarks(marks);
         return;
       }
 
@@ -52,8 +74,13 @@ export function useSectionReveal<T extends HTMLElement>(options: SectionRevealOp
         scale: SCROLL_ENTRANCE.scale,
         transformOrigin: "50% 50%",
       });
+      if (marks.length > 0) gsap.set(marks, { clipPath: TITLE_MARK_WIPE.from });
 
-      gsap.to(targets, {
+      const tl = gsap.timeline({
+        scrollTrigger: { trigger: section, start, once: true },
+      });
+
+      tl.to(targets, {
         autoAlpha: 1,
         y: 0,
         scale: 1,
@@ -63,8 +90,21 @@ export function useSectionReveal<T extends HTMLElement>(options: SectionRevealOp
         // 끝나면 인라인 스타일을 지운다 — 안 지우면 CSS hover/미디어쿼리가
         // GSAP 이 남긴 transform 에 밀려서 안 먹는다.
         clearProps: "opacity,visibility,transform",
-        scrollTrigger: { trigger: section, start, once: true },
       });
+
+      if (marks.length > 0) {
+        tl.to(
+          marks,
+          {
+            clipPath: TITLE_MARK_WIPE.to,
+            duration: TITLE_MARK_WIPE.duration,
+            ease: SCROLL_ENTRANCE.ease,
+            stagger: 0.08,
+            clearProps: "clipPath",
+          },
+          TITLE_MARK_WIPE.at,
+        );
+      }
     },
     { scope: sectionRef, dependencies: [start, stagger, disabled] },
   );

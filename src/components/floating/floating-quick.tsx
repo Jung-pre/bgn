@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type ComponentType } from "react";
-import Image from "next/image";
 import clsx from "clsx";
 import { useIsMobileLayout } from "@/shared/lib/use-media-query";
 import type { GnbMessages } from "@/shared/i18n/messages";
@@ -65,6 +64,26 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
   const isMobile = useIsMobileLayout();
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * 푸터에 닿으면 FAB 을 접는다.
+   *
+   * FAB 덩어리(마스코트 + 말풍선)가 223px 폭이라 푸터 우하단의 브랜드 로고와
+   * 데스크톱 전 구간에서 겹친다. 시안에는 FAB 이 없으니 정답이 없는 자리인데,
+   * 로고를 가리는 것보다 잠깐 접히는 쪽이 낫다 — 푸터에는 전화·지점·오시는 길이
+   * 이미 다 있다. state 가 아니라 **속성만** 뒤집어 리렌더를 만들지 않는다.
+   */
+  const [atFooter, setAtFooter] = useState(false);
+  useEffect(() => {
+    const footer = document.querySelector("footer");
+    if (!footer || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([entry]) => setAtFooter(Boolean(entry?.isIntersecting)), {
+      // 푸터가 화면 아래 1/3 에 들어오는 순간 = 로고가 FAB 높이에 접근하는 시점
+      rootMargin: "0px 0px -66% 0px",
+    });
+    io.observe(footer);
+    return () => io.disconnect();
+  }, []);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const fanListId = useId();
 
@@ -117,13 +136,16 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
           {BAR_LEFT.map(renderBarItem)}
           <li className={styles.bottomCenter}>
             <button type="button" className={styles.mascotFab} aria-label={messages.chatbotBubble}>
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element -- 장식용 고정 크기 아이콘.
+                  next/image 로 두면 CSS 가 크기를 바꾼다며 종횡비 경고를 매번 낸다 */}
+              <img
                 className={styles.mascotImage}
-                src="/brand/mascot-icon.webp"
+                src="/main/img_00_mascot-icon01.webp"
                 alt=""
                 width={40}
                 height={40}
-                sizes="40px"
+                loading="lazy"
+                decoding="async"
               />
             </button>
           </li>
@@ -135,7 +157,12 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
 
   /* ── PC: 우하단 팬아웃 ────────────────────────────────────────────────── */
   return (
-    <div ref={rootRef} className={styles.fanRoot} data-open={isOpen || undefined}>
+    <div
+      ref={rootRef}
+      className={styles.fanRoot}
+      data-open={isOpen || undefined}
+      data-at-footer={atFooter || undefined}
+    >
       <div className={styles.fanArea}>
         <button
           ref={toggleRef}
@@ -201,13 +228,15 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
           {messages.chatbotBubble}
         </p>
         <button type="button" className={styles.mascotButton} aria-label={messages.chatbotBubble}>
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element -- 위 주석과 같은 이유 */}
+          <img
             className={styles.mascotImage}
-            src="/brand/mascot-icon.webp"
+            src="/main/img_00_mascot-icon01.webp"
             alt=""
             width={80}
             height={80}
-            sizes="80px"
+            loading="lazy"
+            decoding="async"
           />
         </button>
       </div>

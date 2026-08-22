@@ -109,7 +109,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: url("/main/centers/bg.webp") var(--tex-pos, 50% 50%) / var(--tex-size, cover)
+  background: url("/main/img_07_bg01.webp") var(--tex-pos, 50% 50%) / var(--tex-size, cover)
     no-repeat;
   mix-blend-mode: color-burn;
   pointer-events: none;
@@ -428,7 +428,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: url("/main/centers/bg.webp") 20% 50% / 900% 130% no-repeat;
+  background: url("/main/img_07_bg01.webp") 20% 50% / 900% 130% no-repeat;
   mix-blend-mode: color-burn;
   pointer-events: none;
 }

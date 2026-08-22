@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRef } from "react";
+import { gsap, useGSAP } from "@/shared/lib/gsap";
 import { useSceneActive } from "@/r3f/use-scene-active";
 import { useIsMobileLayout } from "@/shared/lib/use-media-query";
 import styles from "./closing-sphere-section.module.css";
@@ -22,9 +23,38 @@ const SphereScene = dynamic(
 );
 
 export function ClosingSphereSection() {
+  const sectionRef = useRef<HTMLElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const progressRef = useRef(0);
   const active = useSceneActive(hostRef);
   const isMobile = useIsMobileLayout();
+
+  /**
+   * pin 하지 않는다. 섹션이 뷰포트를 스쳐 지나가는 동안의 진행도만 구체에 넘긴다.
+   * 히어로는 pin + progressRef 로 도는데, 여긴 그걸 안 줘서 인트로 뒤 멈춰 있었다.
+   */
+  useGSAP(
+    () => {
+      const section = sectionRef.current;
+      if (!section) return;
+      const state = { p: 0 };
+      gsap.to(state, {
+        p: 1,
+        ease: "none",
+        onUpdate: () => {
+          progressRef.current = state.p;
+        },
+        scrollTrigger: {
+          trigger: section,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: 0.6,
+          invalidateOnRefresh: true,
+        },
+      });
+    },
+    { scope: sectionRef },
+  );
 
   /**
    * 모바일 시안에는 이 섹션이 **없다**. 모바일 프레임 순서가
@@ -34,13 +64,19 @@ export function ClosingSphereSection() {
   if (isMobile) return null;
 
   return (
-    <section className={styles.section} aria-hidden>
+    <section ref={sectionRef} className={styles.section} aria-hidden>
       <div ref={hostRef} className={styles.canvasHost}>
         {/* 시안 2:2893 은 대륙이 거의 안 읽히는 안개 덩어리다.
             · intensity  — 파티클 밝기를 셰이더 단계에서 낮춘다(CSS opacity 는 배경이 비쳐 탁해진다)
             · showCore   — 한반도 파란 코어는 시안에 없다. 브랜드 포커스를 두 번 반복하면 히어로가 희석된다
             · interactive — 스쳐 지나가는 전환 씬이라 커서 조작 어포던스를 주지 않는다 */}
-        <SphereScene active={active} intensity={0.5} showCore={false} interactive={false} />
+        <SphereScene
+          active={active}
+          progressRef={progressRef}
+          intensity={0.5}
+          showCore={false}
+          interactive={false}
+        />
       </div>
     </section>
   );

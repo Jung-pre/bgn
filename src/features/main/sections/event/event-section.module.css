@@ -46,7 +46,9 @@
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-default);
-  color: var(--color-text-primary);
+  /* 8:2712 실측 = `grayscale/black`. 다른 섹션 타이틀(#242424 / #0a2048)과 달리
+     이 섹션만 순수 검정이라 토큰 별칭을 쓰지 않고 직접 지정한다. */
+  color: var(--color-black);
   /* 시안(2:2842)에서 타이틀은 카피 컬럼 폭(408)에 딱 맞는 **한 줄**이다.
      자동 줄바꿈을 허용하면 1px 차이로 "EVENT" 가 아래로 떨어진다. */
   white-space: nowrap;

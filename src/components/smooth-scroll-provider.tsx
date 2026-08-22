@@ -20,6 +20,25 @@ import { MQ } from "@/shared/config/breakpoints";
  * Lenis 자체 rAF 와 GSAP ticker 가 따로 돌면 프레임 순서가 매번 뒤바뀌어
  * 1프레임 지터가 생긴다. `gsap.ticker` 하나에 Lenis 를 태워 순서를 고정한다.
  *
+ * ## 내부 스크롤 영역은 `allowNestedScroll` 이 판별한다
+ * Lenis 는 기본적으로 wheel 을 `preventDefault` 하고 자기가 스크롤을 그린다.
+ * 그래서 페이지 안의 가로 캐러셀·탭 스트립 같은 **내부 스크롤 영역**은 그냥 두면
+ * 휠이 도달하지 않는다. 예전에는 그런 요소마다 `data-lenis-prevent` 를 달았는데,
+ * 이 속성은 **축을 가리지 않고 그 요소 위의 모든 휠을 네이티브로 넘긴다.**
+ * 결과가 두 가지 사고였다.
+ *
+ *   ① 스크롤 컨테이너가 아닌 요소(데스크톱의 AI 카드 그리드, 탭 스트립)에 붙어 있으면
+ *      그 위에서 굴린 세로 휠이 전부 네이티브가 된다 → 페이지가 한 번에 툭 튀고,
+ *      스크롤 방향을 보는 GNB 가 깜빡인다.
+ *   ② 진짜 가로 스크롤 영역(이벤트 캐러셀)이라도 **세로** 휠까지 네이티브로 새서
+ *      캐러셀 위를 지나갈 때마다 스무스 스크롤이 끊긴다.
+ *
+ * `allowNestedScroll` 은 Lenis 가 직접 판별하게 한다 — 휠 방향을 보고, 그 축으로
+ * 실제로 스크롤되는 요소일 때만(그리고 아직 끝에 닿지 않았을 때만) 네이티브에 넘긴다.
+ * 즉 가로 캐러셀 위의 가로 휠만 넘어가고 세로 휠은 그대로 Lenis 가 그린다.
+ * 그래서 섹션들의 `data-lenis-prevent` 를 전부 걷어냈다.
+ * (오버레이인 메가메뉴만 예외 — 거기서는 축과 무관하게 뒤 페이지가 안 움직여야 한다.)
+ *
  * ## children 을 감싸지 않는다
  * 레이아웃에서 `{children}` 의 형제로 렌더할 것. 서버 컴포넌트 children 이
  * client boundary 안으로 빨려 들어가는 걸 막는다.
@@ -39,6 +58,10 @@ export function SmoothScrollProvider() {
       // 스크롤이 "미끄덩"거린다.
       syncTouch: false,
       autoResize: true,
+      /* 내부 스크롤 영역 자동 판별 — 위 "## 내부 스크롤 영역" 참고.
+         이걸 끄면(기본값) 섹션마다 `data-lenis-prevent` 를 다시 달아야 하고,
+         그러면 세로 휠까지 같이 새어 나간다. */
+      allowNestedScroll: true,
     });
     lenisRef.current = lenis;
 
@@ -75,21 +98,77 @@ export function SmoothScrollProvider() {
       ScrollTrigger.refresh(true);
     };
 
-    const rafId = requestAnimationFrame(refresh);
-    const timers = [300, 1000, 2500].map((ms) => window.setTimeout(refresh, ms));
+    /**
+     * ## ⚠️ refresh 는 **스크롤 중에 절대 돌리지 않는다**
+     *
+     * 원래는 이미지가 하나 로드될 때마다 `refresh()` 를 그대로 호출했다.
+     * 이 페이지는 lazy 이미지가 수십 장이라, 아래로 내려가는 동안 이미지가
+     * 순차로 도착하면서 **하드 refresh 가 연달아 터진다**. refresh 는 모든
+     * ScrollTrigger 의 start/end 를 다시 재고 pin 을 원복했다 다시 거는
+     * 작업이라, 스크롤 도중에 걸리면 pin 구간에서 스크롤 위치가 튄다.
+     * "스크롤이 중간에 튕긴다"가 이거였다.
+     *
+     * 그래서 두 겹으로 막는다.
+     *  ① 200ms 트레일링 디바운스 — 이미지가 우르르 와도 refresh 는 한 번
+     *  ② 마지막 스크롤 이벤트로부터 250ms 이 안 지났으면 다시 미룬다
+     *     = 손을 뗀 뒤에야 실행된다
+     *
+     * next/image 는 어차피 aspect-ratio 로 자리를 미리 잡아두기 때문에
+     * 늦게 실행돼도 레이아웃이 어긋나지 않는다.
+     */
+    let lastScrollAt = 0;
+    const markScroll = () => {
+      lastScrollAt = performance.now();
+    };
+    window.addEventListener("scroll", markScroll, { passive: true });
+
+    /**
+     * ③ 마지막 방어선 — **문서 크기가 그대로면 아예 돌리지 않는다.**
+     * next/image 가 aspect-ratio 로 자리를 미리 잡으므로 이미지가 늦게 도착해도
+     * 문서 높이는 안 변한다. 즉 이미지 로드발 refresh 는 대부분 **할 일이 없는
+     * refresh** 다. 이 비교 하나로 스크롤 중 refresh 가 실질 0 이 된다.
+     */
+    let lastH = 0;
+    let lastVH = 0;
+
+    let idleTimer = 0;
+    const scheduleRefresh = () => {
+      window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(() => {
+        if (performance.now() - lastScrollAt < 300) {
+          scheduleRefresh(); // 아직 스크롤 중 — 멈출 때까지 미룬다
+          return;
+        }
+        const h = document.documentElement.scrollHeight;
+        if (h === lastH && window.innerHeight === lastVH) return;
+        lastH = h;
+        lastVH = window.innerHeight;
+        refresh();
+      }, 200);
+    };
+
+    // 첫 프레임만 즉시(아직 스크롤이 시작되기 전이다). 나머지는 전부 예약.
+    const rafId = requestAnimationFrame(() => {
+      lastH = document.documentElement.scrollHeight;
+      lastVH = window.innerHeight;
+      refresh();
+    });
+    const timers = [300, 1000, 2500].map((ms) => window.setTimeout(scheduleRefresh, ms));
 
     // img load 는 버블링하지 않으므로 capture 로 잡는다.
     const onImgLoad = (e: Event) => {
-      if ((e.target as HTMLElement | null)?.tagName === "IMG") refresh();
+      if ((e.target as HTMLElement | null)?.tagName === "IMG") scheduleRefresh();
     };
     document.addEventListener("load", onImgLoad, true);
 
     // 폰트 로드 후 텍스트 높이가 바뀌는 경우도 커버.
-    document.fonts?.ready.then(refresh).catch(() => {});
+    document.fonts?.ready.then(scheduleRefresh).catch(() => {});
 
     return () => {
       cancelAnimationFrame(rafId);
       timers.forEach(clearTimeout);
+      window.clearTimeout(idleTimer);
+      window.removeEventListener("scroll", markScroll);
       document.removeEventListener("load", onImgLoad, true);
     };
   }, [pathname]);

@@ -5,8 +5,13 @@ import type { NextConfig } from "next";
  * Next 기본 3000 으로 되돌리지 말 것 — 다른 프로젝트와 충돌한다.
  */
 const nextConfig: NextConfig = {
-  /** Docker 단독 실행용 standalone 번들. 배포 방식이 다르면 지워도 됨. */
-  output: "standalone",
+  /**
+   * Docker 단독 실행용 standalone 번들.
+   * Next 16.3 + Vercel 어댑터는 standalone 일 때 `.next/next-server.js.nft.json` 을
+   * 안 만들고, onBuildComplete 가 그 파일을 찾아 ENOENT 로 죽는다.
+   * Vercel 빌드(`VERCEL=1`)에서는 플랫폼 출력만 쓴다.
+   */
+  output: process.env.VERCEL ? undefined : "standalone",
   /** 개발 배지가 좌하단 레이아웃을 가려 디자인 검수를 방해해서 끔. */
   devIndicators: false,
 

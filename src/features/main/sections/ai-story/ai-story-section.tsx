@@ -13,7 +13,7 @@ import styles from "./ai-story-section.module.css";
  *
  * 세그먼트 탭 3개 + 대형 비디오 카드 1장(854×484).
  *
- * ## 썸네일 = `/main/ai/story-card.webp` (854×484 — 카드와 1:1 동일 치수)
+ * ## 썸네일 = `/main/img_06_card01.webp` (854×484 — 카드와 1:1 동일 치수)
  * 시안의 카드는 **한 장의 영상 썸네일**이고 카피(아이브로우 + 2줄 타이틀)가
  * 이미지에 **구워져 있다**. 그래서 같은 문구를 DOM 텍스트로 또 얹으면 이중으로
  * 겹쳐 보인다 → 카피는 `<img alt>` 로만 전달한다. 이미지가 못 뜨면 alt 가
@@ -36,9 +36,13 @@ import styles from "./ai-story-section.module.css";
  * 먼저 정리하고 들어오는 편이 깨끗하다.
  *
  * ## 모바일 탭 가로 스크롤
- * 시안에서 탭이 좌우로 잘린 채 노출된다(= 스크롤 가능 신호).
- * 내부 가로 스크롤 영역이므로 `data-lenis-prevent` 가 반드시 필요하다 —
- * 없으면 Lenis 가 wheel/touch 를 가로채 탭이 움직이지 않는다.
+ * 시안에서 탭이 좌우로 잘린 채 노출된다(= 스크롤 가능 신호). 탭 스트립이 실제로
+ * 가로 스크롤되는 건 ≤768 뿐이다.
+ *
+ * ⚠️ `data-lenis-prevent` 는 쓰지 않는다. 이 속성은 축을 가리지 않아서, 데스크톱처럼
+ * 스크롤되지 않는 상태에서도 스트립 위의 **세로** 휠까지 네이티브로 넘겨 버린다.
+ * 내부 스크롤 판별은 Lenis 의 `allowNestedScroll` 에 맡긴다
+ * (`smooth-scroll-provider.tsx` 의 "## 내부 스크롤 영역" 참고).
  */
 export interface AiStorySectionProps {
   messages: AiStorySectionMessages;
@@ -113,7 +117,6 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
         aria-label="AI 브랜드 스토리 주제"
         onKeyDown={handleTabKeyDown}
         data-reveal-item
-        data-lenis-prevent
       >
         {messages.tabs.map((tab, i) => {
           const isActive = i === activeTab;
@@ -169,7 +172,7 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
             {/* eslint-disable-next-line @next/next/no-img-element -- 카드 치수(854×484)와 1:1 인 확정 크기 에셋이라 next/image 리사이즈 이점이 없다 */}
             <img
               className={styles.cardBg}
-              src="/main/ai/story-card.webp"
+              src="/main/img_06_card01.webp"
               alt={`${messages.videoEyebrow}. ${messages.videoTitle.replace(/\n/g, " ")}`}
               width={854}
               height={484}

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
 import {
@@ -21,6 +21,7 @@ import {
   TOWER_CLOUDS_TOP,
   TOWER_LINES,
   TOWER_STAGE,
+  TOWER_WATERMARK,
   type TowerSprite,
 } from "./hero-assets";
 import styles from "./hero-section.module.css";
@@ -60,6 +61,44 @@ const SphereScene = dynamic(() => import("./scene-sphere").then((m) => m.SphereS
 const FADE_START = 0.45;
 const FADE_END = 0.7;
 
+/**
+ * 광선 스프라이트를 겹침(`repeat`)까지 펼친 평면 목록.
+ *
+ * 원본 띠와 광택 띠가 **같은 인덱스**를 써야 드리프트·스크롤 오프셋이 어긋나지
+ * 않는다. 어긋나면 같은 그림이 두 장 겹쳐 보인다.
+ */
+const LINE_SPRITES: readonly TowerSprite[] = TOWER_LINES.flatMap((s) =>
+  Array.from({ length: s.repeat ?? 1 }, () => s as TowerSprite),
+);
+
+/**
+ * 띠별 스크롤 패럴랙스 (`[data-line]` 인덱스 순).
+ *
+ * 그룹 전체(`pxLinesRef`)가 이미 한 덩어리로 흐른다. 여기 값은 그 위에 얹는
+ * **띠마다 다른 여벌**이다. 이게 없으면 넷이 판때기처럼 같은 속도로 미끄러져서
+ * 시안의 "실크가 서로 스쳐 지나가는" 인상이 안 난다.
+ *
+ * ⚠️ 단위는 **스프라이트 자기 박스 대비 %** 다. 띠 폭이 스테이지의 1.2~1.9배라
+ *    스테이지 % 로 읽으면 실제 이동량이 두 배 가까이 커진다.
+ *
+ *   0 line-3  가장 크고 멀다              → 느리게
+ *   1 line-1  채도 높은 리본              → 반대 방향
+ *   2 line-2  파스텔 리본 (2겹 중 1)
+ *   3 line-2  파스텔 리본 (2겹 중 2)      → 같은 그림이라 더 벌려 겹침을 푼다
+ *   4 line-9  점묘 웨이브, 가장 가깝다    → 가장 빠르게, 반대 방향
+ *
+ * ⚠️ 2026-08: 띠 전체가 흐르는 방향을 **오른쪽으로 뒤집었다**(그룹 X 부호 포함).
+ *    부호를 되돌릴 땐 아래 `shift(pxLinesRef...)` 의 X 도 같이 뒤집어야 한다 —
+ *    둘이 어긋나면 띠끼리 서로를 상쇄해 움직임이 거의 안 보인다.
+ */
+const LINE_SCROLL = [
+  { x: -1.2, y: -0.8, r: -0.25 },
+  { x: 1.8, y: 1.3, r: 0.4 },
+  { x: -1.8, y: -1.5, r: -0.35 },
+  { x: -2.6, y: -2.1, r: -0.5 },
+  { x: 2.8, y: 1.9, r: 0.55 },
+] as const;
+
 export interface HeroSectionProps {
   messages: HeroSectionMessages;
 }
@@ -71,6 +110,11 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const towerLayerRef = useRef<HTMLDivElement>(null);
   const copySphereRef = useRef<HTMLDivElement>(null);
   const copyTowerRef = useRef<HTMLDivElement>(null);
+  /**
+   * 마퀴는 **구체 씬에만** 있다. 시안 타워 프레임(8:733)에는 마퀴가 없다.
+   * 계속 떠 있으면 타워 카피와 겹쳐서 시안보다 훨씬 시끄럽다.
+   */
+  const marqueeRef = useRef<HTMLDivElement>(null);
 
   /**
    * 타워 씬 패럴랙스 래퍼들. 매 프레임 transform 만 쓰므로 전부 ref 다.
@@ -78,6 +122,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
    */
   const pxParticlesRef = useRef<HTMLDivElement>(null);
   const pxCloudTopRef = useRef<HTMLDivElement>(null);
+  const pxWatermarkRef = useRef<HTMLDivElement>(null);
   const pxBandRefs = [
     useRef<HTMLDivElement>(null),
     useRef<HTMLDivElement>(null),
@@ -86,6 +131,13 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const pxTowerRef = useRef<HTMLDivElement>(null);
   const pxLinesRef = useRef<HTMLDivElement>(null);
   const sheenRef = useRef<HTMLDivElement>(null);
+  const stageClipRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * 띠별 스크롤 오프셋을 쓸 DOM 노드 캐시.
+   * `onProgress` 는 매 프레임 돌기 때문에 거기서 `querySelectorAll` 을 하면 안 된다.
+   */
+  const lineNodesRef = useRef<HTMLElement[] | null>(null);
 
   /** `prefersReducedMotionSync` 는 SSR 에서 못 부르므로 첫 프레임에 한 번만 캐시한다 */
   const reducedRef = useRef<boolean | null>(null);
@@ -133,6 +185,9 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const ct = copyTowerRef.current;
       if (cs) cs.style.opacity = String(1 - clamp01(t * 1.6));
       if (ct) ct.style.opacity = String(clamp01((t - 0.35) * 2));
+      // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)
+      const mq = marqueeRef.current;
+      if (mq) mq.style.opacity = String(1 - clamp01(t * 1.6));
 
       // 타워 에셋을 미리 마운트해 크로스페이드 때 디코딩이 안 걸리게 한다
       if (!towerMountedRef.current && p > 0.12) {
@@ -153,10 +208,22 @@ export function HeroSection({ messages }: HeroSectionProps) {
       shift(pxTowerRef.current, 0.6 * u, -1.1 * u);
       shift(pxParticlesRef.current, 0, 1.8 * u);
       shift(pxCloudTopRef.current, -2.4 * u, -1.6 * u);
+      /* 워터마크는 타워와 같은 깊이감으로 — 가장 멀리 있는 축에 가깝게 아주 조금만 */
+      shift(pxWatermarkRef.current, 0.9 * u, -1.3 * u);
       shift(pxBandRefs[0]?.current ?? null, 3.6 * u, 2.6 * u);
       shift(pxBandRefs[1]?.current ?? null, 2.0 * u, 1.4 * u);
       shift(pxBandRefs[2]?.current ?? null, 2.8 * u, 2.0 * u);
-      shift(pxLinesRef.current, -4.5 * u, 1.0 * u);
+      shift(pxLinesRef.current, 4.5 * u, 1.0 * u);
+
+      /* 띠마다 여벌 오프셋 — 그룹 하나만 흘리면 넷이 한 덩어리로 미끄러진다.
+         원본과 광택이 같은 `data-line` 을 쓰므로 둘은 언제나 같이 움직인다. */
+      const lineNodes = lineNodesRef.current;
+      if (lineNodes) {
+        for (const el of lineNodes) {
+          const k = LINE_SCROLL[Number(el.dataset.line) % LINE_SCROLL.length];
+          if (k) shiftRotate(el, k.x * u, k.y * u, k.r * u);
+        }
+      }
     },
     /**
      * ⚠️ 여기에 `isMobile` 을 넣으면 안 된다.
@@ -171,6 +238,19 @@ export function HeroSection({ messages }: HeroSectionProps) {
      */
     dependencies: [],
   });
+
+  /**
+   * 띠 노드 수집 — 타워 레이어가 마운트된 뒤 한 번만.
+   *
+   * `[data-line]` 은 원본 띠와 광택 띠 양쪽에 같은 인덱스로 붙어 있어서 한 번에
+   * 모으면 둘이 자동으로 같은 오프셋을 받는다.
+   */
+  useEffect(() => {
+    const root = stageClipRef.current;
+    lineNodesRef.current = root
+      ? Array.from(root.querySelectorAll<HTMLElement>("[data-line]"))
+      : null;
+  }, [towerMounted]);
 
   /** 진입 인트로 — ScrollTrigger 없이 즉시. 로딩 화면을 두지 않는다. */
   useGSAP(
@@ -213,6 +293,9 @@ export function HeroSection({ messages }: HeroSectionProps) {
    *    빛이 실크를 타고 지나가는 인상이 여기서 나온다.
    *
    * 둘 다 GPU 합성만 쓰므로(transform / mask-position) 레이아웃을 건드리지 않는다.
+   *
+   * ⚠️ **스크롤 연동은 여기가 아니다.** `onProgress` 의 `LINE_SCROLL` 이 맡는다.
+   *    같은 요소에 GSAP 과 ref 가 함께 `transform` 을 쓰면 나중 것이 앞을 지운다.
    */
   useGSAP(
     () => {
@@ -230,7 +313,10 @@ export function HeroSection({ messages }: HeroSectionProps) {
         { x: -1.0, y: -0.7, r: -0.25, s: 1.013, d: 29.4 },
       ] as const;
 
-      for (const [i, el] of drifts.entries()) {
+      for (const el of drifts) {
+        /* 배열 순서가 아니라 `data-drift` 값으로 고른다 — 원본 띠와 광택 띠가
+           같은 인덱스를 공유해야 둘이 똑같이 흔들린다. */
+        const i = Number(el.dataset.drift ?? 0);
         const k = PLAN[i % PLAN.length];
         if (!k) continue;
         gsap.to(el, {
@@ -342,6 +428,12 @@ export function HeroSection({ messages }: HeroSectionProps) {
                   ))}
                 </div>
 
+                {/* `BGn` 워터마크 — 8:759. 시안 z-순서가 상단 구름과 하단 구름 띠
+                 **사이**라 여기 놓는다. 타워보다 뒤이므로 첨탑에 가려진다. */}
+                <div ref={pxWatermarkRef} className={styles.px}>
+                  <TowerSpriteImg sprite={TOWER_WATERMARK} />
+                </div>
+
                 {/* 하단 구름 띠 — 8:2904 의 세 덩어리. 각각 다른 속도로 흐른다 */}
                 {TOWER_CLOUD_BANDS.map((band, i) => (
                   <div
@@ -375,28 +467,23 @@ export function HeroSection({ messages }: HeroSectionProps) {
 
                     셰이더 리본을 쓸 수 있으면 정지 PNG 대신 캔버스를 올린다.
                     둘을 겹치면 같은 그림이 두 장 보이므로 **배타적으로** 렌더한다. */}
-                <div className={styles.stageClip}>
+                <div ref={stageClipRef} className={styles.stageClip}>
                   <div ref={pxLinesRef} className={styles.px}>
-                    {TOWER_LINES.flatMap((s, li) =>
-                      Array.from({ length: s.repeat ?? 1 }, (_, i) => (
-                        <TowerSpriteImg
-                          key={`${s.node}-${i}`}
-                          sprite={s}
-                          drift={li * 2 + i}
-                        />
-                      )),
-                    )}
-                  </div>
+                    {LINE_SPRITES.map((s, i) => (
+                      <TowerSpriteImg key={`${s.node}-${i}`} sprite={s} drift={i} />
+                    ))}
 
-                  {/* 광택 — 같은 띠를 한 겹 더 얹고 **움직이는 그라디언트 마스크**로
-                      가늘게 오려낸다. 빛이 실크를 타고 지나가는 것처럼 보인다.
-                      원본 위에 얹으므로 plus-lighter(정확한 덧셈)를 쓴다. */}
-                  <div ref={sheenRef} className={styles.lineSheen} aria-hidden>
-                    {TOWER_LINES.flatMap((s) =>
-                      Array.from({ length: s.repeat ?? 1 }, (_, i) => (
-                        <TowerSpriteImg key={`sheen-${s.node}-${i}`} sprite={s} />
-                      )),
-                    )}
+                    {/* 광택 — 같은 띠를 한 겹 더 얹고 **움직이는 그라디언트 마스크**로
+                        가늘게 오려낸다. 빛이 실크를 타고 지나가는 것처럼 보인다.
+
+                        ⚠️ 원본과 **같은 패럴랙스 래퍼 안**에 둔다. 밖에 두면 스크롤이
+                        진행될수록 원본만 흘러가고 광택은 제자리에 남아서, 같은 띠가
+                        두 장 겹쳐 보이는 유령이 생긴다. */}
+                    <div ref={sheenRef} className={styles.lineSheen} aria-hidden>
+                      {LINE_SPRITES.map((s, i) => (
+                        <TowerSpriteImg key={`sheen-${s.node}-${i}`} sprite={s} drift={i} />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -439,8 +526,12 @@ export function HeroSection({ messages }: HeroSectionProps) {
           </div>
         </div>
 
-        {/* 시그니처 마퀴 — Figma 2:410 : top 583, Marcellus 108px, `*` 구분자 */}
-        <Marquee text={messages.marquee} className={styles.marquee} outline duration={28} />
+        {/* 시그니처 마퀴 — Figma 2:410 : top 583, Marcellus 108px, `*` 구분자.
+            래퍼는 opacity 만 맡는다 — 위치는 그대로 `.marquee` 가 갖는다
+            (래퍼에 position 을 주면 absolute 기준이 바뀐다). */}
+        <div ref={marqueeRef}>
+          <Marquee text={messages.marquee} className={styles.marquee} outline duration={28} />
+        </div>
 
         {/* 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 + 40 흰 채움 */}
         <div className={styles.scrollHint} data-hero-fade>
@@ -496,7 +587,15 @@ function SplitBrandTitle({
           {ch}
         </span>
       ))}
-      <span className={clsx(styles.char, brandClassName)} aria-hidden lang="en" {...attr}>
+      {/* `data-font="body"` — 시안의 히어로 `BGN` 은 영문이지만 Pretendard 다.
+          이게 없으면 globals.css 의 `[lang|="en"]` 규칙이 Belleza 로 바꿔 버린다. */}
+      <span
+        className={clsx(styles.char, brandClassName)}
+        aria-hidden
+        lang="en"
+        data-font="body"
+        {...attr}
+      >
         {brand}
       </span>
       {Array.from(after).map((ch, i) => (
@@ -513,6 +612,17 @@ const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 /** 스테이지 대비 % 로 평행이동. 매 프레임 호출되므로 문자열 조립만 한다. */
 function shift(el: HTMLElement | null, x: number, y: number) {
   if (el) el.style.transform = `translate3d(${x}%, ${y}%, 0)`;
+}
+
+/**
+ * 평행이동 + 미세 회전. 띠 전용이다.
+ *
+ * 회전이 없으면 띠가 "미끄러지는 판"으로 보인다. 1도 미만이라 눈으로는
+ * 각도가 아니라 **휘어짐**으로 읽힌다. 요소 중심 기준이라 시안 배치와
+ * 회전 중심이 같다.
+ */
+function shiftRotate(el: HTMLElement | null, x: number, y: number, r: number) {
+  if (el) el.style.transform = `translate3d(${x}%, ${y}%, 0) rotate(${r}deg)`;
 }
 
 /** 시안 px → 스테이지 대비 %. 스테이지가 1920×920 비율이라 X/Y 가 같은 배율로 줄어든다. */
@@ -563,15 +673,24 @@ function TowerSpriteImg({ sprite, drift }: { sprite: TowerSprite; drift?: number
   if (drift === undefined) return img;
 
   /**
-   * 드리프트 래퍼.
+   * 래퍼 두 겹.
    *
-   * 스프라이트 자신의 `transform` 에는 시안의 rotate/flip 이 이미 들어 있다.
-   * 거기에 애니메이션을 덧쓰면 시안 배치가 깨지므로 **바깥에 한 겹 더** 두고
-   * 그 래퍼만 움직인다. 회전 중심이 두 박스 모두 같아서 부호도 어긋나지 않는다.
+   * 스프라이트 자신의 `transform` 에는 시안의 rotate/flip 이 이미 들어 있어서
+   * 애니메이션을 덧쓰면 배치가 깨진다. 그래서 바깥에 래퍼를 두는데, **한 겹으로는
+   * 부족하다** — 스크롤 오프셋과 아이들 드리프트가 같은 요소의 `transform` 을
+   * 서로 지우기 때문이다(CLAUDE.md 역할 경계).
+   *
+   *   .lineScroll  스크롤 진행도 → 매 프레임 ref 로 직접
+   *   .lineDrift   GSAP 무한 yoyo 드리프트
+   *   img          시안의 rotate/flip 고정값
+   *
+   * 세 박스의 중심이 모두 같아서 회전 부호는 어긋나지 않는다.
    */
   return (
-    <div className={styles.lineDrift} data-drift={drift} style={box}>
-      {img}
+    <div className={styles.lineScroll} data-line={drift} style={box}>
+      <div className={styles.lineDrift} data-drift={drift}>
+        {img}
+      </div>
     </div>
   );
 }

@@ -26,8 +26,22 @@ import styles from "./gnb.module.css";
  * 스크롤 방향으로 숨김/표시. rAF 로 throttle 해서 프레임당 1회만 계산한다.
  */
 
-const SCROLL_IDLE_TOP_PX = 48;
-const SCROLL_DELTA_MIN = 6;
+/** 이 위쪽에서는 방향과 무관하게 항상 보인다. */
+const ALWAYS_VISIBLE_TOP_PX = 48;
+
+/**
+ * 숨김/표시 히스테리시스 — **한 프레임 델타가 아니라 같은 방향 누적 이동거리**로 판단한다.
+ *
+ * 예전 구현은 "이번 프레임에 6px 이상 내려갔으면 숨긴다"였다. 스무스 스크롤이 감속하며
+ * 부호가 한두 프레임 흔들리거나, 내부 스크롤 영역 위에서 휠이 네이티브로 새어 페이지가
+ * 한 번에 튀면 그때마다 GNB 가 나타났다 사라졌다 했다. 누적으로 바꾸면 그 정도 흔들림은
+ * 임계값을 못 넘긴다.
+ *
+ * 내려갈 때는 둔하게, 올라올 때는 민감하게 — 메뉴를 찾는 동작이 위로 굴리는 것이라
+ * 복귀가 늦으면 답답하다.
+ */
+const HIDE_AFTER_PX = 96;
+const SHOW_AFTER_PX = 40;
 
 export interface GnbProps {
   locale: Locale;
@@ -44,6 +58,8 @@ export function Gnb({ locale, messages }: GnbProps) {
 
   const lastYRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+  /** 같은 방향으로 누적된 이동거리(px). 방향이 바뀌면 버린다. */
+  const travelRef = useRef(0);
 
   /** 스크롤 방향 기반 숨김. 최상단 근처에서는 항상 보인다. */
   const evaluate = useCallback(() => {
@@ -51,15 +67,32 @@ export function Gnb({ locale, messages }: GnbProps) {
     const y = window.scrollY || 0;
     const delta = y - lastYRef.current;
     lastYRef.current = y;
-    if (y <= SCROLL_IDLE_TOP_PX) {
+
+    if (y <= ALWAYS_VISIBLE_TOP_PX) {
+      travelRef.current = 0;
       setIsHidden(false);
       return;
     }
-    if (Math.abs(delta) < SCROLL_DELTA_MIN) return;
-    setIsHidden(delta > 0);
+    if (delta === 0) return;
+
+    // 방향이 바뀌면 누적을 버린다 — "내려가다 살짝 되올린" 정도로는 안 뒤집히게.
+    if (Math.sign(delta) !== Math.sign(travelRef.current)) travelRef.current = 0;
+    travelRef.current += delta;
+
+    if (travelRef.current > HIDE_AFTER_PX) {
+      travelRef.current = 0;
+      setIsHidden(true);
+    } else if (travelRef.current < -SHOW_AFTER_PX) {
+      travelRef.current = 0;
+      setIsHidden(false);
+    }
   }, []);
 
   useEffect(() => {
+    /* 새로고침으로 페이지 중간에서 복원되면 `lastYRef` 의 초기값 0 과의 차이가
+       수천 px 이 되어 첫 스크롤 한 번에 곧바로 숨는다. 구독 전에 현재 위치를 심는다. */
+    lastYRef.current = window.scrollY || 0;
+
     const onScroll = () => {
       if (rafRef.current != null) return;
       rafRef.current = window.requestAnimationFrame(evaluate);
@@ -160,13 +193,16 @@ export function Gnb({ locale, messages }: GnbProps) {
           </nav>
 
           <div className={clsx(styles.utils, isMegaOpen && styles.utilsHidden)}>
-            <Link href={withLocale("/login")} className={styles.utilLink}>
-              {messages.login}
-            </Link>
-            <span className={styles.utilDivider} aria-hidden />
-            <Link href={withLocale("/signup")} className={styles.utilLink}>
-              {messages.signup}
-            </Link>
+            {/* 8:2310 `Auth Options` — 로그인/구분선/회원가입은 gap 12 로 따로 묶인다 */}
+            <div className={styles.auth}>
+              <Link href={withLocale("/login")} className={styles.utilLink}>
+                {messages.login}
+              </Link>
+              <span className={styles.utilDivider} aria-hidden />
+              <Link href={withLocale("/signup")} className={styles.utilLink}>
+                {messages.signup}
+              </Link>
+            </div>
 
             <LocaleMenu locale={locale} label={messages.languageLabel} />
 

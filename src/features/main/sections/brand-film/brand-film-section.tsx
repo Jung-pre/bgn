@@ -50,13 +50,13 @@ import styles from "./brand-film-section.module.css";
  * `<body data-gnb-hide="true">` 를 세운다. GNB 쪽은 이 속성을 CSS 로 받는다
  * (컴포넌트 간 결합을 만들지 않으려고 context 대신 data 속성을 쓴다).
  */
-const VIDEO_SRC: string | undefined = undefined; // TODO: 영상 도착 시 "/main/brand-film/film.mp4"
+const VIDEO_SRC: string | undefined = undefined; // TODO: 영상 도착 시 "/main/video_03_film01.mp4"
 
-const PLATE = "/main/brand-film/poster.webp";
-const OVERLAY_SPARK = "/main/brand-film/overlay-spark.webp";
-const OVERLAY_TYPO = "/main/brand-film/overlay-typo.webp";
+const PLATE = "/main/img_03_poster01.webp";
+const OVERLAY_SPARK = "/main/img_03_overlay01.webp";
+const OVERLAY_TYPO = "/main/img_03_overlay02.webp";
 /** 영상이 없을 때 `<video poster>` 대신 쓰이는 최종 합성본(폴백 경로 전용) */
-const VIDEO_POSTER = "/main/brand-film/poster-2.webp";
+const VIDEO_POSTER = "/main/img_03_poster02.webp";
 
 /** 타이포 중심 — `overlay-typo.webp` 실측(정규화 좌표). 폭죽이 여기서 터진다 */
 const TYPO_CENTER = { x: 0.535, y: 0.36 } as const;
@@ -69,25 +69,13 @@ const CUE = {
   typoIn: [0.32, 0.66],
   /** 폭죽이 터지는 지점들 */
   bursts: [0.16, 0.27, 0.4, 0.55],
-  /**
-   * 앞뒤 섹션과 잇는 크로스페이드 구간.
-   *
-   * 이 섹션만 어두운 시네마틱 컷이라 경계에서 색이 그대로 튄다 — 실측 색차가
-   * 의료진→브랜드필름 238, 브랜드필름→AI시스템 201 이었다(다른 경계는 9~33).
-   * 히어로가 구체→타워를 크로스페이드하듯, 여기도 **앞 섹션 톤으로 시작해서
-   * 뒤 섹션 톤으로 끝낸다.** 구간을 짧게(12%) 잡아야 폭죽·타이포 연출을 안 먹는다.
-   */
-  veilIn: 0.12,
-  veilOut: 0.88,
 } as const;
 
-/** 이웃 섹션에서 실측한 톤. 여기서 시작하고 여기서 끝난다. */
-const NEIGHBOR_TONE = {
-  /** 의료진 섹션 끝 */
-  prev: "217, 224, 244",
-  /** AI 정밀 검사 시스템 섹션 시작 */
-  next: "248, 248, 249",
-} as const;
+/**
+ * 앞 장면과 겹치는 입장만. 폭죽·타이포 큐는 건드리지 않는다.
+ * 예전엔 입장 구간에 맞춰 CUE 전체를 0~1 로 다시 접어서 연출이 늦게/빠르게 터졌다.
+ */
+const ENTRY_END = 0.22;
 
 /** 0~1 로 정규화하고 클램프 */
 function span(p: number, a: number, b: number) {
@@ -105,8 +93,6 @@ export function BrandFilmSection() {
   const sparkRef = useRef<HTMLDivElement>(null);
   const typoRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const veilInRef = useRef<HTMLDivElement>(null);
-  const veilOutRef = useRef<HTMLDivElement>(null);
   const fwRef = useRef<Fireworks | null>(null);
   /** 잔불을 켤지 — 진행도가 첫 폭죽을 지나면 1 */
   const twinkleRef = useRef(0);
@@ -181,19 +167,45 @@ export function BrandFilmSection() {
 
       const gnbSt = ScrollTrigger.create({
         trigger: section,
-        start: "top 20%",
+        /* 섹션이 의료진과 100vh 겹치므로 top 20% 면 GNB 가 너무 일찍 숨는다 */
+        start: "top top",
         end: "bottom 30%",
         onToggle: (self) => {
           document.body.dataset.gnbHide = self.isActive ? "true" : "false";
         },
       });
 
-      if (!composite) return () => {
-        gnbSt.kill(true);
-        delete document.body.dataset.gnbHide;
+      if (!composite)
+        return () => {
+          gnbSt.kill(true);
+          delete document.body.dataset.gnbHide;
+        };
+
+      const prev = section.previousElementSibling as HTMLElement | null;
+      const clearPrev = () => {
+        if (!prev) return;
+        prev.style.opacity = "";
+        prev.style.transform = "";
+        prev.style.transformOrigin = "";
       };
 
       const apply = (p: number) => {
+        /* 입장만 투명도로. scale 을 스테이지에 주면 플레이트 줌·plus-lighter 가 뭉개진다. */
+        const enter = easeOut(span(p, 0, ENTRY_END));
+        const pin = pinRef.current;
+        if (pin) {
+          if (enter >= 1) {
+            pin.style.opacity = "";
+          } else {
+            pin.style.opacity = enter.toFixed(3);
+          }
+        }
+        if (prev) {
+          prev.style.opacity = (1 - enter).toFixed(3);
+          prev.style.transformOrigin = "50% 50%";
+          prev.style.transform = `scale(${(1 + enter * 0.08).toFixed(4)})`;
+        }
+
         const plate = plateRef.current;
         const spark = sparkRef.current;
         const typo = typoRef.current;
@@ -220,18 +232,11 @@ export function BrandFilmSection() {
           typo.style.filter = `blur(${((1 - t) * 26).toFixed(2)}px) brightness(${(0.8 + 0.6 * t).toFixed(3)})`;
         }
 
-        /* 앞뒤 섹션과의 크로스페이드. p=0 이면 앞 섹션 톤이 화면을 덮고 있다가
-           걷히고, p=1 이면 뒤 섹션 톤으로 덮인 채 끝난다 → 경계에서 색이 안 튄다. */
-        const vIn = veilInRef.current;
-        if (vIn) vIn.style.opacity = (1 - easeOut(span(p, 0, CUE.veilIn))).toFixed(3);
-        const vOut = veilOutRef.current;
-        if (vOut) vOut.style.opacity = easeOut(span(p, CUE.veilOut, 1)).toFixed(3);
-
         /* 폭죽 — 진행도가 큐를 **넘어설 때 한 번만** 터진다.
            매 프레임 터뜨리면 스크롤을 멈춘 자리에서 무한히 터진다. */
         const fw = fwRef.current;
         if (fw) {
-          twinkleRef.current = p > CUE.bursts[0] && p < 0.94 ? 1 : 0;
+          twinkleRef.current = p > CUE.bursts[0] ? 1 : 0;
           CUE.bursts.forEach((cue, i) => {
             if (p >= cue && !firedRef.current.has(i)) {
               firedRef.current.add(i);
@@ -269,6 +274,7 @@ export function BrandFilmSection() {
         gnbSt.kill(true);
         // ⚠️ kill(true) — revert 하지 않으면 pin-spacer 가 DOM 에 남아 섹션이 밀린다
         st.kill(true);
+        clearPrev();
         delete document.body.dataset.gnbHide;
       };
     },
@@ -317,20 +323,6 @@ export function BrandFilmSection() {
             </div>
             {/* eslint-enable @next/next/no-img-element */}
             <canvas ref={canvasRef} className={styles.fireworks} aria-hidden />
-
-            {/* 앞/뒤 섹션 톤 베일. 캔버스보다 위라서 폭죽까지 함께 걷힌다. */}
-            <div
-              ref={veilInRef}
-              className={styles.veil}
-              style={{ background: `rgb(${NEIGHBOR_TONE.prev})` }}
-              aria-hidden
-            />
-            <div
-              ref={veilOutRef}
-              className={styles.veil}
-              style={{ background: `rgb(${NEIGHBOR_TONE.next})`, opacity: 0 }}
-              aria-hidden
-            />
           </>
         ) : (
           <VideoSlot

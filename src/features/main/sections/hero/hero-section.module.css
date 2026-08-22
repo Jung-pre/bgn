@@ -63,10 +63,23 @@
    시안(2:416)은 배경까지 포함된 한 장의 렌더 이미지라 CSS 로 근사해야 한다.
    ⚠️ 여기를 더 밝게 만들면 안 된다 — 구체가 가산 블렌딩이라 배경이 흰색에
    가까워질수록 파티클이 그대로 사라진다. 실제로 처음엔 너무 옅어서 안 보였다. */
+/**
+ * 구체 씬 배경 = **시안 프레임 fill 원본**(`img_01_bg01.webp`, 1920×920).
+ *
+ * 예전에는 이 하늘을 radial 3겹으로 손수 그렸는데, 시안의 파스텔은 그라데이션
+ * 스톱으로 재현되는 색이 아니라 **번짐이 있는 실사 톤**이다. 아무리 스톱을 맞춰도
+ * 중간의 라벤더 기둥과 좌하단 살구빛의 경계가 시안보다 딱딱했다.
+ * 타워 씬이 이미 같은 파일을 하늘로 쓰고 있어서(`HERO_ASSETS.sky`) 두 씬의
+ * 배경이 정확히 같아지는 이점도 있다 — 크로스페이드 때 하늘이 흔들리지 않는다.
+ *
+ * 그라데이션은 지우지 않고 **이미지 아래 폴백**으로 남긴다. 11KB 짜리라 거의
+ * 즉시 뜨지만, 첫 페인트에 흰 화면이 스치는 것보다는 낫다.
+ */
 .sphereBg {
   position: absolute;
   inset: 0;
   background:
+    url("/main/img_01_bg01.webp") center / cover no-repeat,
     /* 좌하단의 살구빛 웜 톤 */
     radial-gradient(56% 48% at -2% 78%, rgba(240, 200, 200, 0.85) 0%, rgba(240, 200, 200, 0) 68%),
     /* 우측의 짙은 블루 */
@@ -242,19 +255,33 @@
   display: grid;
 }
 
+/**
+ * 두 장면의 카피는 같은 그리드 칸에 겹쳐 있고 opacity 로 교차한다.
+ *
+ * ⚠️ 세로 위치는 **장면마다 다르다.** 예전엔 둘 다 `align-self: center` 였는데
+ *    시안은 구체 씬이 화면 위쪽 1/5 지점, 타워 씬이 거의 정중앙이다.
+ *      구체 씬  top 160 / 920 = 17.4%   (2:475, 모바일 2:3793 은 124/812 = 15.3%)
+ *      타워 씬  top 357 / 920 = 38.8%   (8:794, 모바일 2:3380 은 285/812 = 35.1%)
+ *    `%` 마진은 **가로 폭** 기준이라 쓸 수 없다 — vh 로 잡는다.
+ */
 .copy {
   grid-area: 1 / 1;
-  align-self: center;
+  align-self: start;
   will-change: opacity;
 }
 
+.copySphere {
+  margin-top: 17.4vh;
+}
+
 .copyTower {
+  margin-top: 38.8vh;
   opacity: 0;
   pointer-events: none;
 }
 
-/* 장면 1 — Figma 2:475/2:476/2:478
-   "세계를 향한" ExtraBold 96 / "BGN" 120 / "의 도약" 96, tracking -1.92px(-2%) */
+/* 장면 1 — "세계를 향한" ExtraBold 96 / "BGN" 120 / "의 도약" 96, tracking -2%.
+   모바일 실측(2:3793)이 48 / 64 / 48 이라 clamp 양 끝이 전부 시안값이다. */
 .line1,
 .line2 {
   margin: 0;
@@ -269,11 +296,11 @@
 }
 
 .line1 {
-  font-size: var(--fs-display-92);
+  font-size: var(--fs-display-96);
 }
 
 .line2 {
-  font-size: var(--fs-display-92);
+  font-size: var(--fs-display-96);
 }
 
 /* inline-block 이어야 transform 이 먹는다 (inline 요소는 y 이동 무시) */
@@ -283,9 +310,12 @@
   will-change: opacity, transform;
 }
 
-/* Figma 2:478 — BGN 만 120px + radial gradient(#8d79ff → #102c87) */
+/* Figma 2:478 — BGN 만 120px + radial gradient(#8d79ff → #102c87).
+   자간은 시안 -1.92px/64 = **-3%** 다. `[lang|="en"]` 전역 규칙이 +1% 로
+   덮어쓰던 것을 `data-font="body"` 로 끊어 두고 여기서 다시 지정한다. */
 .brandSphere {
   font-size: var(--fs-display-120);
+  letter-spacing: -0.03em;
   /* Figma 2:478 실측 radial gradient. 양 끝은 토큰과 정확히 일치한다
      (#8d79ff = primary/sub/500, #102c87 = primary/primary/800).
      중간 스톱은 Figma 가 보간해 넣은 값이라 토큰이 없다. */
@@ -303,31 +333,66 @@
   text-shadow: none;
 }
 
-/* 장면 2 — Figma 2:3069 : "세상을 선명하게" 40 / BGN 160 / 밝은눈안과 138 */
+/**
+ * 장면 2 — Figma 8:794(PC) / 2:3380(MO) 실측.
+ *
+ *   세상을 선명하게   SemiBold  42 / 1.25 / -3%   흰색           (8:795)
+ *   BGN            Bold     160 / 0.9  / -2%   흰 radial      (8:797)
+ *   밝은눈안과        Bold     138 / 1.0  / -2%   흰색           (8:801)
+ *
+ * ⚠️ **전부 흰색이다.** 예전 구현은 네이비 + 120/120 이었는데 시안과 다르다.
+ *    title 프레임(910×197)은 gap 0 이다 — 53(=42×1.25) + 144(=160×0.9) = 197.
+ */
 .towerEyebrow {
-  margin: 0 0 0.25em;
-  font-size: var(--fs-42);
-  font-weight: var(--weight-medium);
+  margin: 0;
+  font-size: var(--fs-hero-eyebrow);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
   letter-spacing: var(--tracking-default);
-  color: var(--primary-900);
+  color: var(--color-white);
 }
 
 .towerTitle {
   margin: 0;
-  font-size: var(--fs-display-120);
+  font-size: var(--fs-hero-name);
   font-weight: var(--weight-bold);
-  line-height: 1.15;
-  letter-spacing: -0.03em;
-  color: var(--primary-900);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-white);
+  /* 8:801 실측 0 0 10.37px — 138 기준 em 으로 환산해 크기를 따라가게 한다 */
+  text-shadow: 0 0 0.0751em rgba(0, 0, 0, 0.08);
+  /**
+   * 시안에서 `BGN` 과 `밝은눈안과` 사이는 **6.914px** 뿐이다(거의 붙어 있다).
+   * i18n 문구가 "BGN 밝은눈안과" 라 공백 한 칸(≈0.26em)이 들어가는데,
+   * 그대로 두면 시안보다 다섯 배 벌어진다. 공백만 좁힌다.
+   */
+  word-spacing: -0.12em;
 }
 
-/* 실버/화이트 메탈 그라데이션 */
+/**
+ * 시안의 흰 radial 그라데이션(흰색 55% → 흰색 20%).
+ * 예전엔 실버(#c8d4e6) linear 였는데 시안보다 탁했다.
+ */
 .brandTower {
-  font-family: var(--font-display-stack);
-  background: linear-gradient(120deg, #ffffff 0%, #c8d4e6 45%, #ffffff 100%);
+  font-size: var(--fs-hero-brand);
+  line-height: 0.9;
+  /* 시안은 자간 -2% 에 글자 상자까지 -8.642px(-5.4%) 겹쳐 놨다. 합쳐서 -7.4%. */
+  letter-spacing: -0.074em;
+  /* 8:797 dev 모드 값 그대로. 흰 코어가 **오른쪽(65.53%)** 에 있고 바깥은 알파 0.2 다.
+     예전엔 코어를 왼쪽(30%)에 두고 끝을 0.62 로 올려 놨는데, 그러면 B 쪽만 하얗고
+     전체가 은회색으로 눌린다 — "회색으로 보인다"의 원인이었다. */
+  background: radial-gradient(
+    42.25% 55.97% at 65.53% 50%,
+    #ffffff 55%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* 8:797 실측 0 0 4px. **text-shadow 로 주면 안 된다** — background-clip:text
+     글리프 위에 그림자가 겹쳐 흰 코어가 224 회색까지 눌린다(실측 확인).
+     시안의 drop shadow 는 레이어 결과에 걸리는 효과라 filter 가 정확한 대응. */
+  filter: drop-shadow(0 0 0.025em rgba(0, 0, 0, 0.12));
 }
 
 /* --- 마퀴 — Figma 2:410 : top 583 (920 기준 63.4%) ------------------------- */
@@ -406,21 +471,32 @@
     padding-inline: var(--mobile-gutter);
   }
 
-  .line1,
-  .line2 {
-    font-size: var(--fs-32);
-  }
+  /* 크기는 위 clamp 가 이미 모바일 실측값(48 / 64 / 26 / 96 / 72)으로 수렴한다.
+     여기서는 시안이 PC 와 **다르게 지정한 것**만 덮어쓴다. */
 
+  /* 2:3796 — 모바일 BGN 은 그라데이션이 아니라 단색 네이비다 */
   .brandSphere {
-    font-size: var(--fs-42);
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: var(--primary-900);
+    text-shadow:
+      0 0 10px rgba(0, 0, 0, 0.28),
+      2px 1px 2px rgba(0, 0, 0, 0.9);
   }
 
-  .towerEyebrow {
-    font-size: var(--fs-20);
-  }
-
+  /* 2:3387 — 모바일만 행간 1.25 (PC 는 1.0). 폭이 좁아 BGN 이 윗줄로 넘어간다 */
   .towerTitle {
-    font-size: var(--fs-32);
+    line-height: var(--leading-tight);
+  }
+
+  /* 모바일 시안의 카피 세로 위치 — 2:3793(124/812) / 2:3380(285/812) */
+  .copySphere {
+    margin-top: 15.3vh;
+  }
+
+  .copyTower {
+    margin-top: 35.1vh;
   }
 
   .marquee {
@@ -478,13 +554,26 @@
    장식이라 포인터를 먹지 않는다. 캔버스는 스테이지(1920×920 비율) 안쪽이
    아니라 **레이어 전체**를 덮는다 — 리본은 시안에서도 프레임 밖으로 흘러 나간다. */
 /**
- * 실크 띠 한 장을 감싸는 드리프트 래퍼.
- * 스프라이트 자신의 transform 에는 시안의 rotate/flip 이 들어 있어서
- * 애니메이션을 덧쓰면 배치가 깨진다. 그래서 바깥에 한 겹 더 둔다.
+ * 실크 띠 한 장을 감싸는 래퍼 두 겹.
+ *
+ * 스프라이트 자신의 transform 에는 시안의 rotate/flip 이 들어 있어서 애니메이션을
+ * 덧쓰면 배치가 깨진다. 그래서 바깥에 래퍼를 두되, 스크롤 오프셋(ref 직접 쓰기)과
+ * 아이들 드리프트(GSAP)가 서로의 `transform` 을 지우지 않도록 **각자 한 겹씩** 갖는다.
+ *
+ * 시안 좌표(left/top/width/height)는 바깥이 들고 안쪽은 그 박스를 그대로 채운다 —
+ * 두 박스의 중심이 같아야 회전이 어긋나지 않는다.
+ *
+ * `will-change` 는 바깥에만 건다. 안쪽은 GSAP 이 애니메이션 동안 알아서 승격시키고,
+ * 띠가 원본·광택 합쳐 열 장이라 둘 다 걸면 합성 레이어가 스무 장이 된다.
  */
-.lineDrift {
+.lineScroll {
   position: absolute;
   will-change: transform;
+}
+
+.lineDrift {
+  position: absolute;
+  inset: 0;
 }
 
 /**

@@ -46,22 +46,13 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
         `loading="lazy"` 는 문서 최하단이라 특히 효과가 크다(첫 화면에서 1.4MB 절약).
       */}
       <div className={styles.decor} aria-hidden>
-        {/* 시안 8:2770 — 대표번호 뒤의 큰 발광체. 배경보다 밝은 원이라 screen 으로 얹는다 */}
-        {/* eslint-disable-next-line @next/next/no-img-element -- 풀블리드 장식이라 next/image 의 리사이즈 이점이 없다 */}
-        <img
-          className={styles.glowSphere}
-          src="/main/footer/sphere.webp"
-          alt=""
-          loading="lazy"
-          decoding="async"
-        />
         {/* 시안 8:2770 좌측 — 병원 건물 와이어프레임.
             알파가 있는 wire-4 를 쓴다(wire-1 은 같은 그림의 검은 배경 버전이라
             screen 블렌드가 필요하고, 그 경우 배경의 푸른 기가 선에 섞인다). */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className={styles.wireBuilding}
-          src="/main/footer/wire-4.webp"
+          src="/main/img_12_wire04.webp"
           alt=""
           loading="lazy"
           decoding="async"
@@ -70,7 +61,7 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className={styles.wireCity}
-          src="/main/footer/wire-3.webp"
+          src="/main/img_12_wire03.webp"
           alt=""
           loading="lazy"
           decoding="async"

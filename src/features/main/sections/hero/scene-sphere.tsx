@@ -299,12 +299,14 @@ function Globe({
     const scroll = progressRef?.current ?? 0;
 
     // 정면 경도(FOCUS_ROTATION_Y)를 기준으로 삼고, 인트로는 그 앞에서 살짝 돌다 멈춘다.
-    // 인트로가 끝난 뒤에도 아주 느리게 계속 돈다 — 완전히 멈추면 3D 인 걸 못 알아본다.
+    // 클로징은 포인터가 없어서, 스크롤·느린 자전이 없으면 인트로 1.8초 뒤 완전히 멈춘다.
+    const idle = interactive ? 0 : _state.clock.elapsedTime * 0.07;
     g.rotation.y =
       FOCUS_ROTATION_Y +
       (1 - introEase) * 0.55 + // 등장하며 살짝 돌기
       scroll * 0.9 + // 스크롤에 따라 추가 회전
-      eased.current.x * 0.3; // 포인터 추종 (비인터랙티브면 eased 가 0 에 머문다)
+      eased.current.x * 0.3 + // 포인터 추종 (비인터랙티브면 eased 가 0 에 머문다)
+      idle;
     // 지축 기울기를 고정으로 주고 그 위에 포인터 반응을 얹는다
     g.rotation.z = AXIAL_TILT;
     g.rotation.x = eased.current.y * 0.16;

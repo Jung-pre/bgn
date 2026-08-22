@@ -74,7 +74,7 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
       /* 앞 섹션(AI 정밀 검사 시스템) 끝 색 실측값 — 경계 이음매를 지운다 */
       style={{ "--blend-from": "rgb(232, 240, 251)" } as React.CSSProperties}
     >
-      {/* 8:1078 하단 도트 메시 웨이브 — `/main/ai/bg.webp`. 장식이라 CSS 배경으로 깐다
+      {/* 8:1078 하단 도트 메시 웨이브 — `/main/img_05_bg01.webp`. 장식이라 CSS 배경으로 깐다
           (DOM <img> 로 두면 alt="" 요소가 하나 더 늘 뿐 얻는 게 없다). */}
       <span className={styles.mesh} aria-hidden />
 
@@ -89,7 +89,19 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
       />
 
       <div className={styles.inner}>
-        <div className={clsx(styles.copy, expanded && styles.copyExpanded)} data-reveal-item>
+        <div
+          className={clsx(styles.copy, expanded && styles.copyExpanded)}
+          data-reveal-item
+          onClick={
+            expanded
+              ? (e) => {
+                  /* 폼·타이틀이 아니라 딤처럼 보이는 빈 자리를 눌렀을 때만 닫는다.
+                     `.copyExpanded` 가 inset:0 이라 딤 버튼보다 위에 깔려 클릭을 가로챈다. */
+                  if (e.target === e.currentTarget) close();
+                }
+              : undefined
+          }
+        >
           <p className={styles.eyebrow} lang="en">
             {messages.eyebrow}
           </p>
@@ -158,7 +170,11 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
             setExpanded(true);
           }}
         >
-          <VideoSlot decorative poster="/main/ai/logo-glass.webp" className={styles.objectVideo} />
+          <VideoSlot
+            decorative
+            poster="/main/img_05_logo-glass01.webp"
+            className={styles.objectVideo}
+          />
         </button>
       </div>
 

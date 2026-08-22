@@ -3,6 +3,11 @@
 import { useRef } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
+import {
+  queryTitleMarks,
+  settleTitleMarks,
+  TITLE_MARK_WIPE,
+} from "@/features/main/sections/common/use-section-reveal";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 import { Marquee } from "@/components/marquee/marquee";
 import type { AiStepMessages, AiSystemSectionMessages } from "@/shared/i18n/messages";
@@ -81,7 +86,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         Array.from(root.querySelectorAll<T>(selector));
 
       const wipes = pick<HTMLElement>(section, "[data-wipe]");
-      const decos = pick<HTMLElement>(section, "[data-deco]");
+      const marks = queryTitleMarks(section);
       const cards = pick<HTMLElement>(section, "[data-ai-card]");
       const draws = pick<SVGGeometryElement>(section, "[data-draw]");
       const arts = pick<HTMLImageElement>(section, "[data-art]");
@@ -103,9 +108,10 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
       if (prefersReducedMotionSync()) {
         // early-return 금지. 최종 상태로 눌러 놓고 인라인 스타일을 지운다.
-        settleReducedMotion([...wipes, ...decos, ...cards, ...arts, ...badges, ...rows]);
+        settleReducedMotion([...wipes, ...marks, ...cards, ...arts, ...badges, ...rows]);
         // clearProps 가 커버하지 못하는 SVG 프레젠테이션 속성은 직접 확정.
-        gsap.set([...wipes, ...decos], { clipPath: "none" });
+        gsap.set(wipes, { clipPath: "none" });
+        settleTitleMarks(marks);
         gsap.set(draws, { strokeDashoffset: 0 });
         for (const { value, spec } of counters) {
           value.textContent = formatNumeric(spec.value, spec);
@@ -113,7 +119,8 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         return;
       }
 
-      gsap.set([...wipes, ...decos], { clipPath: "inset(0 100% 0 0)" });
+      gsap.set(wipes, { clipPath: TITLE_MARK_WIPE.from });
+      if (marks.length > 0) gsap.set(marks, { clipPath: TITLE_MARK_WIPE.from });
       gsap.set(cards, {
         autoAlpha: 0,
         y: SCROLL_ENTRANCE.y,
@@ -142,8 +149,15 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         0,
       )
         // 주석 "함께 꾸밈요소 배치" — 마커 박스도 헤드라인과 같은 좌→우로 열린다.
-        // scaleX 로 키우면 안에 든 글자까지 눌려 보이므로 wipe 로 연다.
-        .to(decos, { clipPath: "inset(0 0% 0 0)", duration: 0.7, clearProps: "clipPath" }, 0.25);
+        .to(
+          marks,
+          {
+            clipPath: TITLE_MARK_WIPE.to,
+            duration: TITLE_MARK_WIPE.duration,
+            clearProps: "clipPath",
+          },
+          TITLE_MARK_WIPE.at,
+        );
 
       tl.to(
         cards,
@@ -234,9 +248,13 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         ) : null}
       </header>
 
-      {/* 모바일(≤768)에서만 실제 가로 스크롤 컨테이너가 된다 — Lenis 가 터치를
-          가로채면 스와이프가 죽으므로 그때를 위해 붙여 둔다. */}
-      <ol className={styles.grid} data-lenis-prevent>
+      {/* 모바일(≤768)에서만 실제 가로 스크롤 컨테이너가 된다.
+          ⚠️ 여기에 `data-lenis-prevent` 를 달지 않는다. 데스크톱에서 이 그리드는
+          스크롤 컨테이너가 아니면서 뷰포트의 3분의 2를 덮는다. 그 위에서 굴린 세로
+          휠이 통째로 네이티브로 새면서 페이지가 한 번에 튀고 GNB 가 깜빡였다.
+          내부 스크롤 판별은 Lenis 의 `allowNestedScroll` 이 축까지 보고 처리한다
+          (`smooth-scroll-provider.tsx`) — 모바일 가로 스와이프는 그대로 산다. */}
+      <ol className={styles.grid}>
         {messages.steps.map((step, index) => (
           <li key={step.step} className={styles.card} data-ai-card>
             <div className={styles.art} aria-hidden>
@@ -274,7 +292,7 @@ function renderWithMark(title: string, marker?: string) {
   return (
     <>
       {before}
-      <span className="title-mark" data-deco>
+      <span className="title-mark">
         {marker}
       </span>
       {rest.join(marker)}
@@ -293,9 +311,9 @@ function renderWithMark(title: string, marker?: string) {
  * (`.art` 래퍼에 `aria-hidden` 이 걸려 있어 이중으로 막힌다.)
  */
 const STEP_ART = [
-  { src: "/main/ai/eye-1.webp", width: 1536, height: 1024, className: "artCard1" },
-  { src: "/main/ai/eye-4.webp", width: 1536, height: 1024, className: "artCard2" },
-  { src: "/main/ai/eye-hero.webp", width: 1672, height: 941, className: "artCard3" },
+  { src: "/main/img_04_eye01.webp", width: 1536, height: 1024, className: "artCard1" },
+  { src: "/main/img_04_eye02.webp", width: 1536, height: 1024, className: "artCard2" },
+  { src: "/main/img_04_eye03.webp", width: 1672, height: 941, className: "artCard3" },
 ] as const;
 
 function StepArt({ index }: { index: number }) {

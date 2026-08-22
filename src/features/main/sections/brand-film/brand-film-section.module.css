@@ -15,10 +15,14 @@
 }
 
 /* 합성 연출 — 배경→불티→타이포가 다 등장할 스크롤 길이.
-   220vh: 100vh 는 pin 이 붙어 있는 동안이고 나머지 120vh 가 연출 예산이다.
-   더 길게 잡으면 "안 넘어가는 섹션"이 되고, 짧으면 타이포가 스치듯 지나간다. */
+   220vh: 100vh 는 pin, 나머지 120vh 가 연출 예산(원래 큐).
+   margin-top -100vh 로 의료진 마지막 화면과 같은 자리에서 겹친다. */
 .section[data-composite="true"] {
   height: 220vh;
+  margin-top: -100vh;
+  z-index: 1;
+  /* 겹치는 동안 이 색이 의료진을 덮으면 크로스페이드가 아니다 */
+  background: transparent;
 }
 
 .pinShell {
@@ -71,20 +75,6 @@
   pointer-events: none;
 }
 
-/**
- * 앞/뒤 섹션 톤 베일.
- *
- * 불투명도는 스크롤 진행도가 직접 쓴다(`brand-film-section.tsx` 의 `apply`).
- * 폭죽 캔버스보다 뒤에 두면 불티만 남아 떠다녀서 어색하다 — 맨 위에 둔다.
- */
-.veil {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  will-change: opacity;
-}
-
 /* 정지 폴백(영상/동작 줄이기)에서는 진행도가 없다. 가장자리만 부드럽게. */
 .section[data-composite="false"] .pinShell::before,
 .section[data-composite="false"] .pinShell::after {
@@ -117,6 +107,7 @@
   /* 모바일은 스크롤 예산을 줄인다 — 같은 220vh 면 엄지로 넘기기에 너무 길다 */
   .section[data-composite="true"] {
     height: 180vh;
+    margin-top: -100vh;
   }
   .pinShell {
     height: 100svh;

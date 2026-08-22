@@ -58,19 +58,19 @@ export interface HistorySectionProps {
  */
 const ERA_PHOTOS: { src: string; alt: string }[] = [
   {
-    src: "/main/history/event-2.webp",
+    src: "/main/img_08_photo01.webp",
     alt: "2011년 아이얼안과와 체결한 공동 라식 전문센터 합작 체결식 기념 촬영",
   },
   {
-    src: "/main/history/award.webp",
+    src: "/main/img_08_photo02.webp",
     alt: "ZEISS 공식 인증 스마일 라식 센터 선정 인증패를 전달받는 박세광 대표원장",
   },
   {
-    src: "/main/history/cert.webp",
+    src: "/main/img_08_photo03.webp",
     alt: "글로벌 학회에서 비쥬맥스 라식 부문 상패를 전달받는 모습",
   },
   {
-    src: "/main/history/zeiss.webp",
+    src: "/main/img_08_photo04.webp",
     alt: "ZEISS SMILE pro CENTER · ZEISS SMILE CENTER 인증 엠블럼",
   },
 ];
@@ -81,7 +81,7 @@ const ERA_PHOTOS: { src: string; alt: string }[] = [
  */
 const WHEEL_PHOTOS: { src: string; alt: string; variant?: "intro" }[] = [
   {
-    src: "/main/history/group-2.webp",
+    src: "/main/img_08_photo05.webp",
     alt: "BGN 밝은눈안과 의료진 단체 사진",
     variant: "intro",
   },
@@ -110,15 +110,19 @@ export function HistorySection({ messages }: HistorySectionProps) {
           {/* 인트로 — 시안 2:1989. 시대 세트와 같은 3단 그리드다.
               시안에서 이 행의 노드는 이미 활성(파란 점)이라 상태를 고정해 둔다 */}
           <div className={styles.era} data-visible="true">
-            {/* 사진은 바퀴(.wheelColumn)로 빠졌지만 **그리드 첫 칸은 남겨야 한다.**
-                안 남기면 노드가 1번 칸으로 올라와 카피가 축 왼쪽으로 밀린다. */}
-            <span className={styles.photoSlot} aria-hidden />
+            {/* PC 에서 사진은 바퀴(.wheelColumn)로 빠졌지만 **그리드 첫 칸은
+                남겨야 한다.** 안 남기면 노드가 1번 칸으로 올라와 카피가 축
+                왼쪽으로 밀린다. 모바일에서는 이 칸이 그대로 사진 자리가 된다
+                (아래 `SlotPhoto` 주석 참고). */}
+            <span className={styles.photoSlot}>
+              <SlotPhoto photo={WHEEL_PHOTOS[0]} />
+            </span>
 
             <span className={styles.node} aria-hidden />
 
             <div className={styles.copy}>
-              <h2 id="history-title" className={styles.introTitle} data-history-headline>
-                {renderWithMarker(messages.introTitle, messages.introTitleMarker)}
+              <h2 id="history-title" className={styles.introTitle}>
+                {renderTitleLines(messages.introTitle, messages.introTitleMarker)}
               </h2>
             </div>
           </div>
@@ -126,24 +130,30 @@ export function HistorySection({ messages }: HistorySectionProps) {
           <ol className={styles.eras}>
             {eras.map((era, i) => (
               <li key={era.period} className={styles.era} data-history-set>
-                <span className={styles.photoSlot} aria-hidden />
+                <span className={styles.photoSlot}>
+                  <SlotPhoto photo={ERA_PHOTOS[i]} />
+                </span>
 
                 <span className={styles.node} aria-hidden />
 
                 <div className={styles.copy}>
-                  <p className={styles.period} lang="en">
+                  <p className={styles.period} lang="en" data-history-line>
                     {era.period}
                   </p>
-                  <h3 className={styles.eraTitle}>{era.title}</h3>
+                  <h3 className={styles.eraTitle} data-history-line>
+                    {era.title}
+                  </h3>
                   {/* 시안은 인용과 발화자가 **한 줄**이고 박스가 글자 폭에 붙는다 */}
-                  <blockquote className={styles.quote}>
+                  <blockquote className={styles.quote} data-history-line>
                     <p>&ldquo;{era.quote}&rdquo;</p>
                     {" - "}
                     <cite>{era.quoteAuthor}</cite>
                   </blockquote>
                   <ul className={styles.points}>
                     {era.points.map((point) => (
-                      <li key={point}>{point}</li>
+                      <li key={point} data-history-point>
+                        {point}
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -189,16 +199,62 @@ export function HistorySection({ messages }: HistorySectionProps) {
 }
 
 /**
- * 헤드라인 일부 어절을 시안의 형광 마커로 감싼다.
- * 마커 span 에 `data-history-marker` 를 달아 좌→우 wipe 대상이 되게 한다.
+ * 모바일 전용 사진 — PC 의 물레방아를 대신한다.
+ *
+ * 물레방아(`.wheelColumn`)는 뷰포트 중앙에 `sticky` 로 붙는 100vh 컨테이너다.
+ * 좌우 2단인 PC 에서는 사진이 왼쪽 절반, 카피가 오른쪽 절반이라 서로 안 겹친다.
+ * 그런데 모바일은 1단이라 같은 자리를 두고 다투게 되고, 스크롤 축도 달라서
+ * (사진은 화면 중앙 고정 / 카피는 그냥 흐름) 둘이 어긋난 채 겹쳐 읽힌다.
+ * 그래서 **모바일에서는 바퀴를 끄고** 원래 그리드 자리에 사진을 그대로 놓는다.
+ *
+ * 같은 URL 이라 브라우저 캐시가 한 번만 받아 온다. 바퀴 쪽 `<img>` 는
+ * `aria-hidden` 컨테이너 안이므로 대체 텍스트는 이쪽이 갖는다.
  */
+function SlotPhoto({
+  photo,
+}: {
+  photo: { src: string; alt: string; variant?: "intro" } | undefined;
+}) {
+  if (!photo) return null;
+  return (
+    /* eslint-disable-next-line @next/next/no-img-element -- 카드 크기에 맞춘 컷이라 리사이즈 이점이 없다 */
+    <img
+      className={styles.slotPhoto}
+      data-variant={photo.variant}
+      src={photo.src}
+      alt={photo.alt}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+
+/**
+ * 헤드라인을 **줄 단위**로 쪼개고, 강조 어절만 시안의 선택 커서 마크로 감싼다.
+ *
+ * 줄을 나누는 이유는 모션 때문이다 — 시안 주석(2:1990)이 요구하는 "왼쪽에서
+ * 오른쪽으로 텍스트 생성"은 줄마다 따로 열려야 그렇게 읽힌다. 한 덩어리를
+ * 통째 클립하면 두 줄이 동시에 열려 커튼이 된다.
+ *
+ * 꾸밈은 전역 `.title-mark`(2:1993) 다 — 옅은 파랑 바탕 + 좌우 2px 바 +
+ * 왼쪽 위·오른쪽 아래 점. 예전에 쓰던 `.marker`(형광펜 밑줄)는 시안에 없다.
+ */
+function renderTitleLines(text: string, marker: string) {
+  return text.split("\n").map((line, i) => (
+    <span key={i} className={styles.titleLine} data-history-line>
+      {renderWithMarker(line, marker)}
+    </span>
+  ));
+}
+
+/** 강조 어절 하나를 선택 커서 마크로 감싼다. 없으면 원문 그대로. */
 function renderWithMarker(text: string, marker: string) {
   if (!marker || !text.includes(marker)) return text;
   const [before, ...rest] = text.split(marker);
   return (
     <>
       {before}
-      <span className="marker" data-history-marker>
+      <span className="title-mark" data-history-marker>
         {marker}
       </span>
       {rest.join(marker)}

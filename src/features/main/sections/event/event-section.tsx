@@ -84,15 +84,14 @@ export function EventSection({ messages }: EventSectionProps) {
         </header>
 
         <div className={styles.sliderWrap} data-reveal-item>
-          {/* 내부 가로 스크롤 영역 — data-lenis-prevent 없으면 Lenis 가
-              wheel/touch 를 가로채서 트랙이 아예 움직이지 않는다. */}
-          <ul
-            ref={trackRef}
-            className={styles.track}
-            data-lenis-prevent
-            aria-label="이벤트 목록"
-            {...dragProps}
-          >
+          {/* 내부 가로 스크롤 영역.
+              ⚠️ 예전엔 `data-lenis-prevent` 를 달았다. 트랙이 진짜 가로 스크롤
+              컨테이너인 건 맞지만, 이 속성은 축을 가리지 않아서 480px 높이의 이 띠
+              위를 지나가는 **세로** 휠까지 네이티브로 넘겨 버린다. 캐러셀을 지날
+              때마다 스무스 스크롤이 끊기고 GNB 가 깜빡이던 원인이다.
+              지금은 Lenis 의 `allowNestedScroll` 이 휠 방향을 보고 가로일 때만
+              트랙에 넘긴다 (`smooth-scroll-provider.tsx`). */}
+          <ul ref={trackRef} className={styles.track} aria-label="이벤트 목록" {...dragProps}>
             {events.map((ev) => (
               <li key={ev.href} className={styles.card}>
                 <Link href={ev.href} className={styles.cardLink} draggable={false}>

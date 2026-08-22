@@ -49,7 +49,7 @@ export interface DoctorMessages {
   name: string;
   title: string;
   /**
-   * 누끼 인물 사진(WebP). Figma 원본에서 추출해 `public/main/team/` 에 넣었다.
+   * 누끼 인물 사진(WebP). Figma 원본에서 추출해 `public/main/` 에 `img_02_doctorNN` 으로 넣었다.
    * 이름 ↔ 얼굴 대응은 전부 확인된 것이다(추측 아님) — 아래 `doctors` 주석 참고.
    */
   photo: string;
@@ -274,14 +274,14 @@ const ko: Dictionary = {
       앞의 5명은 시안 카드에 이름이 찍혀 있어 그대로 읽었다.
     */
     doctors: [
-      { name: "박세광", title: "대표원장", photo: "/main/team/park-segwang.webp" },
-      { name: "김정완", title: "원장", photo: "/main/team/kim-jeongwan.webp" },
-      { name: "한정엽", title: "원장", photo: "/main/team/han-jeongyeop.webp" },
-      { name: "송윤중", title: "원장", photo: "/main/team/song-yunjung.webp" },
-      { name: "김민경", title: "원장", photo: "/main/team/kim-minkyung.webp" },
-      { name: "이연호", title: "원장", photo: "/main/team/lee-yeonho.webp" },
-      { name: "김소현", title: "원장", photo: "/main/team/kim-sohyun.webp" },
-      { name: "이수민", title: "원장", photo: "/main/team/lee-sumin.webp" },
+      { name: "박세광", title: "대표원장", photo: "/main/img_02_doctor01.webp" },
+      { name: "김정완", title: "원장", photo: "/main/img_02_doctor02.webp" },
+      { name: "한정엽", title: "원장", photo: "/main/img_02_doctor03.webp" },
+      { name: "송윤중", title: "원장", photo: "/main/img_02_doctor04.webp" },
+      { name: "김민경", title: "원장", photo: "/main/img_02_doctor05.webp" },
+      { name: "이연호", title: "원장", photo: "/main/img_02_doctor06.webp" },
+      { name: "김소현", title: "원장", photo: "/main/img_02_doctor07.webp" },
+      { name: "이수민", title: "원장", photo: "/main/img_02_doctor08.webp" },
     ],
   },
 
@@ -363,7 +363,7 @@ const ko: Dictionary = {
         description:
           "정밀한 검사와 첨단 장비를 바탕으로\n눈 상태에 맞는 안전한 시력교정을\n제공하는 스마트라식센터",
         href: "/center/smile",
-        image: "/main/centers/smile.webp",
+        image: "/main/img_07_center01.webp",
       },
       {
         shortName: "시력교정센터",
@@ -375,7 +375,7 @@ const ko: Dictionary = {
         href: "/center/vision-correction",
         // vision.webp 는 exam.webp 와 **같은 사진**이라 안종합검진 카드와 겹친다.
         // 시안 8:5205 는 세극등 검사 컷이므로 consult.webp 가 맞다.
-        image: "/main/centers/consult.webp",
+        image: "/main/img_07_center02.webp",
       },
       {
         shortName: "백내장센터",
@@ -385,7 +385,7 @@ const ko: Dictionary = {
         description:
           "정밀한 진단과 체계적인 수술 시스템으로\n개인의 눈 상태에 맞는 맞춤형 백내장 치료를\n제공하는 백내장센터",
         href: "/center/cataract",
-        image: "/main/centers/cataract.webp",
+        image: "/main/img_07_center03.webp",
       },
       {
         shortName: "드림렌즈센터",
@@ -395,7 +395,7 @@ const ko: Dictionary = {
         description:
           "자는 동안 시작되는 근시 관리\n성장기 아이의 눈 상태를 꼼꼼히 확인하고\n근시 진행을 고려한 드림렌즈를 처방합니다.",
         href: "/center/dream-lens",
-        image: "/main/centers/dream-lens.webp",
+        image: "/main/img_07_center04.webp",
       },
       {
         shortName: "건성안센터",
@@ -405,7 +405,7 @@ const ko: Dictionary = {
         description:
           "정밀한 눈물막·안구표면 검사부터\n개인의 건조증 원인에 맞춘 체계적인 치료를\n제공하는 건성안센터",
         href: "/center/dry-eye",
-        image: "/main/centers/dry-eye.webp",
+        image: "/main/img_07_center05.webp",
       },
       {
         shortName: "안종합검진센터",
@@ -415,7 +415,7 @@ const ko: Dictionary = {
         description:
           "정밀한 안과 검진과 체계적인 검사 시스템으로\n눈 건강 상태를 꼼꼼하게 확인하고\n질환을 조기에 발견하는 안종합검진센터",
         href: "/center/examination",
-        image: "/main/centers/exam.webp",
+        image: "/main/img_07_center06.webp",
       },
     ],
   },
@@ -479,19 +479,19 @@ const ko: Dictionary = {
         tags: ["Doctor's Story", "히포크라테스의 생각"],
         title: "백내장 명의? 증세의 정도를 확인하는 판단력이 필요합니다.",
         href: "/blog/1",
-        image: "/main/blog/post-1.webp",
+        image: "/main/img_09_post01.webp",
       },
       {
         tags: ["Doctor's Story"],
         title: "스마일라식, 후기로는 알 수 없는 이야기",
         href: "/blog/2",
-        image: "/main/blog/post-2.webp",
+        image: "/main/img_09_post02.webp",
       },
       {
         tags: ["서선의 기술", "안(眼)목 있는 이야기"],
         title: "부드러운 햇살에 속지 마세요, 눈 건강에 더 위험한 이유",
         href: "/blog/3",
-        image: "/main/blog/post-3.webp",
+        image: "/main/img_09_post03.webp",
       },
     ],
   },
@@ -508,19 +508,19 @@ const ko: Dictionary = {
         title: "SUMMER EVENT 뜨거운 8월",
         subtitle: "8월 한정 시력교정술 특별혜택",
         href: "/event/1",
-        image: "/main/event/banner-1.webp",
+        image: "/main/img_10_banner01.webp",
       },
       {
         title: "여름준비, 시력부터",
         subtitle: "혜택이 왔썸머",
         href: "/event/2",
-        image: "/main/event/banner-3.webp",
+        image: "/main/img_10_banner03.webp",
       },
       {
         title: "노안·백내장 수술 최대혜택 이벤트",
         subtitle: "",
         href: "/event/3",
-        image: "/main/event/banner-2.webp",
+        image: "/main/img_10_banner02.webp",
       },
     ],
   },

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import clsx from "clsx";
-import { useSectionReveal } from "@/features/main/sections/common/use-section-reveal";
 import type { MedicalTeamSectionMessages } from "@/shared/i18n/messages";
 import { crossLayout, useCrossCarousel } from "./use-cross-carousel";
+import { useTeamReveal } from "./use-team-reveal";
 import styles from "./medical-team-section.module.css";
 
 /**
@@ -65,32 +65,34 @@ function Chevron({ dir }: { dir: -1 | 1 }) {
 }
 
 export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
-  const sectionRef = useSectionReveal<HTMLElement>();
+  const sectionRef = useTeamReveal<HTMLElement>();
   const doctors = messages.doctors;
   const { activeIndex, select, step, stageRef, dragProps } = useCrossCarousel(doctors.length);
 
   return (
     <section ref={sectionRef} className={styles.section} aria-labelledby="team-title">
-      <header className={styles.header} data-reveal-item>
+      <header className={styles.header} data-team-header>
         <div>
-          <p className="eyebrow" lang="en">
+          <p className="eyebrow" lang="en" data-team-wipe>
             {messages.eyebrow}
           </p>
-          <h2 id="team-title" className="section-title">
+          <h2 id="team-title" className="section-title" data-team-wipe>
             {renderBoxedTitle(messages.title)}
           </h2>
           {/* 시안 2:995 는 타이틀 아래에 한 줄 설명이 있다.
               i18n 에 값이 채워지기 전에는 렌더하지 않는다(빈 여백만 남는다). */}
           {messages.description ? (
-            <p className={`section-desc ${styles.desc}`}>{messages.description}</p>
+            <p className={`section-desc ${styles.desc}`} data-team-fade>
+              {messages.description}
+            </p>
           ) : null}
         </div>
-        <Link href="/about/doctors" className={styles.cta}>
+        <Link href="/about/doctors" className={styles.cta} data-team-fade>
           {messages.cta} <span aria-hidden>→</span>
         </Link>
       </header>
 
-      <div className={styles.viewport} data-reveal-item>
+      <div className={styles.viewport}>
         <div ref={stageRef} className={styles.stage} {...dragProps}>
           <ul className={styles.deck}>
             {doctors.map((doctor, i) => {
@@ -103,6 +105,9 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
                   style={style}
                   aria-hidden={hidden || undefined}
                 >
+                  {/* 등장 모션은 이 래퍼만 움직인다. `<li>` transform 은 캐러셀 배치라
+                      GSAP 이 건드리면 카드가 한가운데로 뭉친다. */}
+                  <div className={styles.cardReveal} data-team-card>
                   {/* 옆 카드를 눌러 그 카드로 이동한다. 활성 카드는 이동할 곳이 없으므로
                       버튼을 비활성화해 탭 순서에서도 빠지지 않게 aria-current 만 남긴다. */}
                   <button
@@ -148,6 +153,7 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
                       ) : null}
                     </span>
                   </button>
+                  </div>
                 </li>
               );
             })}
@@ -155,7 +161,7 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
         </div>
       </div>
 
-      <div className={styles.controls} data-reveal-item>
+      <div className={styles.controls} data-team-controls>
         <button
           type="button"
           className={styles.arrow}

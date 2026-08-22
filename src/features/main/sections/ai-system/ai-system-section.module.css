@@ -21,7 +21,7 @@
   overflow: hidden;
 }
 
-/* 8:962 상단을 가로지르는 흰 실크 웨이브 = `/main/ai/bg-2.webp` (2000×1333).
+/* 8:962 상단을 가로지르는 흰 실크 웨이브 = `/main/img_04_bg01.webp` (2000×1333).
    시안에서는 거의 톤온톤이라 존재감이 아주 옅다 → 낮은 opacity + 아래로 페이드.
    장식이라 DOM <img> 대신 ::before 로 깐다(alt="" 요소를 늘릴 이유가 없다). */
 .section::before {
@@ -29,7 +29,7 @@
   position: absolute;
   inset: 0 0 auto 0;
   height: 46%;
-  background: url("/main/ai/bg-2.webp") center top / cover no-repeat;
+  background: url("/main/img_04_bg01.webp") center top / cover no-repeat;
   mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 100%);
   opacity: 0.32;
   pointer-events: none;
@@ -512,9 +512,11 @@
   pointer-events: none;
 }
 
+/* 시안(8:962)에서 이 마퀴는 카드 뒤로 **읽히는 정도**로 지나간다.
+   5% / 16% 는 1920 에서 사실상 보이지 않아 시안보다 한참 옅었다. */
 .marquee :global(*) {
-  color: rgba(10, 32, 72, 0.05);
-  -webkit-text-stroke-color: rgba(10, 32, 72, 0.16);
+  color: rgba(10, 32, 72, 0.06);
+  -webkit-text-stroke-color: rgba(10, 32, 72, 0.26);
 }
 
 @media (max-width: 1440px) {
