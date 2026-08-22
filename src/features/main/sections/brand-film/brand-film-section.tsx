@@ -71,10 +71,7 @@ const CUE = {
   bursts: [0.16, 0.27, 0.4, 0.55],
 } as const;
 
-/**
- * 앞 장면과 겹치는 입장만. 폭죽·타이포 큐는 건드리지 않는다.
- * 예전엔 입장 구간에 맞춰 CUE 전체를 0~1 로 다시 접어서 연출이 늦게/빠르게 터졌다.
- */
+/** 앞 장면과 겹치는 입장만. 폭죽·타이포 큐는 건드리지 않는다. */
 const ENTRY_END = 0.22;
 
 /** 0~1 로 정규화하고 클램프 */
@@ -199,6 +196,8 @@ export function BrandFilmSection() {
           } else {
             pin.style.opacity = enter.toFixed(3);
           }
+          /* 투명한 핀이 의료진 화살표·도트를 가로채지 않게 */
+          pin.style.pointerEvents = "none";
         }
         if (prev) {
           prev.style.opacity = (1 - enter).toFixed(3);
