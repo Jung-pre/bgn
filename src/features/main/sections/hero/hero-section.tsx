@@ -579,7 +579,8 @@ function SplitBrandTitle({
     );
   }
   const [before, ...rest] = title.split(brand);
-  const after = rest.join(brand);
+  /* 시안은 BGN 과 뒤 문구 사이가 ~7px 다. 공백 한 칸은 너무 넓어서 그룹 마진으로 둔다. */
+  const after = rest.join(brand).replace(/^\s+/, "");
   return (
     <>
       {Array.from(before ?? "").map((ch, i) => (
@@ -587,16 +588,12 @@ function SplitBrandTitle({
           {ch}
         </span>
       ))}
-      {/* `data-font="body"` — 시안의 히어로 `BGN` 은 영문이지만 Pretendard 다.
-          이게 없으면 globals.css 의 `[lang|="en"]` 규칙이 Belleza 로 바꿔 버린다. */}
-      <span
-        className={clsx(styles.char, brandClassName)}
-        aria-hidden
-        lang="en"
-        data-font="body"
-        {...attr}
-      >
-        {brand}
+      <span className={styles.brandGroup} lang="en" data-font="body">
+        {Array.from(brand).map((ch, i) => (
+          <span key={`br${i}`} className={clsx(styles.char, brandClassName)} aria-hidden {...attr}>
+            {ch}
+          </span>
+        ))}
       </span>
       {Array.from(after).map((ch, i) => (
         <span key={`a${i}`} className={styles.char} aria-hidden {...attr}>
