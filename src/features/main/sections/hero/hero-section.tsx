@@ -115,6 +115,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
    * 계속 떠 있으면 타워 카피와 겹쳐서 시안보다 훨씬 시끄럽다.
    */
   const marqueeRef = useRef<HTMLDivElement>(null);
+  const scrollHintRef = useRef<HTMLDivElement>(null);
 
   /**
    * 타워 씬 패럴랙스 래퍼들. 매 프레임 transform 만 쓰므로 전부 ref 다.
@@ -185,9 +186,15 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const ct = copyTowerRef.current;
       if (cs) cs.style.opacity = String(1 - clamp01(t * 1.6));
       if (ct) ct.style.opacity = String(clamp01((t - 0.35) * 2));
-      // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)
+      // 마퀴·스크롤 유도는 구체 씬 전용. 타워 프레임(8:733)에 둘 다 없다.
+      const fadeOut = 1 - clamp01(t * 1.6);
       const mq = marqueeRef.current;
-      if (mq) mq.style.opacity = String(1 - clamp01(t * 1.6));
+      if (mq) mq.style.opacity = String(fadeOut);
+      const hint = scrollHintRef.current;
+      if (hint) {
+        hint.style.opacity = String(fadeOut);
+        hint.style.visibility = fadeOut < 0.02 ? "hidden" : "";
+      }
 
       // 타워 에셋을 미리 마운트해 크로스페이드 때 디코딩이 안 걸리게 한다
       if (!towerMountedRef.current && p > 0.12) {
@@ -534,7 +541,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
         </div>
 
         {/* 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 + 40 흰 채움 */}
-        <div className={styles.scrollHint} data-hero-fade>
+        <div ref={scrollHintRef} className={styles.scrollHint} data-hero-fade>
           <span className={styles.scrollBar} aria-hidden>
             <span className={styles.scrollBarFill} />
           </span>
