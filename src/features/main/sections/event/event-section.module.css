@@ -1,8 +1,21 @@
+/**
+ * 시안 `8:2700` 상단부(1920×830) 실측:
+ *   카드      y 137 ~ 622 (486×486, gap 26, x613~1099 / 1125~1609)
+ *   진행바    y 666 ~ 675
+ *   섹션 하단 830
+ * 전역 --gap-section(120)이면 카드가 120 에서 시작해 17 뜨고 섹션이 792 로 짧다.
+ */
 .section {
-  padding-block: var(--gap-section);
-  /* 시안 2:2832 — 좌상단이 아주 옅게 푸른 밝은 회백색 */
-  background:
-    radial-gradient(60% 45% at 6% 12%, rgba(226, 239, 254, 0.55) 0%, transparent 70%), #fafafa;
+  /* 시안 2:2832(1920×832) 실측 — 카드 y140~620, 컨트롤 652~692, 프레임 832.
+     140 + 480 + 32 + 40 + 140 = 832. 137/155 는 카드가 3 높고 섹션이 12 길었다. */
+  padding-block: 140px;
+  /**
+   * 배경은 **완전 무채색 #f7f7f7** 이다. 예전에 좌상단 푸른 radial 을 깔았는데
+   * 시안 픽셀은 좌상단도 247,247,247 로 R=G=B 다(우리는 238,244,251 이었다).
+   * 대신 하단 ~110px 이 클로징 스피어로 넘어가며 어두워진다:
+   *   y720 247 → y760 240 → y800 235 → y828 230 (x30·x960·x1890 모두 같다).
+   */
+  background: linear-gradient(180deg, rgba(228, 228, 228, 0) 86%, #e4e4e4 100%), #f7f7f7;
   overflow: hidden;
 }
 
@@ -26,8 +39,21 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--gap-xs);
-  align-self: center;
+  /* 블록 간격은 flex gap 이 아니라 각자 margin 으로 준다 — 시안 2:2832 의
+     간격이 8 / 4 / 34 로 제각각이라 균일 gap 으로는 못 맞춘다.
+     기준 잉크: 아이브로우 147~163, 마크 186~238, 본문 253~270 / 283~300,
+     버튼 340~398. */
+  gap: 0;
+  /**
+   * ⚠️ `center` 가 아니라 **상단 정렬**이다.
+   * 시안 `8:2700` 실측: 카드 y137~622, 헤더 잉크 149(아이브로우)~398(버튼).
+   * 즉 헤더 윗줄이 카드 상단과 거의 나란하다. center 로 두면 헤더가
+   * 270~421 로 **120px 내려앉아** 카드 한가운데에 붙는다.
+   */
+  align-self: start;
+  /* 아이브로우 잉크가 시안(147)보다 2 높다 — Belleza 24 의 라인박스 오프셋 차이.
+     아래 카드 줄은 이미 140 으로 맞아 있어 섹션 패딩 대신 여기서만 민다. */
+  padding-top: 2px;
 }
 
 /*
@@ -40,11 +66,14 @@
 }
 
 .title {
-  margin: 0;
+  margin: 18px 0 0;
   /* 시안 2:2843 — headline 1 (Pretendard Bold 42, tracking -3%) */
   font-size: var(--fs-42);
   font-weight: var(--weight-bold);
-  line-height: var(--leading-tight);
+  /* `.title-mark` 상자가 42×1.333 = 56 이라 줄상자도 같이 1.333 이어야 한다.
+     --leading-tight 로 두면 마크가 줄상자 밖으로 튀어나와 제목 전체가
+     7 올라가고 아래 본문·버튼이 그만큼 밀린다. */
+  line-height: 1.333;
   letter-spacing: var(--tracking-default);
   /* 8:2712 실측 = `grayscale/black`. 다른 섹션 타이틀(#242424 / #0a2048)과 달리
      이 섹션만 순수 검정이라 토큰 별칭을 쓰지 않고 직접 지정한다. */
@@ -60,7 +89,8 @@
 }
 
 .desc {
-  margin: var(--gap-xs) 0 0;
+  /* 마크 상자 하단 242 → 본문 박스 246 (잉크 253). */
+  margin: 4px 0 0;
   font-size: var(--fs-20);
   line-height: var(--leading-normal);
   /* 시안 2:2846 = grayscale/neutral-gray/700 */
@@ -80,7 +110,8 @@
   justify-content: center;
   gap: var(--gap-xs);
   min-width: 12.5rem;
-  margin-top: 2rem;
+  /* 본문 박스 하단 306 → 버튼 상단 340 = 34. */
+  margin-top: 34px;
   padding: 1rem 1.5rem;
   border-radius: var(--radius-full);
   background: var(--gradient-cta);
@@ -253,10 +284,47 @@
 }
 
 @media (max-width: 768px) {
+  /**
+   * 모바일 시안 `2:5180`(375×658) 실측.
+   *   아이브로우 잉크  y  86 ~ 100
+   *   타이틀(마크 포함) y 109 ~ 152
+   *   본문 2줄        y 168~184 / 195~211
+   *   카드            y 266 ~ 505 (239 높이), x20~259 / 276~374
+   *   컨트롤          y 538 ~ 577
+   *   프레임 하단      658  (컨트롤 아래 80)
+   * PC 값(140)을 그대로 쓰면 헤더가 60px 내려앉는다.
+   */
+  .section {
+    /* 하단 95 — 81 이면 섹션이 644 로 시안(658)보다 14 짧다.
+       컨트롤 하단(575)에서 시안과 같은 80 을 남기려면 이 값이 맞다. */
+    padding-block: 80px 95px;
+  }
+
+  /**
+   * 모바일 시안에는 `이벤트 보러가기` 버튼이 **없다** — 아이브로우/타이틀/본문
+   * 다음이 바로 카드 줄이다(본문 잉크 211 → 카드 266).
+   */
+  .cta {
+    display: none;
+  }
+
   .inner {
     grid-template-columns: 1fr;
-    gap: var(--gap-lg);
+    /* 시안 2:5180 — 본문 박스 하단 226 → 카드 상단 266 */
+    gap: 35px;
     padding-left: var(--mobile-gutter);
+  }
+
+  /**
+   * 카피 블록 간격은 PC 와 다르다 — 시안 2:5180 잉크:
+   *   아이브로우 86~100 / 마크 109~152 / 본문 168~184 · 195~211
+   * PC 값(18 / 4)을 그대로 쓰면 제목이 13, 본문이 5 내려앉는다.
+   */
+  .title {
+    margin-top: 5px;
+  }
+  .desc {
+    margin-top: 12px;
   }
   .controls {
     padding-right: var(--mobile-gutter);

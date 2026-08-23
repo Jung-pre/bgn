@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import clsx from "clsx";
 import { useSectionReveal } from "@/features/main/sections/common/use-section-reveal";
@@ -79,6 +79,22 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
     [reduceMotion],
   );
 
+  /**
+   * 마운트 시 활성 탭을 스트립 가운데로 보낸다.
+   *
+   * 모바일 시안 `2:4009` 는 탭 줄이 화면보다 넓고 **활성 알약이 화면 중앙**
+   * (x97~291, 중심 194 ≒ 375/2)에 오도록 좌우가 잘려 있다. `selectTab` 안에만
+   * 센터링이 있어서 사용자가 탭을 누르기 전까지는 1번 탭부터 왼쪽 정렬로 보였다.
+   * `behavior: auto` 로 첫 페인트에 바로 자리를 잡는다.
+   */
+  useEffect(() => {
+    const strip = tabStripRef.current;
+    const button = strip?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[activeTab];
+    if (!strip || !button) return;
+    if (strip.scrollWidth <= strip.clientWidth + 1) return;
+    strip.scrollLeft = button.offsetLeft - (strip.clientWidth - button.clientWidth) / 2;
+  }, [activeTab]);
+
   /** WAI-ARIA Tabs 패턴 — 좌우 화살표로 탭 이동 */
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const count = messages.tabs.length;
@@ -103,13 +119,7 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
   };
 
   return (
-    <section
-      ref={sectionRef}
-      className={clsx(styles.section, "blend-top")}
-      aria-label="BGN AI 브랜드 스토리"
-      /* 앞 섹션(AI 상담 신청) 끝 색 실측값 */
-      style={{ "--blend-from": "rgb(253, 254, 255)" } as React.CSSProperties}
-    >
+    <section ref={sectionRef} className={styles.section} aria-label="BGN AI 브랜드 스토리">
       <div
         ref={tabStripRef}
         className={styles.tabs}

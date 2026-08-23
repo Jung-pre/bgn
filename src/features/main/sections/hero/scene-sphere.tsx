@@ -117,6 +117,15 @@ export interface SphereSceneProps {
    */
   intensity?: number;
   /**
+   * 껍질 산란광(`GlobeHaze`) 밝기 배수. 기본은 `intensity` 를 따라간다.
+   *
+   * 클로징(`2:2893`)만 이걸 따로 준다. 시안을 스캔해 보면 그쪽 구체는
+   * 테두리 대비가 배경 대비 **+24 정도**밖에 안 되고 안쪽이 +10~+20 으로
+   * 고르게 차 있다 — 즉 파티클이 아니라 헤이즈가 그림을 지배한다.
+   * `intensity` 하나로 같이 내리면 테두리만 남은 링이 되어 시안과 반대가 된다.
+   */
+  haze?: number;
+  /**
    * 한반도 파란 코어 글로우. 클로징에서는 시안에 없다.
    * 브랜드 포커스를 두 번 반복하면 히어로의 의미가 희석된다.
    */
@@ -132,6 +141,7 @@ export function SphereScene({
   active,
   progressRef,
   intensity = 1,
+  haze = intensity,
   showCore = true,
   interactive = true,
 }: SphereSceneProps) {
@@ -151,6 +161,7 @@ export function SphereScene({
         progressRef={progressRef}
         reduced={reduced}
         intensity={intensity}
+        haze={haze}
         showCore={showCore}
         interactive={interactive}
       />
@@ -162,12 +173,14 @@ function Globe({
   progressRef,
   reduced,
   intensity,
+  haze,
   showCore,
   interactive,
 }: {
   progressRef?: RefObject<number>;
   reduced: boolean;
   intensity: number;
+  haze: number;
   showCore: boolean;
   interactive: boolean;
 }) {
@@ -318,7 +331,7 @@ function Globe({
     <>
       {/* 회전 그룹 밖 — 껍질의 산란광이라 구체와 같이 돌면 안 된다 */}
       <group scale={fitScale}>
-        <GlobeHaze intensity={intensity} instant={reduced} />
+        <GlobeHaze intensity={haze} instant={reduced} />
       </group>
       <group ref={groupRef} rotation={[0, FOCUS_ROTATION_Y, AXIAL_TILT]} scale={fitScale}>
         <PointLayer

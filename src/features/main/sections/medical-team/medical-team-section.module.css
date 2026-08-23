@@ -18,14 +18,18 @@
   position: relative;
   padding-block: var(--gap-section);
   overflow: hidden;
+  /**
+   * 시안 2:995 배경 실측(카드가 없는 행만 사용):
+   *   y60   x0 243,236,245 → x960 232,233,242 → x1800 200,223,252
+   *   y940  x0 242,211,227 → x960 227,228,249 → x1800 177,208,249
+   * 즉 ① 좌→우 분홍 → 파랑 이고 ② **아래로 갈수록 좌측이 확 분홍**이다.
+   * 예전 값은 우측 끝이 #dcebfb(220,235,251) 라 시안보다 20 밝았고
+   * 좌하단 분홍이 아예 없었다(244,235,244 로 상단과 같았다).
+   */
   background:
-    radial-gradient(90% 130% at 100% 65%, rgba(150, 200, 245, 0.5) 0%, transparent 62%),
-    linear-gradient(
-      100deg,
-      #f6ecf4 0%,
-      /* 2:995 좌상단 */ var(--bg-lavender) 45%,
-      #dcebfb 100% /* 2:995 우측 */
-    );
+    radial-gradient(62% 46% at 2% 100%, rgba(246, 203, 223, 0.85) 0%, transparent 72%),
+    radial-gradient(52% 46% at 100% 100%, rgba(120, 180, 247, 0.45) 0%, transparent 76%),
+    linear-gradient(96deg, #f5eef6 0%, #eeeaf4 38%, #d8e5fa 72%, #bad9fc 100%);
 }
 
 /**
@@ -41,7 +45,10 @@
   inset: 0;
   z-index: 0;
   background: url("/main/img_02_bg01.webp") 55% 72% / cover no-repeat;
-  opacity: 0.9;
+  /* 시안에서 웨이브는 카드 뒤 우측에서만 어렴풋하다 — x1700 열은 y0~320 이
+     204,224,252 로 **평평**하다. 0.9 면 그 자리가 151,185,233 까지 내려가
+     시안에 없는 파란 띠가 생긴다. */
+  opacity: 0.42;
   /* 좌→우(웨이브는 우측에서만 또렷) + 위→아래(헤더 뒤는 민면) 두 방향을 함께 걸어야
      시안처럼 "우하단에서 떠오르는" 형태가 된다. 두 마스크의 교집합을 쓴다. */
   -webkit-mask-image:
@@ -63,15 +70,24 @@
   z-index: 1;
 }
 
+/**
+ * ⚠️ 세로 정렬은 `flex-end` 가 아니라 **center** 다.
+ * 시안 `8:868` 실측: 헤더 상자 y120~265, CTA 버튼 y167~225(높이 58).
+ * `flex-end` 면 CTA 가 209~265 로 42px 내려앉아 본문 설명 옆에 붙는다.
+ * center 면 164~221 이라 시안(167~225)과 3px 안쪽이다.
+ *
+ * ⚠️ 아래 여백 7rem(112) 도 과했다. 예전 주석은 **타이틀** 하단(215)만 보고
+ * 계산했는데 그 아래에 한 줄 설명이 더 있다(잉크 241~258, 상자 하단 265).
+ * 시안 카드 상단이 **329**(활성 카드 파란 테두리 실측) 이므로 265→329 = 64.
+ */
 .header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--gap-lg);
   width: 100%;
   max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
-  /* 2:995 — 타이틀 하단 215 → 카드 상단 330 */
-  margin: 0 auto 7rem;
+  margin: 0 auto 4rem;
   padding-inline: var(--content-side-pad);
 }
 
@@ -259,14 +275,16 @@
 }
 
 /* 활성 카드는 파랑→보라 링 2px 하나로만 구분된다(시안에 확대·상승 없음).
-   테두리에 그라데이션을 쓰려면 border 로는 안 되므로 mask 로 링만 남긴다. */
+   테두리에 그라데이션을 쓰려면 border 로는 안 되므로 mask 로 링만 남긴다.
+   ⚠️ --gradient-cta 가 아니라 --gradient-brand 다. CTA 는 보라→파랑이라
+   그걸 쓰면 링의 위아래가 뒤집힌다(시안 2:3871: 위 127,183,244 / 아래 104,98,169). */
 .cardActive .portrait::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   padding: 2px;
-  background: var(--gradient-cta);
+  background: var(--gradient-brand);
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -317,7 +335,8 @@
   align-items: center;
   justify-content: center;
   gap: 2.5rem;
-  margin-top: 3rem;
+  /* 시안: 아래 레인 카드 하단 771 → 컨트롤 상단 801 = 30 */
+  margin-top: 1.875rem;
 }
 
 /* 시안 화살표는 40px 원 + 셰브론이다. 시안 이미지에서 좌측만 파랑으로 칠해져
@@ -401,11 +420,42 @@
 }
 
 @media (max-width: 768px) {
+  /**
+   * 모바일 세로 리듬 — 시안 `2:3871`(375×739) 픽셀 실측.
+   *   아이브로우 잉크  y  87 ~  99
+   *   타이틀   잉크    y 116 ~ 144
+   *   본문 2줄 잉크    y 170~186 / 200~215
+   *   카드            y 271 ~ 553 (높이 282 — 우리 281 과 일치)
+   *   도트            y 635 ~ 643
+   *   프레임 하단      739
+   * 전역 --gap-section(120)이 위아래로 다 붙어 헤더가 40 내려가고 섹션이
+   * 100 길어져 있었다.
+   */
+  .section {
+    padding-block: 80px 73px;
+  }
+
   .header {
     flex-direction: column;
     align-items: flex-start;
-    margin-bottom: var(--gap-xl);
+    /* 본문 상자 하단 223 → 카드 상단 271 */
+    margin-bottom: 3rem;
     padding-inline: var(--mobile-gutter);
+  }
+
+  /**
+   * 본문만 시안이 **20px** 이다(아이브로우·타이틀은 공용 토큰과 일치 — 잉크 폭
+   * 158/159 대 우리 160/160). 글리프 이송폭이 시안 16.5 대 우리 15 → ×1.10.
+   *
+   * 줄 나눔도 다르다. 시안은 `…바탕으로` / `더 나은 결과를…` 인데(잉크 283 / 199)
+   * 우리는 헤더 폭(335)이 넓어 `더 나은` 까지 1줄에 붙는다. 20px 에서 `…바탕으로 더`
+   * 가 299 라 **300 이하로 묶어야** 시안과 같은 자리에서 끊긴다.
+   */
+  .desc {
+    /* 시안 잉크 상단 169, 우리 175 → 24 에서 6 뺀다 */
+    margin-top: 18px;
+    max-width: 300px;
+    font-size: 20px;
   }
 
   /**
@@ -426,13 +476,18 @@
 
   /* 1024 이하는 rem 이 16px 로 고정된다 — 데스크톱 간격(40+14px)을 그대로 두면
      화살표 2개 + 도트 8개가 375 폭을 꽉 채워 양 끝에 붙는다. */
+  /* 시안 `2:3871` 컨트롤은 **화면 양 끝**이다 — 왼쪽 화살표 x23, 오른쪽 끝 x352.
+     가운데 모아 두면(gap 방식) x40~335 로 좁아진다. */
   .controls {
+    justify-content: space-between;
     gap: var(--gap-md);
     margin-top: var(--gap-lg);
+    padding-inline: var(--mobile-gutter);
   }
 
+  /* 시안 도트 8개가 x85~290(205)에 놓인다. 0.5rem 이면 168 이라 간격 5px 부족. */
   .dots {
-    gap: 0.5rem;
+    gap: 13px;
   }
 }
 

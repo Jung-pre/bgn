@@ -607,7 +607,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
             래퍼는 opacity 만 맡는다 — 위치는 그대로 `.marquee` 가 갖는다
             (래퍼에 position 을 주면 absolute 기준이 바뀐다). */}
         <div ref={marqueeRef}>
-          <Marquee text={messages.marquee} className={styles.marquee} outline duration={28} />
+          <Marquee text={messages.marquee} className={styles.marquee} duration={28} />
         </div>
 
         {/* 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 + 40 흰 채움 */}
@@ -644,6 +644,17 @@ function SplitBrandTitle({
   animate?: boolean;
 }) {
   const attr = animate ? { "data-hero-char": "" } : {};
+
+  /**
+   * ⚠️ 애니메이션이 없을 때는 **글자를 쪼개지 않는다.**
+   *
+   * `.char` 가 `display: inline-block` 이라 글자 하나하나가 원자 단위가 되고,
+   * 그러면 `word-break: keep-all` 이 무력해진다(줄바꿈이 인라인 박스 사이에서
+   * 일어나므로). 모바일 타워 카피가 시안(`2:3340`)의 `BGN` / `밝은눈안과` 가
+   * 아니라 `BGN 밝은` / `눈안과` 로 끊겨 있던 원인이다.
+   * 브랜드 글자(BGN)는 글자별 그라디언트 때문에 그대로 span 을 유지한다.
+   */
+  const plain = !animate;
   if (!brand || !title.includes(brand)) {
     return (
       <>
@@ -659,11 +670,13 @@ function SplitBrandTitle({
   const after = rest.join(brand);
   return (
     <>
-      {Array.from(before ?? "").map((ch, i) => (
-        <span key={`b${i}`} className={styles.char} aria-hidden {...attr}>
-          {ch}
-        </span>
-      ))}
+      {plain
+        ? before
+        : Array.from(before ?? "").map((ch, i) => (
+            <span key={`b${i}`} className={styles.char} aria-hidden {...attr}>
+              {ch}
+            </span>
+          ))}
       {/* `data-font="body"` — 시안의 히어로 `BGN` 은 영문이지만 Pretendard 다.
           이게 없으면 globals.css 의 `[lang|="en"]` 규칙이 Belleza 로 바꿔 버린다.
 
@@ -685,11 +698,13 @@ function SplitBrandTitle({
           {ch}
         </span>
       ))}
-      {Array.from(after).map((ch, i) => (
-        <span key={`a${i}`} className={styles.char} aria-hidden {...attr}>
-          {ch}
-        </span>
-      ))}
+      {plain
+        ? after
+        : Array.from(after).map((ch, i) => (
+            <span key={`a${i}`} className={styles.char} aria-hidden {...attr}>
+              {ch}
+            </span>
+          ))}
     </>
   );
 }

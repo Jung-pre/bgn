@@ -75,7 +75,7 @@
 
 /* 2:1208 — eng-point 2(Belleza 24) + `gradiant 2` 그라데이션 텍스트.
    공용 `.eyebrow`(32 단색)와 다르므로 섹션 전용으로 잡는다. 변수 실값이 MCP 로
-   해석되지 않아 globals 의 --gradient-cta 로 근사. */
+   해석되지 않아 globals 의 --gradient-brand 로 근사. */
 .eyebrow {
   width: fit-content;
   margin: 0 0 0.5rem; /* 2:1207 gap 8 */
@@ -83,7 +83,7 @@
   font-size: var(--fs-eng-24);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-eng);
-  background-image: var(--gradient-cta);
+  background-image: var(--gradient-brand);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
@@ -410,8 +410,18 @@
 }
 
 @media (max-width: 768px) {
+  /**
+   * 모바일 세로 리듬 — 시안 `2:3971`(375×941) 픽셀 실측.
+   *   아이브로우 잉크  y  90 ~  98
+   *   타이틀 2줄       y 116~144 / 158~187
+   *   본문 2줄         y 211~226 / 239~250
+   *   입력칸 글자      y 266~279 / 336~350
+   *   동의 체크        y 394~397
+   * 전역 --gap-section(120)이면 아이브로우가 128 이라 38px 내려앉는다.
+   */
   .section {
-    padding-block: var(--gap-section);
+    /* 아트가 프레임 바닥까지 닿으므로 아래 여백은 0 이다 */
+    padding-block: 82px 0;
   }
 
   .inner {
@@ -420,21 +430,56 @@
     padding-inline: var(--mobile-gutter);
   }
 
-  /* ⚠️ `--fs-32` 는 **clamp(24, 1.6667vw, 32)** 이라 375 에서 24 로 떨어진다.
-     다른 섹션 타이틀은 전부 `--fs-42`(= 375 에서 32 = mo headline 1)를 쓰는데
-     여기만 24 로 작아져 있었다. 같은 토큰으로 맞춘다 — 375/360 에서 2줄로 접히고
-     가로 넘침은 없다(각각 335/320 폭). */
   .title {
     font-size: var(--fs-42);
+    /* 시안 타이틀 2줄 잉크 116~144 / 158~187, 본문 1줄 210.
+       우리 마크 상자가 9px 더 길어 본문이 18px 밀린다 — 절반을 여기서 흡수한다. */
+    margin-bottom: 0.5rem;
+  }
+
+  /**
+   * 폼 기하 — 시안 `2:3971` 실측.
+   *   입력칸 상자   y 317~367 / 377~425  → 높이 50, 간격 10
+   *   동의 체크     y 444~461
+   *   버튼         y 489~544
+   * 우리는 높이 60 / 간격 16 이라 두 칸만으로 16px 이 밀리고,
+   * 그 아래 체크·버튼까지 누적 73px 이 내려가 있었다.
+   */
+  .form {
+    /* 시안 본문 3줄 하단 279 → 첫 입력칸 317 = 38.
+       위 타이틀에서 8 을 줄였으므로 나머지 16 을 여기서 흡수해 22 로 둔다. */
+    margin-top: 1.375rem;
+  }
+
+  .fields {
+    gap: 0.625rem;
+  }
+
+  .field {
+    padding: 0.75rem 1rem;
+  }
+
+  .field:focus-within {
+    padding: calc(0.75rem - 0.5px) calc(1rem - 0.5px);
   }
 
   /* 모바일은 폼이 먼저, 오브젝트는 아래 (시안 p4_07).
      시안 슬롯(2:1242)은 762×762 정사각이다. 4/3 으로 두면 VideoSlot 의
      `object-fit: cover` 가 정사각 유리 B 의 위아래를 잘라 먹는다. */
+  /**
+   * 오브젝트는 **풀블리드**다 — 시안 `2:3971` 에서 아트가 x0~374 를 다 쓰고
+   * y611 부터 프레임 끝(941)까지 이어진다(330 높이, 아래 여백 0).
+   * 좌우 게이트(20)를 그대로 두면 335 폭 정사각이라 양옆이 비고 아래가 120 남는다.
+   */
   .media {
     order: 2;
-    width: 100%;
-    aspect-ratio: 1;
+    width: 100vw;
+    margin-inline: calc(-1 * var(--mobile-gutter));
+    /* `aspect-ratio` 는 안쪽 VideoSlot(height:100%) 때문에 안 먹는다 — 높이를 직접 준다.
+       330/375 = 88vw. */
+    aspect-ratio: auto;
+    height: 88vw;
+    overflow: hidden;
   }
 }
 

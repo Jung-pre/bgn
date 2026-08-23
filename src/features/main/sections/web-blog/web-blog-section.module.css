@@ -318,10 +318,11 @@
     padding: 24px var(--mobile-gutter) 32px;
   }
 
-  /* 시안 8:4986 — 카드 폭에서 좌우 gutter 를 뺀 343×205, radius 12 */
+  /* 시안 `2:5120` 실측 — 사진 상자 x20~355 / y32~241 = **335×209**.
+     예전 343×205(=1.673)는 335 폭에서 높이가 200 이라 9px 짧았다. */
   .thumb {
     width: 100%;
-    aspect-ratio: 343 / 205;
+    aspect-ratio: 335 / 209;
   }
 
   .cardTitle {

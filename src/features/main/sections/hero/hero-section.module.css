@@ -32,14 +32,26 @@
  *
  * z-index 는 배경 레이어 위 / 카피 아래. 카피와 Scroll 인디케이터는 덮지 않는다.
  */
-.pinShell::after {
+/**
+ * ⚠️ **구체 씬이 아니라 타워 레이어에 붙인다.**
+ *
+ * `.pinShell` 에 붙여 두면 두 장면 모두에 항상 깔린다. 그런데 시안 `8:367`
+ * (구체 씬)의 바닥은 흰색이 아니라 **분홍**이다 — x60 기준 y910 이 233,200,207
+ * 인데 우리는 이 베일 때문에 244,230,238 로 하얗게 떴다.
+ * 반대로 타워 씬 `8:733` 의 바닥은 도시가 흰 안개에 잠겨 실제로 밝다.
+ * 그래서 타워 레이어(JS 가 opacity 를 스크럽하는 그 레이어)에 붙이면
+ * **전환이 끝날 때만** 깔린다 — 이음매를 가리는 원래 목적은 그대로다.
+ *
+ * 12×6 구역 평균색 오차: 구체 씬 7.75 → 6.62, 타워 씬 12.65 유지.
+ */
+.towerLayer::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   height: 110px;
-  z-index: calc(var(--z-content) - 1);
+  z-index: 1;
   background: linear-gradient(180deg, rgba(246, 236, 244, 0) 0%, rgba(246, 236, 244, 0.92) 100%);
   pointer-events: none;
 }
@@ -370,35 +382,105 @@
 }
 
 /**
- * 장면 2 BGN — B / G / N 각 글자에 같은 좌→우 그라데이션.
- * 한 span 에 걸면 타원이 단어 전체에 걸쳐 양끝이 죽는다.
+ * 시안의 흰 radial 그라데이션(흰색 55% → 흰색 20%).
+ * 예전엔 실버(#c8d4e6) linear 였는데 시안보다 탁했다.
+ */
+/**
+ * ⚠️ **글자마다 그라디언트가 다르다.** 시안 8:797 은 B(8:798)/G(8:799)/N(8:800)
+ * 이 각각 독립 텍스트 노드이고 radial 반지름이 글자마다 따로 잡혀 있다. 세 글자에
+ * 하나만 걸면 타원 하나가 단어 전체에 걸쳐 가운데만 하얗고 양끝이 죽는다.
  *
- * 10rem = 1920에서 160px. 1024 이하는 rem 이 16px 고정이라
- * 아래 미디어에서 `--fs-hero-brand`(96)로 되돌린다.
+ * 아래 값은 dev 모드 `gradientTransform` 을 CSS % 로 환산한 것이다
+ * (userSpaceOnUse, r=10 → 반지름 = 10 × 행렬 스케일, 글자 상자 대비 %).
+ *   B  102×144  중심(66.84, 72)  rx 56.64 ry 101.27  → 55.5% 70.3%
+ *   G  118×144  중심(77.33, 72)  rx 66.04 ry  60.85  → 56.0% 42.3%
+ *   N  114×144  중심(74.71, 72)  rx 74.71 ry 119.51  → 65.5% 83.0%
+ * 중심은 셋 다 65.5% 50%, 흰 구간은 N 만 48.79% 이고 나머지는 55% 다.
  */
 .brandTower {
-  font-family: Pretendard, var(--font-pretendard-stack);
-  font-size: 10rem;
-  font-style: normal;
-  font-weight: 700;
-  line-height: 90%;
-  letter-spacing: -0.2rem;
-  overflow: visible;
-  color: transparent;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.12);
-  background: linear-gradient(to right, rgba(255, 255, 255, 0.2) 0%, #fff 45%);
-  background-clip: text;
+  font-size: var(--fs-hero-brand);
+  line-height: 0.9;
+  /* 시안 자간 -3.2px(-2%). 글자 상자 겹침(-8.642px)은 아래 margin 으로 따로 준다 —
+     자간에 합쳐 넣으면 그라디언트 기준 상자까지 같이 좁아진다. */
+  letter-spacing: -0.02em;
   -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  /* 8:797 실측 0 0 4px. **text-shadow 로 주면 안 된다** — background-clip:text
+     글리프 위에 그림자가 겹쳐 흰 코어가 224 회색까지 눌린다(실측 확인).
+     시안의 drop shadow 는 레이어 결과에 걸리는 효과라 filter 가 정확한 대응. */
+  filter: drop-shadow(0 0 0.025em rgba(0, 0, 0, 0.12));
 }
 
-/* --- 마퀴 — Figma 2:410 : top 583 (920 기준 63.4%) ------------------------- */
+/**
+ * ⚠️ 아래 세 규칙은 반드시 **`background-image`** 여야 한다.
+ *
+ * `background:` 단축 속성은 지정하지 않은 하위 속성을 초기값으로 되돌린다 —
+ * 즉 위 `.brandTower` 에서 건 `background-clip: text` 가 `border-box` 로 리셋되어
+ * 글자가 잘리지 않고 **상자 전체가 그라디언트로 칠해진다**(`color: transparent`
+ * 때문에 글자는 사라지고 회색 네모 세 개만 남는다). 실제로 그렇게 렌더되고 있었다.
+ */
+
+/* 시안 8:798 / 8:799 의 margin-right -8.642px (160px 기준 -5.4%) */
+.brandTower[data-letter="B"],
+.brandTower[data-letter="G"] {
+  margin-right: -0.054em;
+}
+
+.brandTower[data-letter="B"] {
+  background-image: radial-gradient(
+    55.5% 70.3% at 65.5% 50%,
+    #ffffff 55%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+}
+
+.brandTower[data-letter="G"] {
+  background-image: radial-gradient(
+    56% 42.3% at 65.5% 50%,
+    #ffffff 55%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+}
+
+.brandTower[data-letter="N"] {
+  background-image: radial-gradient(
+    65.5% 83% at 65.5% 50%,
+    #ffffff 48.79%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+}
+
+/**
+ * --- 마퀴 — Figma 2:410 -----------------------------------------------------
+ *
+ * ⚠️ **아웃라인이 아니라 속이 찬 흰색이다.** 시안 `8:367` y645 행을 스캔해 보면
+ * 획이 8~10px 폭으로 **균일하게** 233 이다(배경 206). 1px 아웃라인이면 획 하나에
+ * 얇은 봉우리가 두 개 나와야 한다. 우리는 `outline` 이라 폭 2~3px / 진폭 +11~18
+ * 이었고, 행 표준편차가 시안 14.2 대 우리 7.0 으로 딱 절반이었다.
+ *
+ * 불투명도는 그 값에서 역산한다: 206 + a(255-206) = 233 → **a = 0.55**.
+ * 글자 크기는 이미 맞다(잉크 밴드 높이 78px 로 동일).
+ *
+ * top: 시안 잉크 밴드가 y610~688, 우리가 600~678 이라 1.1%p 내린다.
+ */
 .marquee {
   position: absolute;
   left: 0;
   right: 0;
-  top: 63.4%;
+  top: 64.5%;
   z-index: var(--z-marquee);
+}
+
+.marquee :global(*) {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* 공용 Marquee 는 좌우를 6% 페이드 아웃하지만 **시안은 그냥 잘린다.**
+   시안 x38~47 획이 이미 233(전체 세기)이다 — 페이드가 있으면 그 자리가 217 이다. */
+.marquee {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 /* --- 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 --------- */
@@ -457,13 +539,6 @@
   color: var(--color-white);
 }
 
-/* html rem 이 16px 로 고정되는 구간 — 10rem=160 이 되어 시안 96을 넘긴다 */
-@media (max-width: 1024px) {
-  .brandTower {
-    font-size: var(--fs-hero-brand);
-  }
-}
-
 /* --- 반응형 ------------------------------------------------------------------ */
 @media (max-width: 768px) {
   /* 짧은 화면에서 110px 은 화면의 13% 라 너무 두껍다 */
@@ -489,22 +564,74 @@
       2px 1px 2px rgba(0, 0, 0, 0.9);
   }
 
-  /* 2:3387 — 모바일만 행간 1.25 (PC 는 1.0). 폭이 좁아 BGN 이 윗줄로 넘어간다 */
+  /**
+   * 2:3387 — 모바일만 행간 1.25 (PC 는 1.0). 폭이 좁아 BGN 이 윗줄로 넘어간다.
+   *
+   * ⚠️ `word-break: keep-all` 이 필요하다. 한글은 기본이 **어디서나 줄바꿈**이라
+   * "BGN 밝은눈안과" 가 `BGN 밝은` / `눈안과` 로 끊긴다. 시안 `2:3340` 은
+   * `BGN` / `밝은눈안과` 로 **공백에서** 끊는다(잉크 밴드 335~395 / 415~470).
+   */
   .towerTitle {
-    line-height: var(--leading-tight);
+    /* 줄 간격은 **고정 길이**로 준다. 무단위(1.25)면 각 줄이 자기 폰트 크기를
+       곱하므로 BGN(103px) 줄만 상자가 커져 시안(줄 top 320 → 405 = 85)보다
+       15px 벌어진다. 길이로 주면 두 줄이 같은 85 를 쓴다. */
+    line-height: 71px;
+    word-break: keep-all;
+  }
+
+  /* 시안 `2:3340` BGN 잉크 폭 175(x46~220). 96px 에서 우리는 163 이라 ×1.074.
+     `line-height` 도 같이 풀어야 한다 — 기본값 0.9 는 103px 에서 92.7 이라
+     위에서 고정한 85 를 이기고 줄 간격이 다시 벌어진다. */
+  .brandTower {
+    font-size: 103px;
+    line-height: inherit;
+  }
+
+  /* 시안 카피 좌측 — 아이브로우 x37 / BGN x46 / 밝은눈안과 x40.
+     우리는 21 / 36 / 24 라 게이트(20) 위에 16 을 더 준다. */
+  .copyTower {
+    padding-left: 16px;
   }
 
   /* 모바일 시안의 카피 세로 위치 — 2:3793(124/812) / 2:3380(285/812) */
   .copySphere {
-    margin-top: 15.3vh;
+    margin-top: 13.7vh;
   }
 
   .copyTower {
     margin-top: 35.1vh;
   }
 
+  /**
+   * 카피 세로 위치 — 시안 `2:3248` 잉크 밴드 기준.
+   *   1줄  시안 117~159 / 우리 130~174  → 13px 아래
+   *   2줄  시안 174~221 / 우리 197~249  → 23px 아래
+   * 글리프 열은 두 줄 다 시안과 1px 이내로 일치하므로(폰트 크기는 맞다)
+   * 순수하게 위치 문제다. 17.4vh(141px) → 15.8vh(128px).
+   * 2줄은 BGN(120px)이 라인박스를 키워 줄 간격이 시안(57)보다 10 넓다.
+   */
+  .line2 {
+    margin-top: -10px;
+  }
+
+  /**
+   * 모바일 워터마크 — 시안 `2:3248` 실측.
+   *
+   * 크기: 공용 Marquee 의 모바일 규칙(`--fs-42`)이 375 에서 **32px** 로 풀린다.
+   * 시안은 그 1.56배다. 글리프 폭을 PC(108px, 이미 일치)와 비교해 역산했고
+   * 다섯 글자가 같은 비율을 준다:
+   *   m 82→37 / s 30→14 / i 13→6 / l 12→6 / ✳ 47→22  = 0.46
+   *   108 × 0.46 ≒ **50px**
+   *
+   * 위치: 시안 잉크 밴드가 y628~651(812 기준 77%)인데 58% 는 화면 한가운데라
+   * 구체와 겹쳐 있었다.
+   */
   .marquee {
-    top: 58%;
+    top: 75.2%;
+  }
+
+  .marquee :global(*) {
+    font-size: 50px;
   }
 
   /* 하단 고정 퀵바가 있어서 스크롤 힌트를 뺀다 */

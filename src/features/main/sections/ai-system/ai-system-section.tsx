@@ -3,11 +3,6 @@
 import { useRef } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
-import {
-  queryTitleMarks,
-  settleTitleMarks,
-  TITLE_MARK_WIPE,
-} from "@/features/main/sections/common/use-section-reveal";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 import { Marquee } from "@/components/marquee/marquee";
 import type { AiStepMessages, AiSystemSectionMessages } from "@/shared/i18n/messages";
@@ -86,7 +81,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         Array.from(root.querySelectorAll<T>(selector));
 
       const wipes = pick<HTMLElement>(section, "[data-wipe]");
-      const marks = queryTitleMarks(section);
+      const decos = pick<HTMLElement>(section, "[data-deco]");
       const cards = pick<HTMLElement>(section, "[data-ai-card]");
       const draws = pick<SVGGeometryElement>(section, "[data-draw]");
       const arts = pick<HTMLImageElement>(section, "[data-art]");
@@ -108,10 +103,9 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
       if (prefersReducedMotionSync()) {
         // early-return 금지. 최종 상태로 눌러 놓고 인라인 스타일을 지운다.
-        settleReducedMotion([...wipes, ...marks, ...cards, ...arts, ...badges, ...rows]);
+        settleReducedMotion([...wipes, ...decos, ...cards, ...arts, ...badges, ...rows]);
         // clearProps 가 커버하지 못하는 SVG 프레젠테이션 속성은 직접 확정.
-        gsap.set(wipes, { clipPath: "none" });
-        settleTitleMarks(marks);
+        gsap.set([...wipes, ...decos], { clipPath: "none" });
         gsap.set(draws, { strokeDashoffset: 0 });
         for (const { value, spec } of counters) {
           value.textContent = formatNumeric(spec.value, spec);
@@ -119,8 +113,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         return;
       }
 
-      gsap.set(wipes, { clipPath: TITLE_MARK_WIPE.from });
-      if (marks.length > 0) gsap.set(marks, { clipPath: TITLE_MARK_WIPE.from });
+      gsap.set([...wipes, ...decos], { clipPath: "inset(0 100% 0 0)" });
       gsap.set(cards, {
         autoAlpha: 0,
         y: SCROLL_ENTRANCE.y,
@@ -149,15 +142,8 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         0,
       )
         // 주석 "함께 꾸밈요소 배치" — 마커 박스도 헤드라인과 같은 좌→우로 열린다.
-        .to(
-          marks,
-          {
-            clipPath: TITLE_MARK_WIPE.to,
-            duration: TITLE_MARK_WIPE.duration,
-            clearProps: "clipPath",
-          },
-          TITLE_MARK_WIPE.at,
-        );
+        // scaleX 로 키우면 안에 든 글자까지 눌려 보이므로 wipe 로 연다.
+        .to(decos, { clipPath: "inset(0 0% 0 0)", duration: 0.7, clearProps: "clipPath" }, 0.25);
 
       tl.to(
         cards,
@@ -275,7 +261,10 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
       </ol>
 
       {/* 섹션 전환 디바이더 — 히어로와 같은 시그니처 마퀴. 카드 뒤로 흐른다. */}
-      <Marquee text={messages.marquee} className={styles.marquee} outline duration={30} />
+      {/* 시안 2:1088 의 고스트 텍스트는 **속 빈 아웃라인이 아니라 채운 글자**다.
+          x8~80 열을 이진화해 보면 A 의 꼭짓점 부근(y818~832)이 통째로 채워져 있고
+          획 안쪽이 배경색으로 비지 않는다. `outline` 을 주면 시안과 다른 물건이 된다. */}
+      <Marquee text={messages.marquee} className={styles.marquee} duration={30} />
     </section>
   );
 }
@@ -292,7 +281,7 @@ function renderWithMark(title: string, marker?: string) {
   return (
     <>
       {before}
-      <span className="title-mark">
+      <span className="title-mark" data-deco>
         {marker}
       </span>
       {rest.join(marker)}

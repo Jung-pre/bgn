@@ -170,7 +170,11 @@ function renderAccent(title: string, accent: string) {
   return (
     <>
       {title.slice(0, -accent.length)}
-      <span className={`marker ${styles.titleAccent}`} lang="en">
+      {/* 시안 2:2832 의 EVENT 는 밑줄형 하이라이트(.marker)가 아니라
+         **선택 커서 모티프**(.title-mark)다 — 상자 y186~238(53) 로 줄상자
+         전체 높이고 좌우에 세로 바가 선다. .marker 는 0.45em(18px) 밑줄이라
+         시안의 1/3 높이였다. */}
+      <span className={`title-mark ${styles.titleAccent}`} lang="en">
         {accent}
       </span>
     </>

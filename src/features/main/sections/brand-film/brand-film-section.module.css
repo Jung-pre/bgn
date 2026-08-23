@@ -8,6 +8,32 @@
   background: #345583; /* 8:961 poster-2.webp 상단 하늘 */
 }
 
+/**
+ * 의료진 → 브랜드필름 이음매 지우개.
+ *
+ * 포스터 상단 하늘이 52,85,131 인데(에셋 y0 실측) 바로 위 의료진 섹션 바닥은
+ * 좌 245,211,228 / 중앙 221,228,245 / 우 171,204,244 이다. 그냥 붙이면 휘도차
+ * 120 짜리 **직선 경계**가 생긴다 — 특히 합성 캔버스가 아직 안 그려진 순간엔
+ * 화면 절반이 통짜 남색으로 뚝 떨어져 보인다.
+ *
+ * 그래서 의료진 바닥색을 그대로 가로로 깔고 아래로 페이드시킨다.
+ * `.pinShell` 형제라 pin 이 걸리기 전(=이음매가 보이는 구간)에만 화면에 있고,
+ * 섹션이 고정되면 자연히 위로 빠져나간다.
+ */
+.section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 300px;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(90deg, #f5d3e4 0%, #dde4f5 52%, #abccf4 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.62) 34%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.62) 34%, transparent 100%);
+}
+
 /* 정지 폴백(영상 도착 / 동작 줄이기) — 시안 그대로 한 화면 */
 .section[data-composite="false"] {
   aspect-ratio: 16 / 9;
@@ -15,21 +41,10 @@
 }
 
 /* 합성 연출 — 배경→불티→타이포가 다 등장할 스크롤 길이.
-   상단 가로 그라데이션은 의료진 맨 아래 실측값(좌 #edd3e6 · 중 #daceeb · 우 #afc1ee).
-   핀이 아직 투명할 때 이 바닥이 이음매에 그대로 보인다. */
+   220vh: 100vh 는 pin 이 붙어 있는 동안이고 나머지 120vh 가 연출 예산이다.
+   더 길게 잡으면 "안 넘어가는 섹션"이 되고, 짧으면 타이포가 스치듯 지나간다. */
 .section[data-composite="true"] {
   height: 220vh;
-  z-index: 1;
-  background:
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      transparent 10vh,
-      rgba(52, 85, 131, 0.4) 28vh,
-      #345583 52vh,
-      #345583 100%
-    ),
-    linear-gradient(90deg, #edd3e6 0%, #daceeb 40%, #afc1ee 100%);
 }
 
 .pinShell {
@@ -82,6 +97,20 @@
   pointer-events: none;
 }
 
+/**
+ * 앞/뒤 섹션 톤 베일.
+ *
+ * 불투명도는 스크롤 진행도가 직접 쓴다(`brand-film-section.tsx` 의 `apply`).
+ * 폭죽 캔버스보다 뒤에 두면 불티만 남아 떠다녀서 어색하다 — 맨 위에 둔다.
+ */
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  will-change: opacity;
+}
+
 /* 정지 폴백(영상/동작 줄이기)에서는 진행도가 없다. 가장자리만 부드럽게. */
 .section[data-composite="false"] .pinShell::before,
 .section[data-composite="false"] .pinShell::after {
@@ -111,11 +140,55 @@
   .section[data-composite="false"] {
     min-height: 60vh;
   }
+  /* 모바일은 스크롤 예산을 줄인다 — 같은 220vh 면 엄지로 넘기기에 너무 길다 */
   .section[data-composite="true"] {
     height: 180vh;
   }
+  /**
+   * ⚠️ 100svh 로 두면 **로고타입이 좌우로 잘린다.**
+   *
+   * 포스터는 16:9(1920×1080)인데 375×812 상자에 `cover` 로 채우면 배율이
+   * 812/1080 = 0.752 라 가로로 1444px 이 되고, 화면에는 원본 x710~1209 만 남는다.
+   * 시안 `8:961` 의 `BGN` 로고타입은 x700~1240 이라 좌우가 각각 10px / 31px 잘린다.
+   * 실제 렌더에서도 B 의 왼쪽과 n 의 오른쪽이 화면 밖으로 나가 있었다.
+   *
+   * 68svh(≈552) 면 배율 0.511 → 보이는 구간이 원본 x593~1327 이라 로고가 다 들어온다.
+   * (모바일 시안에는 이 섹션 프레임 자체가 없다 — 의료진 2:3871 다음이 바로
+   *  AI 시스템 2:3928 이다. 그래서 기준으로 삼을 모바일 시안 값이 없다.)
+   */
   .pinShell {
     height: 100svh;
+  }
+
+  /**
+   * 세로 화면에서는 16:9 판을 **레터박스**로 놓고, 남는 위아래는 같은 포스터를
+   * 크게 흐려 깔아 메운다(단색 #345583 을 그대로 두면 하늘색 판이 뚝 끊긴다).
+   * `filter` 는 의사요소에만 걸리므로 형제 레이어(불티·타이포)에는 영향이 없다.
+   */
+  .pinShell::before {
+    content: "";
+    position: absolute;
+    inset: -10%;
+    z-index: 0;
+    background: url("/main/img_03_poster02.webp") center / cover no-repeat;
+    filter: blur(2.5rem) saturate(1.1);
+    transform: scale(1.15);
+  }
+
+  .layer,
+  .layerAdd,
+  .fireworks {
+    top: 50%;
+    bottom: auto;
+    /**
+     * 높이 상한은 **로고타입이 잘리지 않는 최댓값**이다.
+     * `cover` 라 화면에 보이는 원본 가로 구간 = 뷰포트폭 × 1080 / 높이.
+     * 시안 로고타입이 원본 x700~1240(540) 이므로 여유 20 을 두고 560 이상이 필요:
+     *   뷰포트폭 × 1080 / H ≥ 560  →  H ≤ 뷰포트폭 × 1.93
+     * 375 에서 712px. 100svh(812)를 그대로 쓰면 보이는 구간이 498 이라 좌우가 잘린다.
+     */
+    height: min(100svh, 190vw);
+    translate: 0 -50%;
   }
 }
 

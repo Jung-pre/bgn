@@ -10,7 +10,10 @@
    ========================================================================== */
 
 .section {
-  /* `.blend-top::before` 가 절대 배치라 기준이 필요하다 */
+  /* 리빌 기준. 예전엔 `.blend-top::before` 도 여기 걸렸는데, 시안 2:1286 의
+     상단은 **평평한 primary-100** 이라 그라데이션을 뺐다 —
+     실측: 시안은 y0 부터 226,239,254 인데 우리는 253,254,255 에서
+     140px 에 걸쳐 내려와 위쪽이 통째로 떠 보였다. */
   position: relative;
   display: flex;
   flex-direction: column;
@@ -58,8 +61,9 @@
 
 /* 활성 표시 알약 — Motion layoutId 로 탭 사이를 이동한다.
    Figma 2:1942 의 fill 은 보라(primary/sub/500) → 파랑(primary/primary/500)
-   방향의 radial 이다. 공용 --gradient-cta 는 방향이 반대(파랑→보라)라 그대로
-   쓰면 색이 뒤집힌다. 토큰을 고칠 수 없어 여기서만 정의한다. */
+   방향이다. 공용 --gradient-cta 도 이제 같은 방향이지만, 각도(159deg)와
+   스톱(8.5%~45%)이 이벤트 버튼 박스에 맞춰 잰 값이라 이 알약에는 안 맞는다.
+   여기선 0~100% 로 고르게 도는 115deg 를 따로 쓴다. */
 .tabIndicator {
   position: absolute;
   inset: 0;
@@ -154,6 +158,18 @@
 }
 
 @media (max-width: 768px) {
+  /**
+   * 모바일 시안 `2:4009`(375×430) 실측.
+   *   탭 알약 줄  y  80 ~ 127
+   *   카드        y 160 ~ 349, x20~354 (335×190 — 우리와 크기 일치)
+   *   프레임 하단 430  → 카드 아래 81
+   * PC 값 6rem(96)을 그대로 쓰면 탭이 96 에서 시작해 전체가 16 내려가고
+   * 섹션이 460 이 된다.
+   */
+  .section {
+    padding-block: 80px 81px;
+  }
+
   .tabs {
     align-self: stretch;
     padding-inline: var(--mobile-gutter);
@@ -164,8 +180,15 @@
   .tabs::-webkit-scrollbar {
     display: none;
   }
+  /**
+   * ⚠️ `flex-shrink: 0` 이 없으면 **알약끼리 겹친다.**
+   * `min-width: 0` 으로 줄어들 수 있게 해 뒀는데 안쪽 글자는 `white-space: nowrap`
+   * 이라 상자만 줄고 글자는 그대로 넘쳐 세 개가 서로 포개져 있었다.
+   * 시안 `2:4009` 는 줄을 **넘치게 두고**(활성 알약 x97~291) 좌우가 잘린다.
+   */
   .tab {
     min-width: 0;
+    flex-shrink: 0;
     padding: 0.75rem 1.25rem;
     font-size: var(--fs-16);
   }

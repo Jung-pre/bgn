@@ -14,10 +14,20 @@
 
 .section {
   position: relative;
-  padding-block: var(--gap-section);
-  /* 8:962 는 플랫 컬러가 아니다. 위가 흰색, 아래로 갈수록 옅은 블루.
-     하단 톤은 프레임 렌더 실측(근사) — Figma 변수로 관리되지 않는 값. */
-  background: linear-gradient(180deg, var(--color-white) 0%, var(--primary-50) 45%, #e8f0fb 100%);
+  /* 시안 2:1088(1920×1007) 세로 배분: 130 + 헤더 166 + 61 + 카드 520 + 130.
+     --gap-section(120) 이면 헤더 잉크가 125 로 시안(135)보다 10 높다. */
+  padding-block: 8.125rem;
+  /**
+   * ⚠️ 아래로 갈수록 파래지는 그라데이션이 **아니다.**
+   * 시안 2:1088 배경 픽셀(x20 / x1900, 40px 간격):
+   *   좌: y0 248,247,255 → y280 이후 252,252,255 로 평평
+   *   우: y0 248,251,255 → y480~680 242,248,254 → y960 245,249,254
+   * 즉 거의 흰색이고, 오른쪽 중단만 아주 옅게 시원한 쪽으로 기운다.
+   * 예전 값(하단 #e8f0fb)은 바닥이 233,240,251 이라 시안보다 19 어두웠다.
+   */
+  background:
+    linear-gradient(90deg, transparent 42%, rgba(228, 243, 253, 0.28) 100%),
+    linear-gradient(180deg, #f8f7ff 0%, #fcfcff 26%, #fcfcff 100%);
   overflow: hidden;
 }
 
@@ -31,7 +41,7 @@
   height: 46%;
   background: url("/main/img_04_bg01.webp") center top / cover no-repeat;
   mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 100%);
-  opacity: 0.32;
+  opacity: 0.1;
   pointer-events: none;
 }
 
@@ -43,7 +53,9 @@
   gap: 0.5rem; /* 2:1102 → 2:1103 = 8 */
   width: 100%;
   max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
-  margin: 0 auto var(--gap-xl); /* 헤더(167) → 카드(y 231) = 64 */
+  /* 헤더 박스 하단 296 → 카드 상단 357 = 61 (시안 실측).
+     --gap-xl(64) 이면 카드가 3 내려간다. */
+  margin: 0 auto 3.8125rem;
   padding-inline: var(--content-side-pad);
 }
 
@@ -54,8 +66,8 @@
   width: fit-content;
   font-size: var(--fs-eng-24);
   /* 2:1102 는 단색이 아니라 `gradiant 2` 그라데이션 텍스트다.
-     변수 실값이 MCP 로 해석되지 않아 globals 의 --gradient-cta 로 근사. */
-  background-image: var(--gradient-cta);
+     변수 실값이 MCP 로 해석되지 않아 globals 의 --gradient-brand 로 근사. */
+  background-image: var(--gradient-brand);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
@@ -98,6 +110,9 @@
   gap: 2rem; /* 2:1108 — 416×4 + 32×3 = 1760 */
   width: 100%;
   max-width: calc(var(--content-width) + 2 * var(--content-side-pad));
+  /* ⚠️ ol 기본 margin-block(1em = 16) 을 지운다 — 안 지우면 섹션이
+     시안(1007)보다 18 길어진다. */
+  margin-block: 0;
   margin-inline: auto;
   padding-inline: var(--content-side-pad);
   list-style: none;
@@ -507,16 +522,25 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 9.75rem; /* 1007 - 851 = 156 */
+  /* 시안 2:1088 실측 — 고스트 글자의 베이스라인이 y894 다(잉크 817~894).
+     우리 마퀴 상자(108) 안에서 베이스라인은 상자 상단 +95 라 상자는 799 에서
+     시작해야 한다 → 1004 − 799 − 108 = 97.
+     예전 156 은 마퀴가 카드 뒤로 완전히 숨어 아예 안 보였다. */
+  bottom: 6.0625rem;
   z-index: var(--z-marquee);
   pointer-events: none;
+  /* 시안은 좌우 끝을 페이드하지 않는다 — x8~80 / x1848~1912 여백 열에서도
+     글자가 그대로 읽힌다(잉크 y817~894). Marquee 기본 마스크(6%)를 끈다. */
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
-/* 시안(8:962)에서 이 마퀴는 카드 뒤로 **읽히는 정도**로 지나간다.
-   5% / 16% 는 1920 에서 사실상 보이지 않아 시안보다 한참 옅었다. */
+/* 시안 2:1088 실측 — 배경 252,252,255 위에서 글자가 **222,236,252** 다.
+   즉 옅은 하늘색으로 꽉 채운 글자다. 예전 값(알파 0.06 + 스트로크)은
+   좌우 여백 열에서 표준편차가 안 잡힐 만큼 안 보였다. */
 .marquee :global(*) {
-  color: rgba(10, 32, 72, 0.06);
-  -webkit-text-stroke-color: rgba(10, 32, 72, 0.26);
+  color: #deecfc;
+  -webkit-text-stroke: 0;
 }
 
 @media (max-width: 1440px) {
@@ -545,7 +569,8 @@
      81 은 아이브로우 **잉크** 상단이 시안과 같은 y 86 에 오는 값이다
      (Belleza 20/22 의 라인박스 여백 5px 만큼 패딩이 잉크보다 위에 있다). */
   .section {
-    padding-block: 81px 85px;
+    /* 카드 하단 641 → 프레임 722 = 81. 85 면 섹션이 5 길다. */
+    padding-block: 81px 80px;
   }
 
   /**
@@ -565,8 +590,9 @@
 
   .header {
     padding-inline: var(--mobile-gutter);
-    /* 헤더 박스 하단(잉크 238 + 5.6) → 카드 상단 296 = 52. --gap-xl(64)은 과하다 */
-    margin-bottom: 52px;
+    /* 헤더 박스 하단 245 → 카드 상단 **292** = 47.
+       (x160 열에서 y292 가 255,255,255 로 꺾인다 — 296 은 5 늦은 값이었다.) */
+    margin-bottom: 47px;
   }
 
   /* 시안 타이틀 잉크 하단 152 → 본문 잉크 상단 169 = 17px.
@@ -617,8 +643,11 @@
      */
     flex: 0 0 73.87vw;
     scroll-snap-align: start;
-    /* PC 의 416:520(0.800)이 아니다. 모바일 시안은 277:341(0.812) */
-    aspect-ratio: 277 / 341;
+    /* PC 의 416:520(0.800)이 아니다. 모바일 시안은 **277:350**
+       (x160 열 실측: 카드 y292~641). */
+    aspect-ratio: 277 / 350;
+    /* 카드 상단 292 → 번호 잉크 315 = 23. PC 패딩(24)이면 32 라 9 내려간다. */
+    padding: 15px 24px;
   }
 
   /* ul 기본 margin-block-end 16px 이 카드 아래 여백에 그대로 더해진다 */
