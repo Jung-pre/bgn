@@ -14,3 +14,6 @@ next-env.d.ts
 # 다시 필요하면 `_figma/figma-download.ps1` 로 재수집(단, URL 은 7일 만료).
 /_figma/
 /_to_delete/
+
+# 납품 원본 영상(고비트레이트). public/main 에는 웹용으로 다시 뜬 판본만 들어간다.
+/_video_src/

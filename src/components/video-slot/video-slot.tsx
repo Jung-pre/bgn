@@ -19,10 +19,22 @@ import styles from "./video-slot.module.css";
  * - IntersectionObserver 로 **화면 밖이면 pause**. 영상 3개가 동시에 디코딩되면
  *   저사양 모바일에서 그대로 무너진다.
  * - `prefers-reduced-motion` 이면 재생하지 않고 poster 만 보여준다.
+ *
+ * ## 재생 규칙 — "화면에 오면 **0초부터**, 있는 동안 무한 루프, 나가면 정지"
+ * `loop` 만 켜면 화면을 벗어났다 돌아왔을 때 **끊긴 지점부터** 이어진다.
+ * 브랜드 필름처럼 도입부가 연출의 전부인 영상은 그러면 매번 다른 장면으로
+ * 시작해 첫인상이 무너진다. 그래서 다시 들어올 때 `currentTime = 0` 을 찍는다
+ * (`restartOnEnter`). 화면 안에 있는 동안의 반복은 그대로 `loop` 가 맡는다.
  */
 export interface VideoSlotProps {
-  /** 영상 URL. 없으면 poster 만 렌더된다(= 현재 상태) */
+  /** 영상 URL(mp4). 없으면 poster 만 렌더된다 */
   src?: string;
+  /**
+   * 같은 영상의 WebM(VP9) 판본. 있으면 **먼저** 시도한다.
+   * 크롬·엣지·파이어폭스는 이걸 받고(같은 화질에 30~40% 작다), H.264 만 되는
+   * 브라우저는 자동으로 `src` 로 떨어진다. 그래서 mp4 는 항상 있어야 한다.
+   */
+  srcWebm?: string;
   /** 항상 필요. 영상이 없을 때 이게 화면을 채운다 */
   poster?: string;
   /** 장식용이면 true — 스크린리더에서 숨긴다 */
@@ -33,6 +45,8 @@ export interface VideoSlotProps {
   muted?: boolean;
   /** 화면에 들어오면 자동 재생. 브랜드 필름·배경 영상은 true */
   autoPlayInView?: boolean;
+  /** 화면에 다시 들어올 때 처음(0초)부터 재생. 끊긴 지점부터 잇지 않는다 */
+  restartOnEnter?: boolean;
   className?: string;
   /** 화면 밖 판정 여유. 배경 영상은 넉넉히 */
   rootMargin?: string;
@@ -40,12 +54,14 @@ export interface VideoSlotProps {
 
 export function VideoSlot({
   src,
+  srcWebm,
   poster,
   decorative = false,
   label,
   loop = true,
   muted = true,
   autoPlayInView = true,
+  restartOnEnter = true,
   className,
   rootMargin = "200px 0px",
 }: VideoSlotProps) {
@@ -75,12 +91,25 @@ export function VideoSlot({
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     if (inView) {
+      if (restartOnEnter) {
+        /**
+         * ⚠️ `preload="none"` 이라 처음 들어올 때는 아직 메타데이터가 없다
+         * (`readyState === HAVE_NOTHING`). 그 상태에서 `currentTime` 을 쓰면
+         * 브라우저에 따라 무시되거나 InvalidStateError 를 던진다. 어차피
+         * 첫 재생은 0초에서 시작하므로, **되감기가 실제로 필요한 경우에만** 쓴다.
+         */
+        if (v.readyState > 0 && v.currentTime > 0) v.currentTime = 0;
+        else if (v.readyState === 0) {
+          // 메타데이터가 도착한 뒤 한 번만 0 으로 맞춘다(두 번째 진입 이후 대비)
+          v.addEventListener("loadedmetadata", () => (v.currentTime = 0), { once: true });
+        }
+      }
       // 자동재생이 막히는 경우가 있다(저전력 모드 등). 실패해도 poster 가 있으니 조용히 넘긴다.
       v.play().catch(() => {});
     } else {
       v.pause();
     }
-  }, [inView, src, autoPlayInView]);
+  }, [inView, src, autoPlayInView, restartOnEnter]);
 
   return (
     <div
@@ -92,14 +121,17 @@ export function VideoSlot({
         <video
           ref={videoRef}
           className={styles.video}
-          src={src}
           poster={poster}
           preload="none"
           loop={loop}
           muted={muted}
           playsInline
           aria-label={decorative ? undefined : label}
-        />
+        >
+          {/* 순서가 곧 우선순위다 — 브라우저는 위에서부터 재생 가능한 첫 항목을 고른다 */}
+          {srcWebm ? <source src={srcWebm} type="video/webm" /> : null}
+          <source src={src} type="video/mp4" />
+        </video>
       ) : poster ? (
         // eslint-disable-next-line @next/next/no-img-element -- 배경 풀블리드라 next/image 최적화 이점이 없다
         <img className={styles.video} src={poster} alt={decorative ? "" : (label ?? "")} />

@@ -50,7 +50,19 @@ import styles from "./brand-film-section.module.css";
  * `<body data-gnb-hide="true">` 를 세운다. GNB 쪽은 이 속성을 CSS 로 받는다
  * (컴포넌트 간 결합을 만들지 않으려고 context 대신 data 속성을 쓴다).
  */
-const VIDEO_SRC: string | undefined = undefined; // TODO: 영상 도착 시 "/main/video_03_film01.mp4"
+/**
+ * 1번 영상 — 한강·롯데타워 위로 BGN 글자가 그려지는 브랜드 필름.
+ * 이게 채워지면 `composite` 가 false 로 떨어져 아래 합성 스택(plate/spark/typo
+ * + 불꽃 캔버스)이 통째로 빠지고 영상만 남는다. 둘을 겹치면 같은 글씨가
+ * 두 번 보이므로 **절대 동시에 켜지 않는다.**
+ *
+ * 납품본은 1280×720 / 24fps / 10.9초 / AAC 포함 8.2MB 였다. 자동재생은 어차피
+ * 무음이라 오디오 트랙은 버리고 CRF 24 로 다시 떠서 1.4MB 로 줄였다
+ * (원본은 저장소 밖 `_video_src/` 에 보관).
+ */
+const VIDEO_SRC: string | undefined = "/main/video_main01.mp4";
+/** VP9 판본 — 크롬 계열이 이걸 받는다(1.4MB → 908KB) */
+const VIDEO_SRC_WEBM = "/main/video_main01.webm";
 
 const PLATE = "/main/img_03_poster01.webp";
 const OVERLAY_SPARK = "/main/img_03_overlay01.webp";
@@ -326,6 +338,7 @@ export function BrandFilmSection() {
         ) : (
           <VideoSlot
             src={VIDEO_SRC}
+            srcWebm={VIDEO_SRC_WEBM}
             poster={VIDEO_POSTER}
             decorative
             className={styles.video}

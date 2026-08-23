@@ -170,8 +170,14 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
             setExpanded(true);
           }}
         >
+          {/* 2번 영상 — 유리 재질 B 가 천천히 떠 있는 1:1 클립.
+              시안 주석이 "영상 삽입 예정" 이던 자리다. 정사각(1440²)으로 왔고
+              표시 크기가 762px 라 1080² 로 다시 떠서 878KB(원본 7.8MB)로 줄였다.
+              poster 는 그대로 둔다 — 바이트가 도착하기 전 첫 프레임을 채운다. */}
           <VideoSlot
             decorative
+            src="/main/video_main02.mp4"
+            srcWebm="/main/video_main02.webm"
             poster="/main/img_05_logo-glass01.webp"
             className={styles.objectVideo}
           />
