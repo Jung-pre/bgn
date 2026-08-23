@@ -12,31 +12,47 @@
    시안에는 회전도, 축소도, 투명도 감쇠도, 겹침도 없다. 전부 걷어냈다.
    ========================================================================== */
 
-/**
- * 시안 배경 — Figma 8:868 / 2:995 fill 원문.
- * 예전엔 라벤더 민면 + 웨이브를 마스크로 잘랐는데, 시안은 그라데이션 4장과
- * 사진을 **한 스택**으로 얹고 blend 로 색을 입힌다.
- */
+/* 시안 배경은 좌측 연분홍-라벤더 → 우측 하늘색으로 흐르고 우측에 파란 웨이브가 지난다.
+   분홍/하늘 두 값은 토큰이 없어 2:995 에서 직접 뽑았다. */
 .section {
   position: relative;
   padding-block: var(--gap-section);
   overflow: hidden;
   background:
-    radial-gradient(
-      50.06% 42.98% at 33.33% -1.86%,
-      rgba(255, 231, 210, 0.2) 0%,
-      rgba(255, 234, 210, 0) 100%
-    ),
-    radial-gradient(
-      189.82% 62.69% at 1.07% 100%,
-      rgba(231, 162, 188, 0.4) 0%,
-      rgba(207, 195, 214, 0) 100%
-    ),
-    linear-gradient(253deg, rgba(186, 210, 250, 0.6) 20.55%, rgba(207, 195, 214, 0) 69.22%),
-    linear-gradient(260deg, var(--primary-500) 2.34%, var(--primary-sub-500) 42.93%, #eaadc1 99.29%),
-    url("/main/img_02_bg01.webp") 0 -2% / 120.729% 114.964% no-repeat;
-  background-color: #dce8f4;
-  background-blend-mode: multiply, multiply, multiply, screen, normal;
+    radial-gradient(90% 130% at 100% 65%, rgba(150, 200, 245, 0.5) 0%, transparent 62%),
+    linear-gradient(
+      100deg,
+      #f6ecf4 0%,
+      /* 2:995 좌상단 */ var(--bg-lavender) 45%,
+      #dcebfb 100% /* 2:995 우측 */
+    );
+}
+
+/**
+ * 웨이브 실사(`/main/img_02_bg01.webp`, 3200×1538).
+ *
+ * 시안 8:868 에서 웨이브는 **우측 절반에서만** 또렷하고 좌측은 분홍-라벤더 민면이다.
+ * 에셋 전체를 덮고 좌측을 마스크로 지워야 위 그라데이션과 이어진다
+ * (배경 이미지를 위 `background` 에 한 겹 더 얹으면 개별 마스크를 걸 수 없다).
+ */
+.section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url("/main/img_02_bg01.webp") 55% 72% / cover no-repeat;
+  opacity: 0.9;
+  /* 좌→우(웨이브는 우측에서만 또렷) + 위→아래(헤더 뒤는 민면) 두 방향을 함께 걸어야
+     시안처럼 "우하단에서 떠오르는" 형태가 된다. 두 마스크의 교집합을 쓴다. */
+  -webkit-mask-image:
+    linear-gradient(100deg, transparent 18%, rgba(0, 0, 0, 0.35) 46%, #000 78%),
+    linear-gradient(180deg, transparent 8%, rgba(0, 0, 0, 0.5) 22%, #000 40%);
+  mask-image:
+    linear-gradient(100deg, transparent 18%, rgba(0, 0, 0, 0.35) 46%, #000 78%),
+    linear-gradient(180deg, transparent 8%, rgba(0, 0, 0, 0.5) 22%, #000 40%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  pointer-events: none;
 }
 
 /* 배경 레이어(::before)가 position 을 가지므로 내용물도 스택 순서를 명시해야 덮이지 않는다 */
@@ -390,6 +406,17 @@
     align-items: flex-start;
     margin-bottom: var(--gap-xl);
     padding-inline: var(--mobile-gutter);
+  }
+
+  /**
+   * 모바일 시안(2:3871)에는 `의료진소개 보러가기` 버튼이 **없다.**
+   *
+   * 데스크톱 시안(2:1010)에는 헤더 오른쪽에 있지만, 모바일에서는 헤더가 세로로
+   * 쌓이면서 버튼이 카드 위에 한 줄을 통째로 차지한다. 그만큼 카드가 아래로
+   * 밀려서 하단 페이지네이션이 고정 바에 가린다 — 실제로 그렇게 잘려 있었다.
+   */
+  .cta {
+    display: none;
   }
 
   /* 375 폭에서 활성 카드 + 좌우 이웃 일부가 보이도록. 비율(--card-step/--lane-y)은 그대로. */

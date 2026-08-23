@@ -605,6 +605,9 @@
   /* 트랙이 좌우로 12.5 씩 넘치므로 페이지에 가로 스크롤바가 생기지 않게 가둔다 */
   .section {
     overflow: hidden;
+    /* 시안 `2:4671`(375×712): 트랙 y 80, 컨트롤 하단 632 → 아래 여백도 80.
+       모바일 시안에는 섹션 헤더가 아예 없다(제목은 sr-only 로만 남긴다). */
+    padding-block: 80px;
   }
 
   .trackWrap {
@@ -638,10 +641,13 @@
     margin-right: -16px;
   }
 
+  /* 좌우 16 이다(20 아님). `2:4678`(240×480) 실측: 한글 제목 잉크가 x 17 에서
+     시작하고, "Vision Correction Center"(Belleza 20, 실폭 202)가 **한 줄**로 들어간다.
+     20 이면 콘텐츠 폭이 200 이라 영문이 두 줄로 접힌다. */
   .card,
   .itemExpanded .card {
     aspect-ratio: auto;
-    padding: 32px 20px;
+    padding: 32px 16px;
   }
 
   .itemExpanded .card {

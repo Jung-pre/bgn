@@ -44,8 +44,21 @@ export interface CentersAccordionResult {
   toggleGroup: () => void;
 }
 
+/**
+ * 첫 화면의 활성 센터 = **시력교정센터**(목록 2번째).
+ *
+ * PC `2:1952` / 모바일 `2:4671` 두 시안 모두 트랙이
+ * [스마일센터 64 · **시력교정센터** 240 · 백내장센터 64] 로 그려져 있다.
+ * 0(스마일센터)으로 시작하면 좌측 프리뷰가 비어 캐러셀로 읽히지 않는다.
+ *
+ * ⚠️ 시안 도트는 두 화면 다 **1번**이 켜져 있지만, PC 는 도트가 5개인데 센터는
+ *    6개다(모바일은 6개). 즉 도트는 정적 목업이지 스펙이 아니다 → 도트는
+ *    activeIndex 와 1:1 로 둔다(스와이프하면 위치를 정직하게 따라간다).
+ */
+const INITIAL_ACTIVE_INDEX = 1;
+
 export function useCentersAccordion(count: number): CentersAccordionResult {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(() => Math.min(INITIAL_ACTIVE_INDEX, count - 1));
   const [groupOpen, setGroupOpen] = useState(false);
   const trackRef = useRef<HTMLUListElement>(null);
 

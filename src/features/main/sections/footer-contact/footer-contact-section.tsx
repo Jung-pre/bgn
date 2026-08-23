@@ -46,6 +46,17 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
         `loading="lazy"` 는 문서 최하단이라 특히 효과가 크다(첫 화면에서 1.4MB 절약).
       */}
       <div className={styles.decor} aria-hidden>
+        {/* 모바일 전용 중앙 글로우. PC 는 `img_12_bg01` 에 이미 구워져 있어 끈다.
+            에셋 뒤가 검정이라 screen + 원형 마스크로만 쓴다 — 그냥 얹으면
+            검정 판이 슬레이트 필드를 덮는다. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className={styles.glowSphere}
+          src="/main/img_12_sphere01.webp"
+          alt=""
+          loading="lazy"
+          decoding="async"
+        />
         {/* 시안 8:2770 좌측 — 병원 건물 와이어프레임.
             알파가 있는 wire-4 를 쓴다(wire-1 은 같은 그림의 검은 배경 버전이라
             screen 블렌드가 필요하고, 그 경우 배경의 푸른 기가 선에 섞인다). */}

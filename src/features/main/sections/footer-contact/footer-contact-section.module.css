@@ -35,6 +35,31 @@
 }
 
 /**
+ * 우하단 코너 글로우 — 배경판이 못 담는 **도심의 번짐**을 재구성한다.
+ *
+ * 시안의 도심 선화는 선이 촘촘히 겹쳐 아래로 갈수록 **매끄러운 빛무리**로 읽힌다
+ * (구조가 아니라 밝기다 — 그 구역 표준편차는 4 인데 평균은 배경보다 34 밝다).
+ * 우리 `img_12_wire03.webp` 는 같은 장면을 다시 뽑은 판이라 선이 또렷하고 번짐이
+ * 없어서, 세기를 올리면 법적정보 위에 건물이 **또렷하게** 깔리고 낮추면 코너가
+ * 어두워진다. 둘 다 시안과 다르다 → 번짐만 그라데이션으로 따로 만든다.
+ *
+ * 값은 시안 프레임(8:2770)과 12×6 구역 평균색을 맞춰 찾았다.
+ * 필요한 추가광 R:G:B = 34:39:23 이라 흰색이 아니라 살짝 청록빛이다.
+ */
+.footer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    47% 107% at 100% 100%,
+    rgba(215, 255, 235, 0.32) 0%,
+    rgba(215, 255, 235, 0.1) 55%,
+    transparent 100%
+  );
+}
+
+/**
  * ⚠️ 시안 2:2901 배경 그룹의 `blackbg-30`(검정 30%) 스크림을 **여기서 또 깔면
  * 안 된다.** `img_12_bg01.webp` 자체가 시안 프레임을 렌더한 판이라 스크림이
  * 이미 구워져 있다. 한 번 더 얹었다가 실측으로 확인했다:
@@ -110,6 +135,14 @@
   width: 37.125rem; /* 594 */
   height: auto;
   mix-blend-mode: plus-lighter;
+  /**
+   * 시안은 아래로 갈수록 건물이 **사라진다**. 행 표준편차로 잰 감쇠:
+   *   y400 26.3(=100%) / 460 19.8(75%) / 520 13.0(49%) / 580 7.4(28%) / 640 2.6(0%)
+   * 거의 직선이라 y400~640 을 박스 로컬(215~661)로 환산해 41%~95% 로 둔다.
+   * 이게 없으면 하단 법적정보 뒤까지 100% 세기로 깔린다(실측 +28 밝음).
+   */
+  -webkit-mask-image: linear-gradient(to bottom, #000 41%, transparent 95%);
+  mask-image: linear-gradient(to bottom, #000 41%, transparent 95%);
 }
 
 /* 우측 도심 + 롯데타워. 타워 첨탑이 시안 (1655, 128) 에 오도록 맞춘 값.
@@ -138,12 +171,28 @@
   top: 0.625rem; /* 10 */
   width: 95.375rem; /* 1526 */
   height: auto;
-  opacity: 0.3;
+  /**
+   * 0.3 은 **너무 흐렸다.** 시안 타워 구역(x1560~1900) 행 표준편차가 35 인데
+   * 0.3 에서 우리는 19 였다 — 절반 세기다. 예전에 0.3 으로 맞았던 건
+   * 하단 페이드가 없어서 아래쪽이 과하게 밝았고, 그걸 전체 불투명도로
+   * 상쇄하고 있었기 때문이다. 페이드를 넣은 뒤 다시 맞춘 값이 0.9 다.
+   */
+  opacity: 0.9;
   mix-blend-mode: plus-lighter;
-  /* 시안에서 도심은 오른쪽 끝에만 남고 가운데로 갈수록 사라진다.
-     원본은 가운데가 석촌호수라 그대로 두면 하단에 물결 띠가 가로로 남는다. */
-  mask-image: linear-gradient(to right, transparent 0%, #000 48%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 48%);
+  /* ① 가로 — 시안에서 도심은 오른쪽 끝에만 남고 가운데로 갈수록 사라진다.
+        원본은 가운데가 석촌호수라 그대로 두면 하단에 물결 띠가 가로로 남는다.
+     ② 세로 — 시안은 y520 부터 흐려져 y645 에 완전히 사라진다(표준편차
+        35→22.7→14.7→9.8→4.1). 박스가 y10~1154 라 44%~56% 구간이다.
+        이게 없으면 롯데월드·석촌호수 다리가 법적정보 뒤에 그대로 깔린다.
+     두 장을 **교집합**으로 합성한다(어느 한쪽이라도 투명하면 투명). */
+  mask-image:
+    linear-gradient(to right, transparent 0%, #000 48%),
+    linear-gradient(to bottom, #000 44%, transparent 56%);
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0%, #000 48%),
+    linear-gradient(to bottom, #000 44%, transparent 56%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
 }
 
 .ringLarge {
@@ -459,6 +508,28 @@
   .hours {
     column-gap: 3rem;
   }
+
+  /**
+   * 장식 좌표가 **rem 이라 1024 이하에서 안 줄어든다.**
+   *
+   * globals 의 루트 폰트는 `clamp(10px, .8333vw, 16px)` 라 1920→1024 구간에서는
+   * rem 이 뷰포트를 따라 줄지만, **1024 이하는 16px 고정**이다. 그래서 건물이
+   * 1024 에서도 594px 그대로 남아 화면의 58% 를 덮고 진료시간 위로 올라온다.
+   * 이 구간에서만 뷰포트 폭 비율(1920 기준)로 다시 잡는다.
+   *   건물  left -74/1920 = -3.85vw / width 594/1920 = 30.94vw / top 215/792 = 27.1%
+   *   도심  left 748/1920 = 38.96vw / width 1526/1920 = 79.5vw / top 10/792 = 1.26%
+   */
+  .wireBuilding {
+    left: -3.85vw;
+    top: 27.1%;
+    width: 30.94vw;
+  }
+
+  .wireCity {
+    left: 38.96vw;
+    top: 1.26%;
+    width: 79.5vw;
+  }
 }
 
 @media (max-width: 768px) {
@@ -467,16 +538,23 @@
      rem 이 아니라 vw 로 두는 이유: 1024 이하는 root 가 16px 고정이라
      rem 이 화면 폭을 따라가지 않는다. */
   /* 특이도를 PC 규칙(.decor .glowSphere)과 맞춰야 display 가 먹는다 */
+  /**
+   * 발광체는 **모바일에서도 끈다.**
+   *
+   * 되살려 뒀더니 시안보다 훨씬 밝았다 — `2:5207` 중앙열(x187) 실측:
+   *   y450  시안 115,131,159 / 우리 155,173,195  (+40)
+   *   y560  시안 133,137,153 / 우리 166,173,190  (+33)
+   * 시안의 세로 변화는 발광체가 아니라 **배경판 자체의 그라데이션**이다
+   * (y100 106 → y840 132 로 완만하게만 밝아진다).
+   */
   .decor .glowSphere {
-    /* PC 에서 끈 것을 여기서만 되살린다 — 배경이 가로로 크게 잘려
-       구워진 글로우가 프레임 밖으로 밀려나기 때문이다. */
-    display: block;
-    opacity: 0.42;
-    left: 50%;
-    top: 12%;
-    width: 150vw;
-    transform: translateX(-50%);
-    filter: blur(2rem);
+    display: none;
+  }
+
+  /* 우하단 코너 글로우는 **PC 도심의 번짐**을 흉내 낸 것이라 모바일엔 없다.
+     시안 모바일은 y440 아래가 좌우 표준편차 1~2 로 완전히 평평하다. */
+  .footer::after {
+    display: none;
   }
 
   /**
@@ -488,27 +566,57 @@
    * 버튼 위치는 시안과 거의 같으므로 **top 기준 고정 px** 로 잡는다
    * (1024 이하는 root 16px 고정이라 rem 이 그대로 px 이다).
    */
+  /**
+   * 모바일 시안(2:5207) **픽셀 실측** — 열/행 표준편차로 잰 잉크 범위:
+   *   건물  x   0 ~  58 / y 275 ~ 435   (왼쪽 끝에 아주 작게 걸린다)
+   *   타워  x 316 ~ 342 / y 275 ~ 425   (가늘고 길다)
+   * 예전 값은 건물이 x 50~160 으로 **화면 안쪽까지 크게** 들어와 있었고
+   * 타워는 x 278~342 로 두 배 넘게 굵었다.
+   *
+   * 박스 좌표는 PC 배치에서 얻은 이미지 안 잉크 비율로 역산했다:
+   *   건물 잉크 = 박스 폭의 31.0% ~ 83.2%
+   *   타워 잉크 = 박스 폭의 58.5% ~ 66.3%, 첨탑은 박스 높이의 7.4%
+   */
+  /**
+   * 얇은 원형 라인 3개는 **모바일 시안에 없다.**
+   * `2:5207` 은 글자 밴드를 뺀 모든 행의 표준편차가 1~4(= 완전히 매끄럽다).
+   * 우리는 같은 구간이 4.5~10.4 였고, 그 차이가 전부 이 호(arc)들이다.
+   */
+  .decor span {
+    display: none;
+  }
+
   .wireBuilding {
-    left: -10vw;
-    top: 16rem;
+    left: -12.4vw;
+    top: 19.6875rem; /* 315 */
     bottom: auto;
-    width: 62vw;
-    opacity: 0.35;
+    width: 40vw;
+    opacity: 0.85;
+    -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
   }
 
   .wireCity {
-    /* 원본에서 타워는 가로 55~69% 지점이다. 화면 오른쪽 끝(x 295~375)에
-       그 구간이 오도록 152vw / right -47vw 로 맞췄다. 좁혀서 넣으면 타워가
-       화면 밖으로 밀리고 저층 도심만 남는다. */
-    left: auto;
-    right: -47vw;
-    top: 15.7rem;
+    /* 타워 잉크가 x 316~342 (폭 26) 에 오게: 26 / 0.0786 = 331 = 88vw,
+       왼쪽 = 316 − 0.585×331 = 122.5 = 32.7vw. 첨탑 y 275 → top = 257. */
+    left: 28.8vw;
+    right: auto;
+    top: 15.25rem; /* 244 */
     bottom: auto;
-    width: 152vw;
-    opacity: 0.22;
-    /* 아래로 흘러 진료시간·사업자정보를 덮지 않게 끊는다 */
-    mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 55%);
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 55%);
+    width: 95vw;
+    opacity: 0.75;
+    /* ① 가로 — 시안은 타워 **왼쪽에 아무것도 없다**(x310 표준편차 0.7, x315 2.2).
+          타워는 박스 폭의 58.5% 지점에서 시작하므로 그 앞을 잘라낸다.
+          안 자르면 저층 도심이 '부산' 지점 버튼 위로 올라온다.
+       ② 세로 — 시안은 y440 아래가 완전히 깨끗하다. 박스가 y244~511 이라 74% 지점. */
+    mask-image:
+      linear-gradient(to right, transparent 52%, #000 60%),
+      linear-gradient(to bottom, #000 58%, transparent 76%);
+    -webkit-mask-image:
+      linear-gradient(to right, transparent 52%, #000 60%),
+      linear-gradient(to bottom, #000 58%, transparent 76%);
+    mask-composite: intersect;
+    -webkit-mask-composite: source-in;
   }
 
   /* 시안 모바일 2:5207 — SNS 가 상단 중앙, 이하 전부 중앙 정렬 */

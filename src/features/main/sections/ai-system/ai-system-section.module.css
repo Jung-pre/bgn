@@ -540,21 +540,89 @@
 
 /* 모바일 — 가로 스와이프, 우측 카드가 peek 되게 (시안 p4_06) */
 @media (max-width: 768px) {
-  .header {
-    padding-inline: var(--mobile-gutter);
+  /* 시안 실측(엣지/잉크 프로파일) — 위 81 / 아래 85.
+     전역 --gap-section(120)은 모바일에서 과하다.
+     81 은 아이브로우 **잉크** 상단이 시안과 같은 y 86 에 오는 값이다
+     (Belleza 20/22 의 라인박스 여백 5px 만큼 패딩이 잉크보다 위에 있다). */
+  .section {
+    padding-block: 81px 85px;
   }
 
+  /**
+   * 마퀴는 **모바일 시안에 없다.**
+   *
+   * 섹션이 y 4799~5521 이고 카드 하단이 645, 그 아래 77px 은 픽셀을 찍어 봐도
+   * 배경색(251,251,255)뿐이다. 바로 다음이 AI 상담신청 섹션(2:3971)이다.
+   * 이게 남아 있어서 카드 아래가 216px(마퀴 여백 64 + 마퀴 32 + 패딩 120)까지
+   * 벌어져 있었다.
+   *
+   * `.section` 을 붙여야 한다 — 위 `.section .marquee`(0,2,0)가 맨 `.marquee`(0,1,0)
+   * 보다 특이도가 높아 그냥 두면 먹지 않는다.
+   */
+  .section .marquee {
+    display: none;
+  }
+
+  .header {
+    padding-inline: var(--mobile-gutter);
+    /* 헤더 박스 하단(잉크 238 + 5.6) → 카드 상단 296 = 52. --gap-xl(64)은 과하다 */
+    margin-bottom: 52px;
+  }
+
+  /* 시안 타이틀 잉크 하단 152 → 본문 잉크 상단 169 = 17px.
+     flex gap 8 + margin-top 8 = 16 이면 23px 이 되어 6px 밀린다. */
+  .header :global(.section-desc) {
+    margin-top: 2px;
+  }
+
+  /**
+   * 모바일 시안 `2:3928` **픽셀 실측**(프레임 375×722 = 이 섹션 전체).
+   * 잉크 행 프로파일(어두운 픽셀 구간) / 휘도 미분 엣지로 잰 값:
+   *   아이브로우 잉크  y  86 ~ 103
+   *   타이틀   잉크    y 110 ~ 152
+   *   본문 3줄 잉크    y 169~184 / 196~210 / 223~238  (행간 27)
+   *   카드 좌 모서리   x  21   (x20 이 그림자, 22 부터 카드 내부)
+   *   카드1 우 모서리  x 298   → 카드 폭 277
+   *   카드2 좌 모서리  x 318   → 카드 간격 20
+   *   카드 상단 296 / 하단 637 → 카드 높이 341 (16:20 이 아니라 277:341)
+   *   카드 아래       722 − 637 = 85
+   * 프레임들이 y 축으로 **틈 없이 연속**임을 확인했으므로(0 gap) 이 값들은
+   * 스토리보드 컷이 아니라 실제 페이지 좌표다.
+   */
   .grid {
     display: flex;
-    gap: 1rem;
+    gap: 20px;
     padding-inline: var(--mobile-gutter);
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
+
+    /**
+     * ⚠️ 이게 없으면 **좌측 여백이 통째로 사라진다.**
+     *
+     * `scroll-snap-align: start` 는 카드의 시작 모서리를 스냅포트 시작에 붙이는데,
+     * 스냅포트 기본값이 패딩 박스 경계다. 그래서 브라우저가 padding-left 만큼
+     * (실측 scrollLeft 20~22) 스스로 스크롤해 버리고 첫 카드가 x=0 에 딱 붙는다.
+     * `scroll-padding` 으로 스냅포트를 패딩 안쪽으로 옮겨야 인셋이 유지된다.
+     */
+    scroll-padding-inline: var(--mobile-gutter);
   }
 
   .card {
-    flex: 0 0 78%;
+    /**
+     * 시안 277 / 375 = 73.87vw.
+     *
+     * **% 로 주면 안 된다** — flex-basis 의 % 는 컨테이너 *콘텐츠 폭*(375 − 좌우 패딩)
+     * 기준이라 값이 작게 나온다. 뷰포트 기준이어야 시안 폭이 그대로 나온다.
+     */
+    flex: 0 0 73.87vw;
     scroll-snap-align: start;
+    /* PC 의 416:520(0.800)이 아니다. 모바일 시안은 277:341(0.812) */
+    aspect-ratio: 277 / 341;
+  }
+
+  /* ul 기본 margin-block-end 16px 이 카드 아래 여백에 그대로 더해진다 */
+  .grid {
+    margin-bottom: 0;
   }
 }
