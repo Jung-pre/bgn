@@ -53,9 +53,30 @@ import styles from "./hero-section.module.css";
  * 매 프레임 값은 `progressRef` 로만 흐른다. state 는 장면 인덱스가 바뀔 때만.
  */
 
+/**
+ * 띠(광선/웨이브) WebGL 판. 시안 모션 주석이 요구하는 "휘면서 흐르는" 변형은
+ * 래스터 한 장을 미는 DOM 판으로는 안 나온다. 그림은 그대로 텍스처로 쓴다.
+ * 구체 씬이 이미 three 를 받아 오므로 청크 추가 비용은 사실상 없다.
+ */
+const RibbonScene = dynamic(() => import("./scene-ribbons").then((m) => m.RibbonScene), {
+  ssr: false,
+});
+
 const SphereScene = dynamic(() => import("./scene-sphere").then((m) => m.SphereScene), {
   ssr: false,
 });
+
+/**
+ * 띠는 **three(WebGL)로 그린다.** 정지 이미지 판은 쓰지 않는다.
+ *
+ * 이미지 판(`<img>` + transform)은 아직 코드에 남아 있지만 **동작 줄이기 설정과
+ * WebGL 미지원 브라우저 전용 폴백**이다. 정상 경로에서는 절대 함께 보이지 않는다
+ * (같은 자리에 둘 다 그리면 같은 그림이 두 장 겹친다).
+ *
+ * 컨텍스트를 잃어도 `RibbonScene` 이 복구 시 텍스처를 다시 올린다(그 처리가 없으면
+ * 복구된 컨텍스트에 텍스처가 없어 띠가 빈 채로 남는다).
+ */
+const USE_GL_RIBBONS = true;
 
 /** 크로스페이드 구간 경계 */
 const FADE_START = 0.45;
@@ -115,7 +136,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
    * 계속 떠 있으면 타워 카피와 겹쳐서 시안보다 훨씬 시끄럽다.
    */
   const marqueeRef = useRef<HTMLDivElement>(null);
-  const scrollHintRef = useRef<HTMLDivElement>(null);
 
   /**
    * 타워 씬 패럴랙스 래퍼들. 매 프레임 transform 만 쓰므로 전부 ref 다.
@@ -155,6 +175,22 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const towerMountedRef = useRef(false);
 
   /**
+   * 띠 셰이더에 넘길 진행도. `usePinnedProgress` 의 progressRef 는 섹션 원본
+   * 진행도(p)라 크로스페이드 전 구간이 섞여 있다. 띠가 쓰는 건 타워 등장 이후를
+   * 다시 0~1 로 편 `u` 이므로 따로 담는다.
+   */
+  const ribbonProgressRef = useRef(0);
+
+  /**
+   * 띠를 WebGL 로 그릴 수 있는가.
+   *
+   * SSR 스냅샷은 항상 false 다 — 서버에서 컨텍스트를 만들 수 없고, 값이
+   * 갈리면 하이드레이션이 깨진다. 타워 레이어 자체가 `towerMounted`(진행도
+   * 0.12) 전까지 마운트되지 않으므로, 그 전에 이 효과가 먼저 돌아 깜빡임이 없다.
+   */
+  const [glRibbons, setGlRibbons] = useState(false);
+
+  /**
    * 히어로는 첫 화면이라 "보이면 켜기"로 충분해 보이지만, 여유를 준다.
    * 핀 구간 200vh 동안 캔버스 호스트가 뷰포트 경계에 딱 붙어 움직여서
    * margin 0 이면 경계에서 on/off 가 떨리고, 그때마다 셰이더 프로그램이
@@ -186,15 +222,9 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const ct = copyTowerRef.current;
       if (cs) cs.style.opacity = String(1 - clamp01(t * 1.6));
       if (ct) ct.style.opacity = String(clamp01((t - 0.35) * 2));
-      // 마퀴·스크롤 유도는 구체 씬 전용. 타워 프레임(8:733)에 둘 다 없다.
-      const fadeOut = 1 - clamp01(t * 1.6);
+      // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)
       const mq = marqueeRef.current;
-      if (mq) mq.style.opacity = String(fadeOut);
-      const hint = scrollHintRef.current;
-      if (hint) {
-        hint.style.opacity = String(fadeOut);
-        hint.style.visibility = fadeOut < 0.02 ? "hidden" : "";
-      }
+      if (mq) mq.style.opacity = String(1 - clamp01(t * 1.6));
 
       // 타워 에셋을 미리 마운트해 크로스페이드 때 디코딩이 안 걸리게 한다
       if (!towerMountedRef.current && p > 0.12) {
@@ -220,6 +250,8 @@ export function HeroSection({ messages }: HeroSectionProps) {
       shift(pxBandRefs[0]?.current ?? null, 3.6 * u, 2.6 * u);
       shift(pxBandRefs[1]?.current ?? null, 2.0 * u, 1.4 * u);
       shift(pxBandRefs[2]?.current ?? null, 2.8 * u, 2.0 * u);
+      /* 셰이더 판은 그룹 이동까지 캔버스 안에서 처리한다 — 여기서 또 밀면 두 배가 된다 */
+      ribbonProgressRef.current = u;
       shift(pxLinesRef.current, 4.5 * u, 1.0 * u);
 
       /* 띠마다 여벌 오프셋 — 그룹 하나만 흘리면 넷이 한 덩어리로 미끄러진다.
@@ -245,6 +277,19 @@ export function HeroSection({ messages }: HeroSectionProps) {
      */
     dependencies: [],
   });
+
+  useEffect(() => {
+    if (!USE_GL_RIBBONS) return;
+    if (prefersReducedMotionSync()) return; // 동작 줄이기면 정지 DOM 판을 쓴다
+    let ok = false;
+    try {
+      const probe = document.createElement("canvas");
+      ok = Boolean(probe.getContext("webgl2") ?? probe.getContext("webgl"));
+    } catch {
+      ok = false;
+    }
+    setGlRibbons(ok);
+  }, []);
 
   /**
    * 띠 노드 수집 — 타워 레이어가 마운트된 뒤 한 번만.
@@ -379,6 +424,10 @@ export function HeroSection({ messages }: HeroSectionProps) {
         <div ref={sphereLayerRef} className={styles.sphereLayer} aria-hidden>
           <div className={styles.sphereBg} />
           <div ref={canvasHostRef} className={styles.canvasHost}>
+            {/* ⚠️ 크로스페이드 도중에 이 캔버스를 마운트/언마운트하지 않는다.
+                컨텍스트를 만들고 없앨 때마다 브라우저가 GPU 자원을 재배치하는데,
+                하필 그 순간이 띠 캔버스가 처음 보여야 할 타이밍이라 띠가 비어
+                보인다(전환이 끝나야 나타나던 증상). 두 캔버스를 그냥 계속 둔다. */}
             <SphereScene active={sceneActive} progressRef={progressRef} />
           </div>
         </div>
@@ -472,29 +521,50 @@ export function HeroSection({ messages }: HeroSectionProps) {
                 {/* 광선/웨이브 — 8:2949. 시안에서 프레임 마스크로 잘려 있다.
                     clip 을 패럴랙스 래퍼 바깥에 둬야 잘리는 사각형이 안 움직인다.
 
-                    셰이더 리본을 쓸 수 있으면 정지 PNG 대신 캔버스를 올린다.
-                    둘을 겹치면 같은 그림이 두 장 보이므로 **배타적으로** 렌더한다. */}
+                    여기 있는 건 **이미지 판(폴백)** 이다 — 동작 줄이기 설정이나
+                    WebGL 미지원일 때만 그린다. 셰이더 판은 아래쪽에 따로 있다. */}
                 <div ref={stageClipRef} className={styles.stageClip}>
-                  <div ref={pxLinesRef} className={styles.px}>
-                    {LINE_SPRITES.map((s, i) => (
-                      <TowerSpriteImg key={`${s.node}-${i}`} sprite={s} drift={i} />
-                    ))}
-
-                    {/* 광택 — 같은 띠를 한 겹 더 얹고 **움직이는 그라디언트 마스크**로
-                        가늘게 오려낸다. 빛이 실크를 타고 지나가는 것처럼 보인다.
-
-                        ⚠️ 원본과 **같은 패럴랙스 래퍼 안**에 둔다. 밖에 두면 스크롤이
-                        진행될수록 원본만 흘러가고 광택은 제자리에 남아서, 같은 띠가
-                        두 장 겹쳐 보이는 유령이 생긴다. */}
-                    <div ref={sheenRef} className={styles.lineSheen} aria-hidden>
+                  {glRibbons ? null : (
+                    <div ref={pxLinesRef} className={styles.px}>
                       {LINE_SPRITES.map((s, i) => (
-                        <TowerSpriteImg key={`sheen-${s.node}-${i}`} sprite={s} drift={i} />
+                        <TowerSpriteImg key={`${s.node}-${i}`} sprite={s} drift={i} />
                       ))}
+
+                      {/* 광택 — 같은 띠를 한 겹 더 얹고 **움직이는 그라디언트 마스크**로
+                          가늘게 오려낸다. 빛이 실크를 타고 지나가는 것처럼 보인다.
+
+                          ⚠️ 원본과 **같은 패럴랙스 래퍼 안**에 둔다. 밖에 두면 스크롤이
+                          진행될수록 원본만 흘러가고 광택은 제자리에 남아서, 같은 띠가
+                          두 장 겹쳐 보이는 유령이 생긴다. */}
+                      <div ref={sheenRef} className={styles.lineSheen} aria-hidden>
+                        {LINE_SPRITES.map((s, i) => (
+                          <TowerSpriteImg key={`sheen-${s.node}-${i}`} sprite={s} drift={i} />
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </>
+          ) : null}
+
+          {/**
+           * 띠 캔버스 — 타워 에셋과 **따로, 더 일찍** 올린다.
+           *
+           * `towerMounted`(진행도 0.12) 안에 두면 그 React 상태가 뒤집히는 시점이
+           * 이미 스크롤이 한참 지난 뒤일 수 있다. 커밋 + WebGL 초기화까지 몇 프레임을
+           * 더 먹으므로, 캔버스의 첫 프레임이 **타워 레이어가 이미 반쯤 나타난 뒤**에
+           * 도착한다 → 띠가 "띡" 하고 튀어나온다.
+           *
+           * 이 셰이더는 텍스처를 안 쓴다(절차적 생성). 그래서 일찍 올려도 비용이
+           * 컨텍스트 하나뿐이고, 타워 이미지 24장은 그대로 0.12 에서 받는다.
+           *
+           * 위치는 타워 블록 **뒤**다 — 형제 순서가 곧 z 순서라 띠가 타워 위에 온다.
+           */}
+          {glRibbons ? (
+            <div className={styles.stageClip}>
+              <RibbonScene progressRef={ribbonProgressRef} active={sceneActive} />
+            </div>
           ) : null}
         </div>
 
@@ -541,7 +611,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
         </div>
 
         {/* 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 + 40 흰 채움 */}
-        <div ref={scrollHintRef} className={styles.scrollHint} data-hero-fade>
+        <div className={styles.scrollHint} data-hero-fade>
           <span className={styles.scrollBar} aria-hidden>
             <span className={styles.scrollBarFill} />
           </span>
@@ -586,8 +656,7 @@ function SplitBrandTitle({
     );
   }
   const [before, ...rest] = title.split(brand);
-  /* 시안은 BGN 과 뒤 문구 사이가 ~7px 다. 공백 한 칸은 너무 넓어서 그룹 마진으로 둔다. */
-  const after = rest.join(brand).replace(/^\s+/, "");
+  const after = rest.join(brand);
   return (
     <>
       {Array.from(before ?? "").map((ch, i) => (
@@ -595,13 +664,27 @@ function SplitBrandTitle({
           {ch}
         </span>
       ))}
-      <span className={styles.brandGroup} lang="en" data-font="body">
-        {Array.from(brand).map((ch, i) => (
-          <span key={`br${i}`} className={clsx(styles.char, brandClassName)} aria-hidden {...attr}>
-            {ch}
-          </span>
-        ))}
-      </span>
+      {/* `data-font="body"` — 시안의 히어로 `BGN` 은 영문이지만 Pretendard 다.
+          이게 없으면 globals.css 의 `[lang|="en"]` 규칙이 Belleza 로 바꿔 버린다.
+
+          ⚠️ **글자마다 span 을 따로 낸다.** 시안 8:797 은 B(8:798)/G(8:799)/N(8:800)
+          이 각각 독립 텍스트 노드이고 **글자마다 다른 radial 그라디언트**를 갖는다.
+          한 span 에 그라디언트 하나를 걸면 세 글자에 하나의 타원이 걸쳐서
+          가운데 글자만 하얗고 양끝이 죽는다 — 시안과 다른 그림이 된다.
+          `data-letter` 로 글자별 그라디언트를 CSS 가 골라 준다. */}
+      {Array.from(brand).map((ch, i) => (
+        <span
+          key={`brand${i}`}
+          className={clsx(styles.char, brandClassName)}
+          data-letter={ch}
+          aria-hidden
+          lang="en"
+          data-font="body"
+          {...attr}
+        >
+          {ch}
+        </span>
+      ))}
       {Array.from(after).map((ch, i) => (
         <span key={`a${i}`} className={styles.char} aria-hidden {...attr}>
           {ch}
