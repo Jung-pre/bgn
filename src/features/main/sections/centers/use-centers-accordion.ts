@@ -1,6 +1,15 @@
 "use client";
 
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 
 /**
@@ -29,6 +38,12 @@ export const GROUP_SPAN = 1 + GROUP_REVEAL_AFTER;
  */
 export const WINDOW_SPAN = 3;
 
+/** cynx.io 와 같이 잡아당기면 한 칸 이동. 의료진 교차 스와이퍼와 같은 임계값. */
+const DRAG_COMMIT_RATIO = 0.08;
+const DRAG_COMMIT_MIN_PX = 48;
+const DRAG_RESISTANCE = 0.6;
+const CLICK_SUPPRESS_PX = 6;
+
 export interface CentersAccordionResult {
   activeIndex: number;
   groupOpen: boolean;
@@ -42,6 +57,14 @@ export interface CentersAccordionResult {
   /** 좌우 화살표 — 활성 인덱스 ±1 */
   step: (direction: -1 | 1) => void;
   toggleGroup: () => void;
+  /** 트랙에 그대로 스프레드. 드래그 중 x 는 ref → CSS 변수, state 금지. */
+  dragProps: {
+    onPointerDown: (e: ReactPointerEvent<HTMLUListElement>) => void;
+    onPointerMove: (e: ReactPointerEvent<HTMLUListElement>) => void;
+    onPointerUp: (e: ReactPointerEvent<HTMLUListElement>) => void;
+    onPointerCancel: (e: ReactPointerEvent<HTMLUListElement>) => void;
+    onClickCapture: (e: ReactMouseEvent<HTMLUListElement>) => void;
+  };
 }
 
 /**
@@ -61,6 +84,7 @@ export function useCentersAccordion(count: number): CentersAccordionResult {
   const [activeIndex, setActiveIndex] = useState(() => Math.min(INITIAL_ACTIVE_INDEX, count - 1));
   const [groupOpen, setGroupOpen] = useState(false);
   const trackRef = useRef<HTMLUListElement>(null);
+  const drag = useRef({ pointerId: -1, startX: 0, dx: 0, moved: false, raf: 0 });
 
   const select = useCallback(
     (index: number) => {
@@ -143,5 +167,79 @@ export function useCentersAccordion(count: number): CentersAccordionResult {
     return () => item.removeEventListener("transitionend", settle);
   }, [activeIndex]);
 
-  return { activeIndex, groupOpen, trackRef, isExpanded, isVisible, select, step, toggleGroup };
+  const paintDrag = useCallback(() => {
+    drag.current.raf = 0;
+    trackRef.current?.style.setProperty("--drag-x", `${drag.current.dx * DRAG_RESISTANCE}px`);
+  }, []);
+
+  const finishDrag = useCallback((track: HTMLUListElement, pointerId: number) => {
+    if (drag.current.raf) cancelAnimationFrame(drag.current.raf);
+    drag.current.raf = 0;
+    if (track.hasPointerCapture(pointerId)) track.releasePointerCapture(pointerId);
+    delete track.dataset.dragging;
+    track.style.setProperty("--drag-x", "0px");
+    drag.current.pointerId = -1;
+  }, []);
+
+  const dragProps: CentersAccordionResult["dragProps"] = {
+    onPointerDown: (e) => {
+      if (!e.isPrimary) return;
+      Object.assign(drag.current, {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        dx: 0,
+        moved: false,
+      });
+    },
+    onPointerMove: (e) => {
+      const state = drag.current;
+      if (state.pointerId !== e.pointerId) return;
+      state.dx = e.clientX - state.startX;
+      if (!state.moved && Math.abs(state.dx) > CLICK_SUPPRESS_PX) {
+        state.moved = true;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        e.currentTarget.dataset.dragging = "true";
+      }
+      if (!state.raf) state.raf = requestAnimationFrame(paintDrag);
+    },
+    onPointerUp: (e) => {
+      if (drag.current.pointerId !== e.pointerId) return;
+      const { dx } = drag.current;
+      const threshold = Math.max(
+        DRAG_COMMIT_MIN_PX,
+        e.currentTarget.clientWidth * DRAG_COMMIT_RATIO,
+      );
+      finishDrag(e.currentTarget, e.pointerId);
+      if (Math.abs(dx) > threshold) step(dx < 0 ? 1 : -1);
+    },
+    onPointerCancel: (e) => {
+      if (drag.current.pointerId !== e.pointerId) return;
+      finishDrag(e.currentTarget, e.pointerId);
+    },
+    onClickCapture: (e) => {
+      if (!drag.current.moved) return;
+      drag.current.moved = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+  };
+
+  useEffect(() => {
+    const state = drag.current;
+    return () => {
+      if (state.raf) cancelAnimationFrame(state.raf);
+    };
+  }, []);
+
+  return {
+    activeIndex,
+    groupOpen,
+    trackRef,
+    isExpanded,
+    isVisible,
+    select,
+    step,
+    toggleGroup,
+    dragProps,
+  };
 }

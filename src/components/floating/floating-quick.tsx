@@ -56,9 +56,8 @@ const FAN_OFFSET: Record<QuickId, { x: number; y: number }> = {
 /** 펼침 스태거 순서. 시안에 순서 지정이 없어 아래(오시는 길)→위로 훑는 각도 순으로 잡았다 */
 const FAN_ORDER: QuickId[] = ["map", "kakao", "naver", "event"];
 
-/** 모바일 하단바 배치 — 가운데 마스코트 FAB 기준 좌/우 2개씩 (Figma `2:3412` 순서) */
-const BAR_LEFT: QuickId[] = ["map", "kakao"];
-const BAR_RIGHT: QuickId[] = ["naver", "event"];
+/** 모바일 하단바 — 최신 시안 `48:3101` 은 마스코트가 빠진 **4구성**이다 */
+const BAR_ORDER: QuickId[] = ["map", "kakao", "naver", "event"];
 
 export function FloatingQuick({ messages }: FloatingQuickProps) {
   const isMobile = useIsMobileLayout();
@@ -117,41 +116,49 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
   }, [isOpen]);
 
   /* ── 모바일: 하단 고정 바 ─────────────────────────────────────────────── */
+  /**
+   * 수정요청 p4 — **이전 디자인이 남아 있던 자리.**
+   *
+   * 예전 시안(`2:3412`)은 좌 2 / 마스코트 FAB / 우 2 의 **5구성**이었고
+   * 마스코트가 바 한가운데에 파란 원으로 박혀 있었다.
+   * 최신 시안(`48:3099`)은 완전히 다르다:
+   *   - 마스코트는 바에서 **분리되어 바 위 8px, 오른쪽 끝**에 뜬다(60×60, 원판 없음)
+   *   - 바는 항목 **4개를 균등 배치**한다(justify-between)
+   *   - PC 처럼 "퀵메뉴" 그라디언트 원이나 말풍선은 모바일에 없다
+   */
   if (isMobile) {
-    const renderBarItem = (id: QuickId) => {
-      const Icon = ICONS[id];
-      return (
-        <li key={id}>
-          <button type="button" className={styles.bottomItem} data-action={id}>
-            <Icon className={styles.bottomIcon} />
-            <span className={styles.bottomLabel}>{labelOf(id)}</span>
-          </button>
-        </li>
-      );
-    };
-
     return (
-      <nav className={styles.bottomBar} aria-label="빠른 메뉴">
-        <ul className={styles.bottomList}>
-          {BAR_LEFT.map(renderBarItem)}
-          <li className={styles.bottomCenter}>
-            <button type="button" className={styles.mascotFab} aria-label={messages.chatbotBubble}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- 장식용 고정 크기 아이콘.
-                  next/image 로 두면 CSS 가 크기를 바꾼다며 종횡비 경고를 매번 낸다 */}
-              <img
-                className={styles.mascotImage}
-                src="/main/img_00_mascot-icon01.webp"
-                alt=""
-                width={40}
-                height={40}
-                loading="lazy"
-                decoding="async"
-              />
-            </button>
-          </li>
-          {BAR_RIGHT.map(renderBarItem)}
-        </ul>
-      </nav>
+      <div className={styles.bottomDock}>
+        <button type="button" className={styles.mascotButtonMo} aria-label={messages.chatbotBubble}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- 장식용 고정 크기 아이콘.
+              next/image 로 두면 CSS 가 크기를 바꾼다며 종횡비 경고를 매번 낸다 */}
+          <img
+            className={styles.mascotImage}
+            src="/main/img_00_mascot-icon01.webp"
+            alt=""
+            width={60}
+            height={60}
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+
+        <nav className={styles.bottomBar} aria-label="빠른 메뉴">
+          <ul className={styles.bottomList}>
+            {BAR_ORDER.map((id) => {
+              const Icon = ICONS[id];
+              return (
+                <li key={id}>
+                  <button type="button" className={styles.bottomItem} data-action={id}>
+                    <Icon className={styles.bottomIcon} />
+                    <span className={styles.bottomLabel}>{labelOf(id)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </div>
     );
   }
 
@@ -225,7 +232,8 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
       <div className={styles.chatRow}>
         {/* 평상시 노출되는 말풍선 — 팬 오픈 시 숨긴다 */}
         <p className={clsx(styles.bubble, isOpen && styles.bubbleHidden)} aria-hidden={isOpen}>
-          {messages.chatbotBubble}
+          {/* 그라데이션 글자는 별도 span — 알약 배경까지 clip 되면 안 된다 */}
+          <span className={styles.bubbleText}>{messages.chatbotBubble}</span>
         </p>
         <button type="button" className={styles.mascotButton} aria-label={messages.chatbotBubble}>
           {/* eslint-disable-next-line @next/next/no-img-element -- 위 주석과 같은 이유 */}

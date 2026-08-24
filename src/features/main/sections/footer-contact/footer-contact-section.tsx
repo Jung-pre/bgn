@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { SNS_LINKS } from "@/shared/config/nav";
 import type { FooterMessages } from "@/shared/i18n/messages";
 import { useSectionReveal } from "@/features/main/sections/common/use-section-reveal";
+import { useSceneActive } from "@/r3f/use-scene-active";
+import { ScrollTrigger, useGSAP } from "@/shared/lib/gsap";
+import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
 import styles from "./footer-contact-section.module.css";
+
+const SphereScene = dynamic(
+  () => import("@/features/main/sections/hero/scene-sphere").then((m) => m.SphereScene),
+  { ssr: false },
+);
 
 /**
  * 컨택트 + 푸터 — 시안 PC `2:2901` (1920×792) / 모바일 `2:5207` (375×853).
@@ -29,7 +38,89 @@ export interface FooterContactSectionProps {
 export function FooterContactSection({ messages }: FooterContactSectionProps) {
   const [branchId, setBranchId] = useState(messages.branches[0]?.id ?? "");
   const branch = messages.branches.find((b) => b.id === branchId) ?? messages.branches[0];
-  const sectionRef = useSectionReveal<HTMLElement>({ start: "top 90%" });
+  const isMobile = useIsMobileLayout();
+  const stageRef = useRef<HTMLDivElement>(null);
+  const footerRef = useSectionReveal<HTMLElement>({
+    start: "top 90%",
+    disabled: !isMobile,
+  });
+  const earthHostRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const earthProgressRef = useRef(0);
+  const earthActive = useSceneActive(earthHostRef);
+
+  /**
+   * PC 연출 순서 — **네 단계가 겹치지 않고 차례로** 간다.
+   *   ① 지도(파티클 지구)를 선명하게 보여 준다  ② 블러  ③ 어두워짐  ④ 카피 페이드인
+   *
+   * 예전에는 블러와 어두워짐이 `--earth-recede` 하나에 묶여 동시에 걸렸고,
+   * 게다가 `.earthInner` 가 상수 `blur(5px)` 로 시작해 지구가 한 번도 또렷하지
+   * 않았다. 그래서 "지도가 안 보인다 / 그냥 흐린 판이다"로 읽혔다.
+   *
+   * 모바일은 시안에 지구가 없어 pin 없이 기존 reveal 만 쓴다.
+   */
+  useGSAP(
+    () => {
+      const footer = footerRef.current;
+      if (!footer) return;
+
+      const paint = (blur: number, dim: number, copy: number, spin = blur) => {
+        footer.style.setProperty("--earth-blur", String(blur));
+        footer.style.setProperty("--earth-dim", String(dim));
+        footer.style.setProperty("--copy-in", String(copy));
+        /* 구체 자전량. 진행도를 그대로 넘겨 홀드 구간에서도 천천히 돈다
+           (Dev Mode 주석 "지구형태가 약간 돌면서"). */
+        earthProgressRef.current = spin;
+        const inner = innerRef.current;
+        if (inner) inner.style.pointerEvents = copy > 0.55 ? "auto" : "none";
+      };
+
+      if (isMobile || prefersReducedMotionSync()) {
+        paint(1, 1, 1, 1);
+        return;
+      }
+
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+      /**
+       * 단계별 구간(진행도 0~1). 앞 단계가 거의 끝날 때 다음이 시작하도록
+       * 살짝만 물린다 — 완전히 끊으면 계단처럼 보이고, 많이 겹치면 예전처럼
+       * "블러와 어두워짐이 한꺼번에" 가 된다.
+       *   ① 홀드   0.00 ~ 0.30   지도 선명
+       *   ② 블러   0.30 ~ 0.55
+       *   ③ 디밍   0.50 ~ 0.78
+       *   ④ 카피   0.60 ~ 0.94
+       */
+      const map = (p: number) => {
+        const blur = clamp01((p - 0.3) / 0.25);
+        const dim = clamp01((p - 0.5) / 0.28);
+        const copyLin = clamp01((p - 0.6) / 0.34);
+        const copy = 1 - (1 - copyLin) ** 3;
+        paint(blur, dim, copy, p);
+      };
+
+      map(0);
+
+      const st = ScrollTrigger.create({
+        trigger: stage,
+        start: "top top",
+        end: "bottom bottom",
+        pin: footer,
+        pinSpacing: true,
+        scrub: 0.7,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => map(self.progress),
+      });
+
+      return () => {
+        st.kill(true);
+      };
+    },
+    { scope: footerRef, dependencies: [isMobile] },
+  );
 
   /* 시안은 "일요일 휴진 │ 공휴일 정상 진료(…)" 로 세로 구분선을 둔 두 덩어리다.
      사전 원문이 파이프 하나로 이어져 있어 여기서 쪼갠다. */
@@ -38,8 +129,8 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  return (
-    <footer className={styles.footer} ref={sectionRef}>
+  const footer = (
+    <footer className={styles.footer} ref={footerRef}>
       {/*
         배경 장식. 전부 순수 장식이라 `aria-hidden` 컨테이너 안에 두고
         `alt=""` 로 낸다 — 푸터의 정보는 아래 .inner 가 전부 갖고 있다.
@@ -57,6 +148,30 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
           loading="lazy"
           decoding="async"
         />
+      </div>
+
+      {!isMobile ? (
+        <div ref={earthHostRef} className={styles.earth} aria-hidden>
+          <div className={styles.earthInner}>
+            <SphereScene
+              active={earthActive}
+              progressRef={earthProgressRef}
+              intensity={0.72}
+              haze={0.55}
+              showCore={false}
+              interactive={false}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div className={styles.dim} aria-hidden />
+
+      {/*
+        선화는 카피와 같이 페이드인한다. 지구 홀드 구간에 미리 나와 있으면
+        지도가 장식이 아니라 푸터처럼 읽힌다. 좌표는 시안 1920×792 프레임.
+      */}
+      <div className={styles.wires} aria-hidden>
         {/* 시안 8:2770 좌측 — 병원 건물 와이어프레임.
             알파가 있는 wire-4 를 쓴다(wire-1 은 같은 그림의 검은 배경 버전이라
             screen 블렌드가 필요하고, 그 경우 배경의 푸른 기가 선에 섞인다). */}
@@ -77,13 +192,14 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
           loading="lazy"
           decoding="async"
         />
-        {/* 시안 2:3005 / 2:2903 / 2:2902 — 얇은 원형 라인 3개 */}
+        {/* 시안 2:3005 / 2:2903 / 2:2902 — 얇은 원형 라인 3개.
+            건물과 같이 카피 페이드인 때 나온다. */}
         <span className={styles.ringLarge} />
         <span className={styles.ringMid} />
         <span className={styles.ringSmall} />
       </div>
 
-      <div className={styles.inner}>
+      <div className={styles.inner} ref={innerRef}>
         <ul className={styles.snsList} data-reveal-item>
           {SNS_LINKS.map((s) => (
             <li key={s.id}>
@@ -187,6 +303,14 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
         </div>
       </div>
     </footer>
+  );
+
+  if (isMobile) return footer;
+
+  return (
+    <div ref={stageRef} className={styles.stage}>
+      {footer}
+    </div>
   );
 }
 

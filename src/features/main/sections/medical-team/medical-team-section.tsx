@@ -3,6 +3,7 @@
 import Link from "next/link";
 import clsx from "clsx";
 import type { MedicalTeamSectionMessages } from "@/shared/i18n/messages";
+import { renderWithEmphasis } from "@/shared/lib/render-emphasis";
 import { crossLayout, useCrossCarousel } from "./use-cross-carousel";
 import { useTeamReveal } from "./use-team-reveal";
 import styles from "./medical-team-section.module.css";
@@ -67,10 +68,21 @@ function Chevron({ dir }: { dir: -1 | 1 }) {
 export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
   const sectionRef = useTeamReveal<HTMLElement>();
   const doctors = messages.doctors;
-  const { activeIndex, select, step, stageRef, dragProps } = useCrossCarousel(doctors.length);
+  const { activeIndex, select, step, pause, resume, stageRef, dragProps } =
+    useCrossCarousel(doctors.length);
 
   return (
-    <section ref={sectionRef} className={styles.section} aria-labelledby="team-title">
+    <section
+      ref={sectionRef}
+      className={styles.section}
+      aria-labelledby="team-title"
+      onPointerEnter={pause}
+      onPointerLeave={resume}
+      onFocusCapture={pause}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) resume();
+      }}
+    >
       <header className={styles.header} data-team-header>
         <div>
           <p className="eyebrow" lang="en" data-team-wipe>
@@ -83,7 +95,7 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
               i18n 에 값이 채워지기 전에는 렌더하지 않는다(빈 여백만 남는다). */}
           {messages.description ? (
             <p className={`section-desc ${styles.desc}`} data-team-fade>
-              {messages.description}
+              {renderWithEmphasis(messages.description, messages.descriptionEmphasis)}
             </p>
           ) : null}
         </div>
@@ -119,11 +131,6 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
                     onClick={() => select(i)}
                   >
                     <span className={styles.portrait}>
-                      {/* 시안 8:868 — 카드마다 뒤에 큰 `Bgn` 워터마크가 깔린다.
-                          로고 에셋(SVG)이 없어 텍스트로 세운다. 장식이라 a11y 트리에서 뺀다. */}
-                      <span className={styles.watermark} aria-hidden lang="en">
-                        Bgn
-                      </span>
                       {doctor.photo ? (
                         // eslint-disable-next-line @next/next/no-img-element -- 누끼 인물은 카드 폭에 맞춰 CSS 로 눕히므로 next/image 의 레이아웃 제어가 오히려 방해된다
                         <img

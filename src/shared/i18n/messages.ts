@@ -24,6 +24,12 @@ export interface SectionHeaderMessages {
   titleMarker?: string;
   /** 본문 2행 */
   description?: string;
+  /**
+   * 본문 중 SemiBold 로 강조할 어절 — 수정요청 p2(공통).
+   * 시안은 설명문 앞 절만 굵게 쓴다(`48:1113`). `description` 안에 그대로
+   * 들어 있는 부분 문자열을 적으면 첫 번째 일치만 `<strong>` 으로 감싼다.
+   */
+  descriptionEmphasis?: string;
 }
 
 /* ── 히어로 ─────────────────────────────────────────────────────────────── */
@@ -247,6 +253,7 @@ const ko: Dictionary = {
     title: "BGN 의료진",
     // 시안 2:1009 — "풍부한 수술 경험과 전문성"만 SemiBold, 나머지 Regular.
     description: "풍부한 수술 경험과 전문성을 바탕으로 더 나은 결과를 고민합니다.",
+    descriptionEmphasis: "풍부한 수술 경험과 전문성",
     cta: "의료진소개 보러가기",
     // 시안 도트 인디케이터가 8개 → 의료진 8인.
     //
@@ -293,6 +300,7 @@ const ko: Dictionary = {
     // 시안 2:1107 — 2행. 앞줄 "16년간 축적된 안과 데이터"가 SemiBold.
     description:
       "16년간 축적된 안과 데이터를 기반으로\n환자에게 가장 적합한 시력교정 솔루션을 제안합니다",
+    descriptionEmphasis: "16년간 축적된 안과 데이터",
     // 카드 본문은 각 카드의 본문 노드에서 그대로 옮겼다(2:1113 / 2:1128 / 2:1143 / 2:1155).
     steps: [
       {
@@ -331,6 +339,7 @@ const ko: Dictionary = {
     // `.desc` 가 white-space: pre-line 이라 개행이 그대로 살아난다.
     description:
       "25년 안과 노하우를 결합한 AI 시스템으로\n가장 안전하고 정확한 눈 건강 솔루션을 제안합니다",
+    descriptionEmphasis: "25년 안과 노하우를 결합",
     namePlaceholder: "이름을 입력해주세요",
     phonePlaceholder: "연락처를 입력해주세요",
     agreement: "개인정보 처리방침 동의",

@@ -1,0 +1,10 @@
+/* 이전 섹션을 pin 하고 다음 섹션이 위로 덮는 쌍.
+   pin-spacer 가 첫 자식이 되므로 커버는 :last-child 로 잡는다. */
+.pair {
+  position: relative;
+}
+
+.pair > :last-child {
+  position: relative;
+  z-index: 1;
+}

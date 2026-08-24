@@ -81,12 +81,16 @@
   --gradient-cta: linear-gradient(159deg, var(--primary-sub-500) 8.5%, var(--primary-500) 45%);
   /**
    * 브랜드 램프(**파랑 → 보라**, CTA 와 방향이 반대다).
-   * 그라데이션 텍스트(아이브로우)와 의료진 활성 카드 링이 이걸 쓴다.
+   * 의료진 활성 카드 링이 이걸 쓴다.
    * 링은 시안 2:3871 에서 방향이 분명하다 — 위 테두리 127,183,244(파랑),
    * 아래 테두리 104,98,169(보라). CTA 토큰(보라→파랑)을 그대로 쓰면 뒤집힌다.
    */
   --gradient-brand: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-sub-500) 100%);
   --gradient-dark-section: linear-gradient(135deg, #002040 0%, #003870 60%, #002850 100%);
+  /* Figma `gradiant 2` — 섹션 아이브로우(eng-point 2). 위 파랑 40% → 아래 네이비. */
+  --gradient-2: linear-gradient(180deg, var(--primary-500) 40%, var(--primary-900) 100%);
+  /* Figma `gradiant 3` — 상담 확대 아이브로우(eng-point 1). 다크 위, 180deg, 80%에서 끝. */
+  --gradient-3: linear-gradient(180deg, var(--primary-50) 0%, var(--primary-300) 80%);
 
   /* ── 시맨틱 ──────────────────────────────────────────────────────────── */
   --color-text-primary: var(--gray-800); /* 네비·본문 제목 (헤더 실측) */
@@ -217,8 +221,16 @@
   --gnb-shadow: 1px 2px 8px 0 rgba(16, 106, 170, 0.12);
 
   /* 모바일 GNB / 하단바 */
-  --gnb-height-mo: 50px;
-  --gnb-top-mo: 25px;
+  /* 시안 `2:3451` 실측 — pill 335×60 이 (20, 20) 에 놓인다.
+     예전 50 / 25 는 PDF 육안 추정치였다. 모바일 전체메뉴 헤더(`2:3840`, .moHeader)가
+     이미 60 / margin-top 20 으로 맞춰져 있어서 GNB 바만 혼자 어긋나 있었다. */
+  --gnb-height-mo: 60px;
+  --gnb-top-mo: 20px;
+  /* pill radius 도 PC(16)와 다르다 — 모바일은 8 이다 (`2:3451` rounded-[8px]) */
+  --gnb-radius-mo: 8px;
+  /* 시안 `2:3451` — `grayscale/background/whitebg-80` + blur 25 + 같은 섀도.
+     예전 whitebg-20 은 히어로 위에서 알약이 거의 안 보여 시안과 달랐다. */
+  --gnb-bg-mo: var(--whitebg-80);
   /* 시안 `8:3412` 실측 60. 예전 72 는 PDF 육안 추정치였다 —
      퀵바 컴포넌트가 토큰을 무시하고 60 을 따로 박아 두 값이 어긋나 있었다. */
   --mobile-bottombar-height: 60px;
@@ -387,14 +399,31 @@ button {
 /* --- 섹션 헤더 공식 -----------------------------------------------------------
    시안 전 섹션이 예외 없이 이 3단이다.
    개별 섹션에서 다시 정의하지 말고 이 클래스를 쓸 것. */
+/**
+ * 수정요청 p2(공통) — **영문 아이브로우는 32px 단색이 아니다.**
+ *
+ * 시안 스타일 토큰은 `pc/eng - point/eng - point 2` = Belleza Regular **24** /
+ * 1.25 / +1%, 그리고 채움은 단색이 아니라 Figma `gradiant 2` 이다
+ * (`48:1103` 이 `bg-clip-text` + 파랑→네이비). 32px 단색 primary-500 은
+ * 시안보다 크고 납작해서 헤드라인과의 위계가 무너져 있었다.
+ *
+ * ⚠️ `background-clip: text` 는 요소의 **배경 전체**를 글자 모양으로 자른다.
+ * 그래서 이 클래스에는 배경색을 절대 같이 주면 안 된다(플로팅 퀵메뉴에서
+ * 흰 알약이 통째로 사라졌던 그 이슈). 아이브로우는 배경이 없으므로 안전하다.
+ */
 .eyebrow {
+  width: fit-content;
   margin: 0;
   font-family: var(--font-display-stack);
-  font-size: var(--fs-eng-32);
+  font-size: var(--fs-eng-24);
   font-weight: var(--weight-regular);
-  line-height: 1.1;
+  line-height: var(--leading-tight);
   letter-spacing: var(--tracking-eng);
-  color: var(--primary-500);
+  background: var(--gradient-2);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .section-title {
@@ -411,12 +440,23 @@ button {
   font-size: var(--fs-20);
   line-height: var(--leading-normal);
   letter-spacing: var(--tracking-default);
-  color: var(--color-text-muted);
+  /* 수정요청 p2: 시안 본문은 gray-500 이 아니라 **gray-700**(#3d3d3d) 이다.
+     500 은 시안보다 두 단계 옅어 흰 배경에서 글이 떠 보였다. */
+  color: var(--color-text-body);
   /* 시안 설명문은 대부분 디자이너가 **의도적으로 끊은 2줄**이다.
      사전(i18n)에 그 줄바꿈이 `\n` 으로 들어 있는데 pre-line 이 없으면
      공백으로 접혀 한 줄로 흐른다. 좁은 화면에서는 자동 줄바꿈이 추가로 일어나므로
      `pre-wrap` 이 아니라 `pre-line` 이어야 한다(연속 공백은 접히는 게 맞다). */
   white-space: pre-line;
+}
+
+/**
+ * 수정요청 p2(공통) — 본문 안 **강조 어절**.
+ * 시안(`48:1113`)은 "25년 안과 노하우를 결합" 까지만 SemiBold 이고 나머지는
+ * Regular 다. 색은 바뀌지 않고 **굵기만** 올라간다 — 색까지 바꾸면 링크로 읽힌다.
+ */
+.desc-em {
+  font-weight: var(--weight-semibold);
 }
 
 /* 시안의 형광 마커 — 헤드라인 일부 어절을 감싼다.

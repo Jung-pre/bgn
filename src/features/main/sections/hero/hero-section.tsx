@@ -4,11 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
-import {
-  prefersReducedMotionSync,
-  useIsMobileLayout,
-  usePrefersReducedMotion,
-} from "@/shared/lib/use-media-query";
+import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 import { usePinnedProgress } from "@/features/main/sections/common/use-pinned-progress";
 import { useSceneActive } from "@/r3f/use-scene-active";
 import { Marquee } from "@/components/marquee/marquee";
@@ -16,12 +12,8 @@ import type { HeroSectionMessages } from "@/shared/i18n/messages";
 import {
   HERO_ASSETS,
   HERO_ASSETS_READY,
-  TOWER_CLOUD_BANDS,
-  TOWER_CLOUD_TOP_OFFSET,
-  TOWER_CLOUDS_TOP,
   TOWER_LINES,
   TOWER_STAGE,
-  TOWER_WATERMARK,
   type TowerSprite,
 } from "./hero-assets";
 import styles from "./hero-section.module.css";
@@ -143,7 +135,6 @@ function glRibbonsSnapshot() {
 }
 
 export function HeroSection({ messages }: HeroSectionProps) {
-  const isMobile = useIsMobileLayout();
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const sphereLayerRef = useRef<HTMLDivElement>(null);
   const towerLayerRef = useRef<HTMLDivElement>(null);
@@ -157,17 +148,9 @@ export function HeroSection({ messages }: HeroSectionProps) {
 
   /**
    * 타워 씬 패럴랙스 래퍼들. 매 프레임 transform 만 쓰므로 전부 ref 다.
-   * 배열이 아니라 개별 ref 인 이유는 레이어마다 속도가 달라서다(= 깊이감).
+   * 뒤판은 한 장이라 깊이감은 띠(가장 가깝다)와만 나눈다.
    */
-  const pxParticlesRef = useRef<HTMLDivElement>(null);
-  const pxCloudTopRef = useRef<HTMLDivElement>(null);
-  const pxWatermarkRef = useRef<HTMLDivElement>(null);
-  const pxBandRefs = [
-    useRef<HTMLDivElement>(null),
-    useRef<HTMLDivElement>(null),
-    useRef<HTMLDivElement>(null),
-  ];
-  const pxTowerRef = useRef<HTMLDivElement>(null);
+  const pxBackdropRef = useRef<HTMLDivElement>(null);
   const pxLinesRef = useRef<HTMLDivElement>(null);
   const sheenRef = useRef<HTMLDivElement>(null);
   const stageClipRef = useRef<HTMLDivElement>(null);
@@ -184,7 +167,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
   /**
    * 타워 레이어 마운트 게이트.
    *
-   * 타워 씬은 20장 넘는 대형 WebP 합성이라 히어로 첫 화면에서 같이 디코딩하면
+   * 타워 뒤판은 한 장이지만 2x WebP 라 히어로 첫 화면에서 같이 디코딩하면
    * 구체가 뜨기도 전에 메인 스레드를 잡아먹는다. 크로스페이드(0.45)보다
    * 한참 앞선 0.12 에서 **딱 한 번** state 를 뒤집어 마운트한다.
    * (매 프레임 setState 금지 규칙은 ref 가드로 지킨다)
@@ -260,22 +243,11 @@ export function HeroSection({ messages }: HeroSectionProps) {
 
       /**
        * 패럴랙스 — 타워가 등장한 뒤 구간(0.45~1)을 다시 0~1 로 편다.
-       *
-       * 값은 스테이지 크기 대비 %다. 시안이 정지 이미지 한 장이라 정답이 없어서,
-       * "가까운 것일수록 빨리 / 반대 방향으로도 흐르게" 라는 원칙만 잡았다.
-       *   타워(가장 멀다) < 파티클 < 상단 구름 < 하단 구름 띠 < 광선(가장 가깝다)
-       * 광선만 X 를 반대로 보내야 서로 스쳐 지나가는 게 눈에 보인다.
+       * 뒤판은 한 장(가장 멀다), 광선만 더 빨리 흘린다.
        */
       if (reducedRef.current === null) reducedRef.current = prefersReducedMotionSync();
       const u = reducedRef.current ? 0 : clamp01((p - FADE_START) / (1 - FADE_START));
-      shift(pxTowerRef.current, 0.6 * u, -1.1 * u);
-      shift(pxParticlesRef.current, 0, 1.8 * u);
-      shift(pxCloudTopRef.current, -2.4 * u, -1.6 * u);
-      /* 워터마크는 타워와 같은 깊이감으로 — 가장 멀리 있는 축에 가깝게 아주 조금만 */
-      shift(pxWatermarkRef.current, 0.9 * u, -1.3 * u);
-      shift(pxBandRefs[0]?.current ?? null, 3.6 * u, 2.6 * u);
-      shift(pxBandRefs[1]?.current ?? null, 2.0 * u, 1.4 * u);
-      shift(pxBandRefs[2]?.current ?? null, 2.8 * u, 2.0 * u);
+      shift(pxBackdropRef.current, 0.6 * u, -1.1 * u);
       /* 셰이더 판은 그룹 이동까지 캔버스 안에서 처리한다 — 여기서 또 밀면 두 배가 된다 */
       ribbonProgressRef.current = u;
       shift(pxLinesRef.current, 4.5 * u, 1.0 * u);
@@ -436,101 +408,53 @@ export function HeroSection({ messages }: HeroSectionProps) {
         {/* ── 배경 레이어 ─────────────────────────────────────────────── */}
         <div ref={sphereLayerRef} className={styles.sphereLayer} aria-hidden>
           <div className={styles.sphereBg} />
+
+          {/* 시그니처 마퀴 — Figma 2:410 : top 583, Marcellus 108px, `*` 구분자.
+              ⚠️ 자리가 여기인 게 중요하다: **배경 뒤, 캔버스 앞**.
+              수정요청(26.08.24) "지구가 뒤로 가게 … 글자가 보이지 않도록" 대로
+              구체가 문구를 가리려면 캔버스가 문구보다 나중에 그려져야 한다.
+              래퍼는 opacity 만 맡는다 — 위치는 그대로 `.marquee` 가 갖는다. */}
+          <div ref={marqueeRef}>
+            {/* 수정요청: 문구가 너무 빨라 읽히지 않는다 → 28s → 46s */}
+            <Marquee text={messages.marquee} className={styles.marquee} duration={46} />
+          </div>
           <div ref={canvasHostRef} className={styles.canvasHost}>
             {/* ⚠️ 크로스페이드 도중에 이 캔버스를 마운트/언마운트하지 않는다.
                 컨텍스트를 만들고 없앨 때마다 브라우저가 GPU 자원을 재배치하는데,
                 하필 그 순간이 띠 캔버스가 처음 보여야 할 타이밍이라 띠가 비어
                 보인다(전환이 끝나야 나타나던 증상). 두 캔버스를 그냥 계속 둔다. */}
-            <SphereScene active={sceneActive} progressRef={progressRef} />
+            {/* intensity 는 바디 알파를 건드리므로 1 유지.
+               밝기는 헤이즈(가산)만 내려서 구체를 어둡게 한다. */}
+            <SphereScene active={sceneActive} progressRef={progressRef} haze={0.32} />
           </div>
         </div>
 
-        {/* 타워 씬 — Figma 메인_02(8:2877) 1920×920 합성 재현.
-            아래에서 위로: 하늘 → 파티클 텍스처 → 상단 구름 → 하단 구름 띠 → 타워 → 광선.
-            시안에서는 타워/광선이 카피 위에 있지만, 65% 타워가 본문을 덮으면
+        {/* 타워 씬 — 뒤판 한 장(`img_01_bg02`) + 그 위 라인 무빙.
+            시안에서는 타워/광선이 카피 위에 있지만, 타워가 본문을 덮으면
             가독성이 떨어져서 카피는 그대로 위(z-content)에 둔다. */}
         <div ref={towerLayerRef} className={styles.towerLayer} aria-hidden>
           <div className={styles.towerSky} />
           {HERO_ASSETS_READY && towerMounted ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className={styles.towerSkyImg}
-                src={HERO_ASSETS.sky}
-                alt=""
-                decoding="async"
-                loading="eager"
-              />
+              <div ref={pxBackdropRef} className={styles.px}>
+                <picture>
+                  <source
+                    media="(max-width: 768px)"
+                    srcSet={HERO_ASSETS.backdropMo}
+                    type="image/webp"
+                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className={styles.towerSkyImg}
+                    src={HERO_ASSETS.backdrop}
+                    alt=""
+                    decoding="async"
+                    loading="eager"
+                  />
+                </picture>
+              </div>
 
               <div className={styles.towerStage}>
-                {/* 파티클 텍스처 — 8:2880 */}
-                <div
-                  ref={pxParticlesRef}
-                  className={clsx(styles.px, styles.softLight, styles.particlesPx)}
-                >
-                  <div className={styles.particlesBox}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      className={styles.particlesImg}
-                      src={HERO_ASSETS.particles}
-                      alt=""
-                      decoding="async"
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-
-                {/* 상단 구름 — 8:2881 과 그 평행이동 복사본 8:2892 */}
-                <div ref={pxCloudTopRef} className={clsx(styles.px, styles.cloudTop)}>
-                  {TOWER_CLOUDS_TOP.map((s) => (
-                    <TowerSpriteImg key={s.node} sprite={s} />
-                  ))}
-                  {TOWER_CLOUDS_TOP.map((s) => (
-                    <TowerSpriteImg
-                      key={`dup-${s.node}`}
-                      sprite={{
-                        ...s,
-                        x: s.x + TOWER_CLOUD_TOP_OFFSET.x,
-                        y: s.y + TOWER_CLOUD_TOP_OFFSET.y,
-                      }}
-                    />
-                  ))}
-                </div>
-
-                {/* `BGn` 워터마크 — 8:759. 시안 z-순서가 상단 구름과 하단 구름 띠
-                 **사이**라 여기 놓는다. 타워보다 뒤이므로 첨탑에 가려진다. */}
-                <div ref={pxWatermarkRef} className={styles.px}>
-                  <TowerSpriteImg sprite={TOWER_WATERMARK} />
-                </div>
-
-                {/* 하단 구름 띠 — 8:2904 의 세 덩어리. 각각 다른 속도로 흐른다 */}
-                {TOWER_CLOUD_BANDS.map((band, i) => (
-                  <div
-                    key={band[0]?.node ?? i}
-                    ref={pxBandRefs[i]}
-                    className={clsx(styles.px, styles.cloudBand)}
-                    data-band={i}
-                  >
-                    {band.map((s) => (
-                      <TowerSpriteImg key={s.node} sprite={s} />
-                    ))}
-                  </div>
-                ))}
-
-                {/* 타워 — 8:2946 */}
-                <div ref={pxTowerRef} className={styles.px}>
-                  <div className={styles.towerCrop}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      className={styles.towerPic}
-                      src={HERO_ASSETS.tower}
-                      alt=""
-                      decoding="async"
-                      loading="eager"
-                    />
-                  </div>
-                </div>
-
                 {/* 광선/웨이브 — 8:2949. 시안에서 프레임 마스크로 잘려 있다.
                     clip 을 패럴랙스 래퍼 바깥에 둬야 잘리는 사각형이 안 움직인다.
 
@@ -570,7 +494,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
            * 도착한다 → 띠가 "띡" 하고 튀어나온다.
            *
            * 이 셰이더는 텍스처를 안 쓴다(절차적 생성). 그래서 일찍 올려도 비용이
-           * 컨텍스트 하나뿐이고, 타워 이미지 24장은 그대로 0.12 에서 받는다.
+           * 컨텍스트 하나뿐이고, 뒤판 한 장은 그대로 0.12 에서 받는다.
            *
            * 위치는 타워 블록 **뒤**다 — 형제 순서가 곧 z 순서라 띠가 타워 위에 온다.
            */}
@@ -614,13 +538,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
               />
             </p>
           </div>
-        </div>
-
-        {/* 시그니처 마퀴 — Figma 2:410 : top 583, Marcellus 108px, `*` 구분자.
-            래퍼는 opacity 만 맡는다 — 위치는 그대로 `.marquee` 가 갖는다
-            (래퍼에 position 을 주면 absolute 기준이 바뀐다). */}
-        <div ref={marqueeRef}>
-          <Marquee text={messages.marquee} className={styles.marquee} duration={28} />
         </div>
 
         {/* 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 + 40 흰 채움 */}

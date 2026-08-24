@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
@@ -136,16 +137,31 @@ export function Gnb({ locale, messages }: GnbProps) {
     <>
       <header
         className={clsx(styles.header, isHidden && styles.headerHidden)}
+        data-mega-open={isMegaOpen || undefined}
         onBlur={handleBlur}
         /* 메가메뉴가 열리면 오버레이가 헤더를 덮는다 — 뒤로 탭이 새지 않게 비활성화 */
         inert={isMegaOpen}
       >
         <div className={styles.pill}>
           <Link href={`/${locale}`} className={styles.logo} aria-label="BGN 밝은눈안과">
-            <span className={styles.logoMark} lang="en">
-              BGN
-            </span>
-            <span className={styles.logoText}>밝은눈안과</span>
+            {/**
+             * 수정요청 p7-①: 시안(`48:570`)의 GNB 로고는 **텍스트가 아니라 이미지**다
+             * (`logo02 2 [Vectorized]` 202×36, 모바일 `48:3386` 168×30).
+             * 텍스트 조합으로는 "BGn" 스크립트 자체(세리프 이탤릭 합자)와
+             * `밝은`·`눈`의 시안 컬러 카운터를 재현할 수 없다.
+             *
+             * `priority` — GNB 는 항상 첫 화면에 있다. lazy 로 두면 히어로가 뜬 뒤
+             * 로고만 늦게 들어와 헤더가 한 번 껌뻑인다.
+             */}
+            <Image
+              src="/main/logo.png"
+              alt=""
+              width={202}
+              height={36}
+              className={styles.logoImage}
+              priority
+              sizes="202px"
+            />
           </Link>
 
           {/* PC 인라인 네비 — 1024 이하에서는 CSS 로 숨긴다 */}

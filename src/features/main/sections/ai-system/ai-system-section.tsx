@@ -6,6 +6,7 @@ import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/li
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 import { Marquee } from "@/components/marquee/marquee";
 import type { AiStepMessages, AiSystemSectionMessages } from "@/shared/i18n/messages";
+import { renderWithEmphasis } from "@/shared/lib/render-emphasis";
 import { countUpTween, formatNumeric, parseNumericLabel } from "./count-up";
 import styles from "./ai-system-section.module.css";
 
@@ -229,7 +230,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         </h2>
         {messages.description ? (
           <p className={clsx("section-desc", styles.wipeLine)} data-wipe>
-            {messages.description}
+            {renderWithEmphasis(messages.description, messages.descriptionEmphasis)}
           </p>
         ) : null}
       </header>
@@ -242,7 +243,11 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
           (`smooth-scroll-provider.tsx`) — 모바일 가로 스와이프는 그대로 산다. */}
       <ol className={styles.grid}>
         {messages.steps.map((step, index) => (
-          <li key={step.step} className={styles.card} data-ai-card>
+          <li
+            key={step.step}
+            className={clsx(styles.card, index === 3 && styles.cardLavender)}
+            data-ai-card
+          >
             <div className={styles.art} aria-hidden>
               <StepArt index={index} />
             </div>
@@ -292,7 +297,7 @@ function renderWithMark(title: string, marker?: string) {
 /* ── 카드 배경 오브젝트 (8:962 — 1~3번 카드의 3D 렌더 사진) ──────────────── */
 
 /**
- * 카드별 오브젝트. 위치·크기는 CSS(`.artCard1~3`)에서 카드 폭 대비 %로 잡는다 —
+ * 카드별 오브젝트. 에셋은 832×912 @2x 라 카드 폭 100%(1x = 416)로 깐다.
  * 카드가 aspect-ratio 로 줄어드는 구조라 px 로 박으면 1440 에서 어긋난다.
  *
  * 전부 장식이다. 사진이 전하는 정보는 옆의 제목·설명·배지가 이미 글자로 갖고 있어
@@ -300,9 +305,9 @@ function renderWithMark(title: string, marker?: string) {
  * (`.art` 래퍼에 `aria-hidden` 이 걸려 있어 이중으로 막힌다.)
  */
 const STEP_ART = [
-  { src: "/main/img_04_eye01.webp", width: 1536, height: 1024, className: "artCard1" },
-  { src: "/main/img_04_eye02.webp", width: 1536, height: 1024, className: "artCard2" },
-  { src: "/main/img_04_eye03.webp", width: 1672, height: 941, className: "artCard3" },
+  { src: "/main/img_04_eye01.webp", width: 832, height: 912 },
+  { src: "/main/img_04_eye02.webp", width: 832, height: 912 },
+  { src: "/main/img_04_eye03.webp", width: 832, height: 912 },
 ] as const;
 
 function StepArt({ index }: { index: number }) {
@@ -312,7 +317,7 @@ function StepArt({ index }: { index: number }) {
   return (
     /* eslint-disable-next-line @next/next/no-img-element -- 카드 폭에 %로 물려 있어 next/image 의 고정 sizes 계산과 맞지 않는다 */
     <img
-      className={clsx(styles.artImage, styles[art.className])}
+      className={styles.artImage}
       src={art.src}
       alt=""
       width={art.width}

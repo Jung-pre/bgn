@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import clsx from "clsx";
 import Link from "next/link";
 import { useSectionReveal } from "@/features/main/sections/common/use-section-reveal";
 import { VideoSlot } from "@/components/video-slot/video-slot";
 import type { AiConsultSectionMessages } from "@/shared/i18n/messages";
+import { gsap } from "@/shared/lib/gsap";
+import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
+import { renderWithEmphasis } from "@/shared/lib/render-emphasis";
 import styles from "./ai-consult-section.module.css";
 
 /**
@@ -23,12 +27,11 @@ import styles from "./ai-consult-section.module.css";
  * ## 우측 762×762
  * `2:1242` `magnific_the-object-floats-slowly-…` — 주석 원문:
  *   "영상 삽입 예정 / 해당 영역 클릭시 하단 상담신청 Fade in"
- * 3D 유리 `B` 를 만들 자리가 아니라 **영상 슬롯**이다. 클릭하면 딤 위로 폼이
- * 페이드인하는 확대 상태(`8:1118`)로 전환된다.
+ * 3D 유리 `B` 를 만들 자리가 아니라 **영상 슬롯**이다. 클릭하면 왼쪽 카피가
+ * 자리를 유지한 채 카메라 쪽으로 커지며 중앙 확대 상태(`8:1118`)로 간다.
  *
- * 영상은 아직 없지만 시안의 그 프레임(유리 재질 B 로고)이 스틸로 들어왔다 →
- * `VideoSlot` 의 `poster` 로 넣는다. VideoSlot 은 `src` 없이 `poster` 만으로
- * <img> 를 렌더하므로, 나중에 영상이 오면 `src` 한 줄만 추가하면 된다.
+ * 납품 클립은 알파가 없다(모서리 RGB 255, a 255). WebM/MP4 로는 진짜 투명이
+ * 안 되므로 흰 픽셀은 `mix-blend-mode: multiply` 로 섹션/메시에 녹인다.
  *
  * 확대 상태에서 폼을 **복제하지 않는다.** 같은 DOM 에 클래스만 얹어 위치를 바꾼다.
  * 복제하면 입력값·동의 체크가 두 벌로 갈라진다.
@@ -46,25 +49,80 @@ const CLOSE_LABEL = "상담 신청 닫기";
 
 export function AiConsultSection({ messages }: AiConsultSectionProps) {
   const sectionRef = useSectionReveal<HTMLElement>();
+  const stageRef = useRef<HTMLDivElement>(null);
 
   const [agreed, setAgreed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const isMobile = useIsMobileLayout();
+
+  /**
+   * 왼쪽 카피 → 중앙 확대. `position` 은 보간되지 않으니 레이아웃을 먼저 바꾼 뒤
+   * 이전 자리로 되돌린 다음, 스케일과 함께 제자리로 보낸다(FLIP).
+   * 시작 스케일을 한 단 더 작게 잡아 카메라 쪽으로 다가오는 느낌을 만든다.
+   */
+  const animateStage = useCallback((next: boolean) => {
+    const stage = stageRef.current;
+    if (!stage || prefersReducedMotionSync()) {
+      setExpanded(next);
+      return;
+    }
+
+    const first = stage.getBoundingClientRect();
+    flushSync(() => setExpanded(next));
+    const last = stage.getBoundingClientRect();
+
+    const dx = first.left + first.width / 2 - (last.left + last.width / 2);
+    const dy = first.top + first.height / 2 - (last.top + last.height / 2);
+    const sx = first.width / Math.max(last.width, 1);
+    const fromScale = next ? Math.min(sx, 1) * 0.86 : sx;
+
+    gsap.fromTo(
+      stage,
+      { x: dx, y: dy, scale: fromScale, transformOrigin: "center center" },
+      {
+        x: 0,
+        y: 0,
+        scale: 1,
+        duration: next ? 0.72 : 0.48,
+        ease: next ? "power3.out" : "power2.inOut",
+        overwrite: true,
+        clearProps: "transform",
+      },
+    );
+  }, []);
+
+  const open = useCallback(() => {
+    if (expanded || isMobile) return;
+    animateStage(true);
+  }, [animateStage, expanded, isMobile]);
 
   const close = useCallback(() => {
-    setExpanded(false);
+    if (!expanded) return;
+    animateStage(false);
+  }, [animateStage, expanded]);
+
+  useEffect(() => {
+    return () => {
+      gsap.killTweensOf(stageRef.current);
+    };
   }, []);
+
+  /* 모바일 시안에는 확대 상태가 없다. 폭이 넘어오면 닫아 둔다. */
+  useEffect(() => {
+    if (isMobile && expanded) close();
+  }, [close, expanded, isMobile]);
 
   // 확대 상태는 딤이 화면을 덮으므로 Esc 탈출구가 없으면 갇힌다.
   useEffect(() => {
     if (!expanded) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExpanded(false);
+      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [expanded]);
+  }, [close, expanded]);
 
   return (
     <section
@@ -102,86 +160,99 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
               : undefined
           }
         >
-          <p className={styles.eyebrow} lang="en">
-            {messages.eyebrow}
-          </p>
-          <h2 id="consult-title" className={styles.title}>
-            {renderWithMark(messages.title, messages.titleMarker)}
-          </h2>
-          {messages.description ? <p className={styles.desc}>{messages.description}</p> : null}
+          <div ref={stageRef} className={styles.copyStage}>
+            <p className={styles.eyebrow} lang="en">
+              {messages.eyebrow}
+            </p>
+            <h2 id="consult-title" className={styles.title}>
+              {renderWithMark(messages.title, messages.titleMarker)}
+            </h2>
+            {messages.description ? (
+              <p className={styles.desc}>
+                {renderWithEmphasis(messages.description, messages.descriptionEmphasis)}
+              </p>
+            ) : null}
 
-          <form
-            className={styles.form}
-            onSubmit={(e) => {
-              e.preventDefault();
-              // TODO: 제출 API 연동
-            }}
-          >
-            <div className={styles.fields}>
-              <label className={styles.field}>
-                <span className="sr-only">이름</span>
-                <PersonIcon />
-                <input type="text" name="name" placeholder={messages.namePlaceholder} required />
-              </label>
-              <label className={styles.field}>
-                <span className="sr-only">연락처</span>
-                <PhoneIcon />
-                <input
-                  type="tel"
-                  name="phone"
-                  inputMode="tel"
-                  placeholder={messages.phonePlaceholder}
-                  required
-                />
-              </label>
+            <form
+              className={styles.form}
+              onSubmit={(e) => {
+                e.preventDefault();
+                // TODO: 제출 API 연동
+              }}
+            >
+              <div className={styles.fields}>
+                <label className={styles.field}>
+                  <span className="sr-only">이름</span>
+                  <PersonIcon />
+                  <input type="text" name="name" placeholder={messages.namePlaceholder} required />
+                </label>
+                <label className={styles.field}>
+                  <span className="sr-only">연락처</span>
+                  <PhoneIcon />
+                  <input
+                    type="tel"
+                    name="phone"
+                    inputMode="tel"
+                    placeholder={messages.phonePlaceholder}
+                    required
+                  />
+                </label>
 
-              <label className={styles.agree}>
-                <input
-                  type="checkbox"
-                  checked={agreed}
-                  onChange={(e) => setAgreed(e.target.checked)}
-                  required
-                />
-                <span className={styles.checkbox} aria-hidden>
-                  <CheckIcon />
-                </span>
-                <span>{messages.agreement}</span>
-                <Link href="/policy/privacy" className={styles.agreeLink}>
-                  [{messages.agreementLink}]
-                </Link>
-              </label>
-            </div>
+                <label className={styles.agree}>
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                    required
+                  />
+                  <span className={styles.checkbox} aria-hidden>
+                    <CheckIcon />
+                  </span>
+                  <span>{messages.agreement}</span>
+                  <Link href="/policy/privacy" className={styles.agreeLink}>
+                    [{messages.agreementLink}]
+                  </Link>
+                </label>
+              </div>
 
-            <button type="submit" className={styles.submit} disabled={!agreed}>
-              {messages.submit}
-              <ArrowIcon />
-            </button>
-          </form>
+              <button type="submit" className={styles.submit} disabled={!agreed}>
+                {messages.submit}
+                <ArrowIcon />
+              </button>
+            </form>
+          </div>
         </div>
 
-        {/* 2:1242 — 762×762 영상 슬롯. 주석: "해당 영역 클릭시 하단 상담신청 Fade in" */}
-        <button
-          type="button"
-          className={styles.media}
-          data-reveal-item
-          aria-expanded={expanded}
-          aria-label={EXPAND_LABEL}
-          onClick={() => {
-            setExpanded(true);
-          }}
-        >
-          {/* 2번 영상 — 유리 재질 B 가 천천히 떠 있는 1:1 클립.
-              시안 주석이 "영상 삽입 예정" 이던 자리다. 정사각(1440²)으로 왔고
-              표시 크기가 762px 라 1080² 로 다시 떠서 878KB(원본 7.8MB)로 줄였다.
-              poster 는 그대로 둔다 — 바이트가 도착하기 전 첫 프레임을 채운다. */}
-          <VideoSlot
-            decorative
-            src="/main/video_main02.mp4"
-            srcWebm="/main/video_main02.webm"
-            poster="/main/img_05_logo-glass01.webp"
-            className={styles.objectVideo}
-          />
-        </button>
+        {/* 2:1242 — 762×762 영상 슬롯. 주석: "해당 영역 클릭시 하단 상담신청 Fade in"
+            모바일 시안(`2:3971`)에는 확대 상태가 없어서 클릭을 막는다. */}
+        {isMobile ? (
+          <div className={styles.media} data-reveal-item>
+            <VideoSlot
+              decorative
+              src="/main/video_main02.mp4"
+              srcWebm="/main/video_main02.webm"
+              poster="/main/img_05_logo-glass01.webp"
+              className={styles.objectVideo}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={styles.media}
+            data-reveal-item
+            aria-expanded={expanded}
+            aria-label={EXPAND_LABEL}
+            onClick={open}
+          >
+            <VideoSlot
+              decorative
+              src="/main/video_main02.mp4"
+              srcWebm="/main/video_main02.webm"
+              poster="/main/img_05_logo-glass01.webp"
+              className={styles.objectVideo}
+            />
+          </button>
+        )}
       </div>
 
       <button

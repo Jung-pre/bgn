@@ -187,7 +187,7 @@
 }
 
 /* --- 타임라인 노드 ------------------------------------------------------------ */
-/* 시안 실측 ≈ 12px. 18px + 6px 링이면 시안보다 두 배 굵게 보였다. */
+/* 중심 점 ≈ 12px. 뒤 30px 헤일은 시안 SVG(`48:2063`) 라디얼. */
 .node {
   position: relative;
   z-index: 1;
@@ -195,20 +195,28 @@
   height: 0.75rem;
   border-radius: var(--radius-full);
   background: var(--color-line);
-  /* 축 선을 가리는 링. 섹션 배경색과 같아야 한다 */
-  box-shadow: 0 0 0 6px var(--color-white);
   transition:
     background-color 0.4s ease,
-    box-shadow 0.4s ease,
     scale 0.4s ease;
+}
+
+.node::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.875rem; /* 30 */
+  height: 1.875rem;
+  border-radius: var(--radius-full);
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at center, rgb(0 123 255 / 0.3) 0%, rgb(0 123 255 / 0.08) 100%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* 세트가 등장하면 GSAP 이 li 에 data-visible 을 단다(클래스 이름을 JS 로 넘기지 않는다) */
 .era[data-visible="true"] .node {
   background: var(--brand-primary);
-  box-shadow:
-    0 0 0 6px var(--color-white),
-    0 0 0 9px var(--primary-100);
 }
 
 /* --- 이미지 카드 -------------------------------------------------------------- */

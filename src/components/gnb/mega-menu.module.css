@@ -6,10 +6,9 @@
 
 /**
  * ⚠️ `overflow: hidden` 이 필요하다.
- * 닫힘 상태의 `.panel` 은 `translateX(100%)` 로 화면 오른쪽 밖에 세워 둔다.
- * 이 오버레이가 자르지 않으면 그 패널이 문서 가로 폭을 늘린다
- * (1024 에서 1009px 짜리 패널이 통째로 스크롤 영역에 잡혔다).
- * 전체 뷰포트를 덮는 고정 오버레이라 잘라도 잃는 것이 없다.
+ * 닫힘 상태의 `.menuSide`(PC) / `.panel`(모바일) 은 `translateX(100%)` 로
+ * 화면 오른쪽 밖에 세워 둔다. 이 오버레이가 자르지 않으면 그 패널이
+ * 문서 가로 폭을 늘린다 (1024 에서 통째로 스크롤 영역에 잡혔다).
  */
 .root {
   position: fixed;
@@ -18,11 +17,15 @@
   visibility: hidden;
   pointer-events: none;
   overflow: hidden;
+  /* 닫힘 슬라이드가 끝나기 전에는 숨기지 않는다. `rootOpen` 을 빼는 순간
+     visibility 가 같이 hidden 이면 닫힘 모션이 통째로 잘린다. */
+  transition: visibility 0s linear 0.45s;
 }
 
 .rootOpen {
   visibility: visible;
   pointer-events: auto;
+  transition: visibility 0s linear 0s;
 }
 
 .backdrop {
@@ -49,129 +52,113 @@
   inset: 0;
   display: grid;
   grid-template-columns: 25% 1fr; /* 480 / 1440 @1920 */
-  transform: translateX(100%);
-  transition: transform 0.45s cubic-bezier(0.33, 1, 0.68, 1);
-}
-
-.rootOpen .panel {
-  transform: translateX(0);
+  /**
+   * PC 에서는 래퍼를 밀지 않는다. 좌측 브랜드(타워)까지 `translateX(100%)` 로
+   * 같이 밀면 왼쪽에 있어야 할 패널이 화면 오른쪽에서 가로질러 날아온다.
+   * 슬라이드는 `.menuSide` 만, 브랜드는 제자리에서 페이드.
+   * (모바일은 아래 768 쿼리에서 패널 자체를 민다.)
+   */
 }
 
 /* --- 좌측 브랜드 패널 -------------------------------------------------------- */
 /**
- * 주간 롯데월드타워 실사(`/main/img_00_menu-bg01.webp`, 2880×1621) 위에 블루 오버레이.
- * 사진이 가로컷이라 세로 패널에 맞추려면 타워가 있는 x≈74% 를 기준으로 잘라야 한다.
+ * 타워 + BGn 워터마크 + 딤이 한 장에 들어간 2x 컷(`/main/bg_gnb_side.png`, 960×1840).
+ * 1x 는 480×920 — 시안 패널과 같다. 합성·워터마크 DOM 은 두지 않는다.
  *
- * ⚠️ 배경 이미지는 `.rootOpen` 에서만 건다. 오버레이는 닫혀 있어도 DOM 에 남아 있어서
- *    `.brandPanel` 에 그냥 걸면 첫 로드에 355KB 를 아무도 안 보는 채로 받는다.
+ * ⚠️ 배경은 `.rootOpen` 에서만 건다. 오버레이는 닫혀 있어도 DOM 에 남아 있어서
+ *    `.brandPanel` 에 그냥 걸면 첫 로드에 이미지를 아무도 안 보는 채로 받는다.
  */
 .brandPanel {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 24px 80px 56px; /* 로고가 GNB 로고와 같은 x=80 에 오도록 */
-  background: var(--gradient-dark-section);
+  /* 시안 `48:632` 실측 — pt 46 / pb 48 / px 80 */
+  padding: 46px 80px 48px;
+  background: var(--brand-navy);
   color: var(--color-white);
   overflow: hidden;
+  opacity: 0;
+  transform: translateX(-24px);
+  transition:
+    opacity 0.4s ease,
+    transform 0.45s cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 .rootOpen .brandPanel {
+  opacity: 1;
+  transform: none;
   background:
-    linear-gradient(
-        180deg,
-        rgba(12, 30, 66, 0.5) 0%,
-        rgba(12, 30, 66, 0.14) 34%,
-        rgba(12, 30, 66, 0.46) 66%,
-        rgba(12, 30, 66, 0.82) 100%
-      )
-      center / cover no-repeat,
-    /* 타워가 원본 x≈74% 에 있다 — 세로로 잘릴 때 패널 가운데에 오도록 81% 로 민다 */
-    url("/main/img_00_menu-bg01.webp") 81% 50% / cover no-repeat,
+    url("/main/bg_gnb_side.png") center / cover no-repeat,
     var(--brand-navy);
 }
 
 /* 로고는 GNB pill 의 로고와 같은 높이(=pill 세로 중앙)에 온다 */
 .brandLogo {
   position: relative;
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem;
-  height: var(--gnb-height);
-  align-content: center;
-  flex-wrap: wrap;
-  color: var(--color-white);
+  display: block;
+  width: 202px;
+  height: 36px;
 }
 
-.brandLogoMark {
-  font-family: var(--font-display-stack);
-  font-size: 24px;
-  letter-spacing: var(--tracking-eng);
-}
-
-.brandLogoText {
-  font-size: 18px;
-  font-weight: var(--weight-semibold);
-}
-
-/* 워터마크는 패널 상단이 아니라 **세로 중앙**에 놓이고 폭의 3/4 를 차지한다.
-   Belleza(--font-display-stack)는 산세리프라 시안의 세리프 워터마크와 다르다 → Marcellus. */
-.brandMark {
-  position: absolute;
-  top: 47%;
-  left: 50%;
-  margin: 0;
-  transform: translate(-50%, -50%);
-  font-family: var(--font-marcellus-stack);
-  font-style: italic;
-  font-size: min(10.5vw, 200px);
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.22);
-  pointer-events: none;
+.brandLogoImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .brandContact {
-  position: relative; /* 절대배치된 워터마크(.brandMark) 위로 올린다 */
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px; /* 시안 `48:659` */
 }
 
 .brandTelRow {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 4px;
   margin: 0;
 }
 
 .brandTelLabel {
-  font-size: var(--fs-18);
-  font-weight: var(--weight-medium);
-  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--fs-26);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-100);
 }
 
 .brandTel {
   font-size: var(--fs-32);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-default);
-  color: var(--color-white);
+  color: var(--gray-200);
 }
 
 .snsList {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* 48px 배지 — 유튜브만 흰 바탕, 나머지는 blackbg-50 + blur (`48:664`~`48:670`) */
 .snsItem {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   transition: transform 0.2s ease;
+}
+
+.snsItemLight {
+  background: var(--color-white);
 }
 
 .snsItem:hover,
@@ -179,18 +166,27 @@
   transform: translateY(-2px);
 }
 
+.brandDivider {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .brandAddress {
   margin: 0;
-  font-size: var(--fs-14);
-  line-height: var(--leading-normal);
-  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--fs-16);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-200);
 }
 
 /* --- 우측 메뉴 패널 ---------------------------------------------------------- */
 /**
- * 시안에서 이 영역은 **불투명 흰색이 아니다.** 뒤에 있는 GNB pill 과 히어로가
- * 옅게 비쳐 보인다 → 반투명 화이트 + blur 로 그 톤을 만든다.
+ * 시안에서 이 영역은 **불투명 흰색이 아니다.** 뒤 히어로가 옅게 비친다.
  * 좌상단/우하단의 옅은 블루·퍼플 블룸도 시안에 있는 요소다.
+ * GNB pill 은 열림과 함께 숨기므로 네비 글자가 카테고리와 겹치지 않는다.
  */
 .menuSide {
   position: relative;
@@ -202,9 +198,17 @@
     radial-gradient(46% 46% at 94% 82%, rgba(141, 121, 255, 0.16), transparent 72%),
     rgba(249, 251, 255, 0.94);
   /* ⚠️ 25px 은 전체화면 + translateX 트랜지션과 겹치면 합성 비용이 급격히 는다.
-     배경이 이미 0.94 불투명이라 12px 로도 시안의 "비쳐 보임"이 그대로 난다. */
+     배경이 이미 0.94 불투명이라 12px 로도 시안의 "비쳐 보임"이 그대로 난다.
+     부모 `.panel` 에 transform 을 걸면 이 블러가 통째로 죽는다(GNB 글자가
+     메뉴 위에 선명하게 겹친다). 슬라이드는 이 패널에만 건다. */
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  transform: translateX(100%);
+  transition: transform 0.45s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.rootOpen .menuSide {
+  transform: none;
 }
 
 /* GNB 바의 유틸과 **같은 좌표**(top 24 / height 80 / 우측 여백 80) */
@@ -266,7 +270,15 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 12px 80px 64px;
+  /* 시안 `48:692`: 좌 80 / 상 32(=136-104 topBar) / 하 48 */
+  padding: 32px 0 48px 80px;
+  /**
+   * 수정요청 p5 "스크롤 위치" — 시안(`48:752`)의 파란 스크롤바는 **뷰포트 오른쪽
+   * 끝이 아니라 오른쪽에서 80px 안쪽**(메뉴 컨테이너 1360 의 우측 끝)에 선다.
+   * 네이티브 스크롤바는 항상 스크롤 컨테이너의 바깥 끝에 그려지므로,
+   * 컨테이너 자체를 80px 안으로 들여서 위치를 맞춘다. padding-right 로는 안 된다.
+   */
+  margin-right: 80px;
   scrollbar-width: thin;
   scrollbar-color: var(--primary-500) transparent;
 }
@@ -275,24 +287,46 @@
   width: 4px;
 }
 
+.menuPanel::-webkit-scrollbar-track {
+  background: var(--gray-200);
+  border-radius: var(--radius-full);
+}
+
 .menuPanel::-webkit-scrollbar-thumb {
   background: var(--primary-500);
   border-radius: var(--radius-full);
 }
 
 .menuList {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* 대분류 292 + 소분류 4열. 대분류는 소분류 **첫 줄과 baseline 이 맞는다**(top 정렬). */
+/**
+ * 시안 `48:693` 실측: 대분류 **200 고정** + gap **96** + 소분류.
+ *
+ * ⚠️ 예전에는 292 + grid 였다. 대분류 열이 92px 넓다 보니 소분류 첫 열이
+ * 시안보다 오른쪽으로 밀려 4열이 안 들어가고 3열로 접혔다 —
+ * PDF 가 지적한 "전반적으로 다르게 구현" 의 큰 축이 이것이다.
+ *
+ * 행 간격도 padding-block 40 이 아니라 **구분선 기준 gap 48** 이다
+ * (리스트가 `flex-direction: column; gap: 48`).
+ */
 .menuRow {
-  display: grid;
-  grid-template-columns: minmax(9rem, 292px) minmax(0, 1fr);
-  align-items: start;
-  padding-block: 40px;
-  border-bottom: 1px solid var(--gray-200);
+  display: flex;
+  gap: 96px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.menuDivider {
+  width: 100%;
+  height: 1px;
+  background: var(--gray-200);
 }
 
 .depth1Wrap {
@@ -301,13 +335,19 @@
   font-weight: inherit;
 }
 
+/* 대분류 — pc/title/title 3 (SemiBold 26 / 1.5 / -3%), gray-900. 200px 고정폭. */
+.depth1Wrap {
+  flex: 0 0 200px;
+  width: 200px;
+}
+
 .depth1 {
   display: inline-block;
   font-size: var(--fs-26);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-semibold);
   line-height: 1.5;
   letter-spacing: var(--tracking-default);
-  color: var(--primary-900);
+  color: var(--gray-900);
   transition: color 0.2s ease;
 }
 
@@ -316,27 +356,51 @@
   color: var(--primary-500);
 }
 
+/**
+ * 소분류 — **180px 고정폭 × gap 48 의 flex-wrap**.
+ * grid 1fr 로 두면 항목 수에 따라 열 폭이 달라져 행마다 x 좌표가 어긋난다.
+ * 시안은 항목이 3개든 6개든 첫 열이 항상 같은 x 에 선다.
+ * 984px 안에 180×4 + 48×3 = 864 까지 들어가고 5번째부터 다음 줄로 접힌다
+ * (시력교정술 6개 = 4 + 2) — 시안의 줄바꿈과 정확히 같다.
+ */
 .depth2List {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 28px 16px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 24px 48px;
+  min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.depth2List > li {
+  flex: 0 0 180px;
+  width: 180px;
+}
+
 .depth2 {
-  font-size: var(--fs-18);
+  display: inline-block;
+  font-size: var(--fs-20);
   line-height: 1.5;
   letter-spacing: var(--tracking-default);
-  color: var(--gray-800);
+  color: var(--gray-700);
   transition: color 0.2s ease;
 }
 
+/**
+ * 호버 색 — 시안(`48:696` 병원소개)은 단색이 아니라 **브랜드 그라디언트**를
+ * 글자에 넣는다. `background-clip: text` 라 배경색을 같이 지우면 안 되므로
+ * (플로팅 퀵메뉴에서 흰 알약을 통째로 먹었던 그 이슈) 링크 자체에만 건다.
+ * 굵기도 SemiBold 로 같이 올라간다.
+ */
 .depth2:hover,
 .depth2:focus-visible {
-  color: var(--primary-500);
   font-weight: var(--weight-semibold);
+  background-image: var(--gradient-brand);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
 /* 소분류가 없는 행(블로그)도 행 높이를 유지시킨다 */
@@ -348,7 +412,8 @@
 /* --- 태블릿 (≤1280) — 소분류 3열 -------------------------------------------- */
 @media (max-width: 1280px) {
   .menuPanel {
-    padding-inline: 40px;
+    padding-left: 40px;
+    margin-right: 40px;
   }
 
   .topBar {
@@ -374,59 +439,176 @@
   }
 }
 
-/* --- 모바일 (≤768) — 좌측 20px 만 남기고 덮는다. 브랜드 패널은 숨김 ---------- */
+/* ==========================================================================
+   모바일 전체메뉴 — 시안 `48:3730` (375 기준 / 좌 20 여백, 폭 355)
+   수정요청 p6: PC 그리드를 좁힌 형태가 아니라 **완전히 다른 2단 구조**다.
+   ========================================================================== */
+
+.moPanel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: var(--whitebg-90);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 상단 60px 바 — 로고 + ✕. 배경이 없다(패널 흰색 위에 그대로 얹힌다). */
+.moHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  margin: 20px 0 11px;
+  padding-inline: 20px;
+}
+
+.moLogo {
+  display: block;
+  width: 168px;
+  height: 30px;
+}
+
+.moLogoImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/**
+ * 본문 2단. 시안은 1depth 열이 **142px 고정**이고 2depth 가 나머지를 먹는다
+ * (`48:3760` 이 left 142 에서 시작).
+ */
+.moBody {
+  display: grid;
+  grid-template-columns: 142px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.moDepth1Col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 좌측 열만 회색 판이다 — 2depth 쪽은 흰색으로 남는다 */
+  background: var(--gray-100);
+}
+
+.moDepth1List {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.moDepth1 {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  /* ⚠️ `--fs-18` 은 vw 클램프라 375 에서 16px 로 줄어든다.
+     시안 `mo/title/title 4` 는 375 기준 **18 고정**이므로 px 로 박는다. */
+  font-size: 18px;
+  line-height: 1.5;
+  letter-spacing: var(--tracking-default);
+  text-align: left;
+  /* 시안(`48:3735`)에서 "스마일라식∙프로" 는 142 열보다 넓어 **밖으로 삐져나온다**.
+     줄바꿈시키면 그 항목만 2줄이 되어 리스트 리듬이 깨진다. */
+  white-space: nowrap;
+  color: var(--gray-600);
+}
+
+/* 선택 항목 — 단색 파랑이 아니라 **브랜드 그라디언트** + 흰 글씨 (`48:3733`) */
+.moDepth1Active {
+  font-weight: var(--weight-semibold);
+  color: var(--color-white);
+  background-image: var(--gradient-brand);
+}
+
+.moSnsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0 16px 24px;
+  list-style: none;
+}
+
+/* PC 좌측 패널과 색 규칙이 반대다 — 흰 배지 + 검정 심볼 */
+.moSnsItem {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-white);
+  color: var(--gray-900);
+}
+
+.moDepth2List {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  /* 2depth 열은 `48:3760` 기준 폭 193 — 패널 오른쪽 끝에서 20 안쪽에서 끝난다 */
+  padding: 0 20px 24px 8px;
+  list-style: none;
+}
+
+.moDepth2 {
+  display: block;
+  padding: 12px;
+  /* 시안 `mo/body/body 2` = 15px 고정 */
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: var(--tracking-default);
+  color: var(--gray-700);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+/* --- 모바일 (≤768) — 좌측 20px 만 남기고 덮는다 ------------------------------ */
 @media (max-width: 768px) {
   .panel {
     left: var(--mobile-gutter);
     grid-template-columns: 1fr;
+    transform: translateX(100%);
+    transition: transform 0.45s cubic-bezier(0.33, 1, 0.68, 1);
+  }
+
+  .rootOpen .panel {
+    transform: translateX(0);
   }
 
   .brandPanel {
     display: none;
   }
 
-  .topBar {
-    height: calc(var(--gnb-top-mo) + var(--gnb-height-mo));
-    padding: var(--gnb-top-mo) 16px 0 0;
-    gap: 12px;
+  /**
+   * 메뉴가 열리면 뒤 메인 컨텐츠를 어둡게 깔아 패널만 읽히게 한다.
+   * 패널은 거터 20px 만 남기고 덮으므로, 그 틈으로 본문이 그대로 보이면
+   * 메뉴와 페이지가 한 레이어로 붙는다.
+   */
+  .backdrop {
+    background: rgba(10, 32, 72, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
-  .topBarLink,
-  .topBarDivider {
-    display: none;
-  }
-
-  .menuPanel {
-    padding: 8px 20px 40px;
-  }
-
-  .menuRow {
-    grid-template-columns: 1fr;
-    gap: 14px;
-    padding-block: 20px;
-  }
-
-  .depth1 {
-    font-size: var(--fs-20);
-  }
-
-  .depth2List {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .depth2 {
-    font-size: var(--fs-16);
-    color: var(--gray-600);
-  }
-
-  .depth2Empty {
-    display: none;
+  .moPanel {
+    background: var(--color-white);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .root,
+  .rootOpen,
   .panel,
+  .brandPanel,
+  .menuSide,
   .backdrop,
   .depth1,
   .depth2,

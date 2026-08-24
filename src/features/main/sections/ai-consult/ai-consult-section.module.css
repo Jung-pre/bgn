@@ -21,6 +21,7 @@
  */
 .section {
   position: relative;
+  isolation: isolate;
   padding-block: 4.9375rem; /* 79 = (920 − 762) / 2 */
   background: var(--color-white);
   color: var(--gray-900);
@@ -73,9 +74,12 @@
   flex-shrink: 0;
 }
 
-/* 2:1208 — eng-point 2(Belleza 24) + `gradiant 2` 그라데이션 텍스트.
-   공용 `.eyebrow`(32 단색)와 다르므로 섹션 전용으로 잡는다. 변수 실값이 MCP 로
-   해석되지 않아 globals 의 --gradient-brand 로 근사. */
+/* FLIP 대상. 확대 때도 폭을 600 으로 고정해야 스케일이 찌그러지지 않는다. */
+.copyStage {
+  width: 100%;
+}
+
+/* 2:1208 — eng-point 2(Belleza 24) + Figma `gradiant 2`. */
 .eyebrow {
   width: fit-content;
   margin: 0 0 0.5rem; /* 2:1207 gap 8 */
@@ -83,9 +87,10 @@
   font-size: var(--fs-eng-24);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-eng);
-  background-image: var(--gradient-brand);
+  background: var(--gradient-2);
   background-clip: text;
   -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
 }
 
@@ -100,6 +105,7 @@
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-default);
   color: var(--gray-900); /* 2:1215 #171717 */
+  transition: color 0.45s ease;
 }
 
 /* 2:1216 + 2:1210(Group 2432) — 형광펜 밑줄이 아니라 옅은 블루 박스 + 좌우 세로 바 */
@@ -113,6 +119,7 @@
   letter-spacing: var(--tracking-default);
   color: var(--gray-700); /* 2:1218 #3d3d3d */
   white-space: pre-line;
+  transition: color 0.45s ease;
 }
 
 /* ── 폼 (2:1219) ────────────────────────────────────────────────────────── */
@@ -193,6 +200,7 @@
   letter-spacing: var(--tracking-default);
   color: var(--gray-700);
   cursor: pointer;
+  transition: color 0.45s ease;
 }
 
 .agree input {
@@ -292,13 +300,13 @@
 
 .objectVideo {
   border-radius: var(--radius-lg);
+  background: transparent;
 }
 
-/* 에셋 바탕이 순백이 아니라(≈#fdfdfd, 미세한 그라데이션) 그대로 얹으면 흰 섹션 위에
-   762 정사각형 이음매가 보이고, 뒤에 깔린 도트 메시까지 잘라 먹는다.
-   multiply 는 흰 바탕을 사실상 투명하게 만들어 두 문제를 한 번에 없앤다
-   (유리 B 본체는 밝은 회청색이라 톤이 거의 변하지 않는다). */
-.objectVideo img {
+/* 납품 영상·포스터 모두 알파가 없고 모서리가 순백이다.
+   multiply 는 흰 픽셀을 뒤 레이어(섹션/메시)로 바꾸므로 정사각 카드가 사라진다.
+   유리 B 본체는 회청색이라 흰 바탕 위에서는 톤이 거의 그대로다. */
+.objectVideo :is(img, video) {
   mix-blend-mode: multiply;
 }
 
@@ -314,7 +322,7 @@
   backdrop-filter: blur(6px);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.45s ease;
+  transition: opacity 0.55s ease;
 }
 
 .sectionExpanded .dim {
@@ -350,10 +358,23 @@
   margin-left: auto;
 }
 
+.copyExpanded .copyStage {
+  width: 37.5rem;
+}
+
 .copyExpanded .eyebrow,
 .copyExpanded .title,
 .copyExpanded .form {
   margin-inline: auto;
+}
+
+/* 확대 8:1118 — `pc/eng - point 1` + Figma `gradiant 3`(다크 위).
+   기본은 eng-point 2(24) + `--gradient-2`(파랑→네이비). */
+.copyExpanded .eyebrow {
+  font-size: var(--fs-eng-32);
+  line-height: 1.1;
+  background-image: var(--gradient-3);
+  -webkit-text-fill-color: transparent;
 }
 
 .copyExpanded .title,
@@ -403,6 +424,7 @@
 
 @media (max-width: 1024px) {
   .copy,
+  .copyExpanded .copyStage,
   .copyExpanded .form {
     width: 100%;
     max-width: 37.5rem;
@@ -431,6 +453,9 @@
   }
 
   .title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
     font-size: var(--fs-42);
     /* 시안 타이틀 2줄 잉크 116~144 / 158~187, 본문 1줄 210.
        우리 마크 상자가 9px 더 길어 본문이 18px 밀린다 — 절반을 여기서 흡수한다. */
@@ -480,6 +505,18 @@
     aspect-ratio: auto;
     height: 88vw;
     overflow: hidden;
+    cursor: default;
+  }
+
+  /* 정사각 클립을 cover 하면 유리 B 가 잘려 확대된 것처럼 보인다.
+     시안은 하단 슬롯 안에 전체가 앉는다. */
+  .objectVideo :is(img, video) {
+    object-fit: contain;
+    object-position: center bottom;
+  }
+
+  .close {
+    display: none;
   }
 }
 
@@ -488,7 +525,10 @@
   .dim,
   .close,
   .field,
-  .checkbox {
+  .checkbox,
+  .title,
+  .desc,
+  .agree {
     transition: none;
   }
 }

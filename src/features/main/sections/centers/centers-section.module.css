@@ -38,6 +38,15 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  /* cynx.io — 가로로 잡아당기면 한 칸 이동. 세로는 Lenis 에 맡긴다. */
+  touch-action: pan-y;
+  user-select: none;
+  transform: translate3d(var(--drag-x, 0px), 0, 0);
+  transition: transform 0.45s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.track[data-dragging] {
+  transition: none;
 }
 
 /**
@@ -101,18 +110,31 @@
 }
 
 /**
- * 축소 카드 실크 텍스처 — Figma 8:5169 / 8:5181 / 8:5163.
+ * 축소 카드 실크 텍스처 — Figma `205:5352`~`205:5376`.
  * 시안은 카드마다 **같은 실크 원본을 다르게 잘라** 얹어서 결이 전부 다르다.
- * 크기·위치는 컴포넌트가 카드별로 넘기는 CSS 변수로 받는다(아래 CARD_TEXTURE).
+ * background-position % 는 CROP 의 left/top 과 달라서, 사진과 같이 박스 좌표로 깐다.
  */
 .card::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: url("/main/img_07_bg01.webp") var(--tex-pos, 50% 50%) / var(--tex-size, cover)
-    no-repeat;
+  width: var(--tex-w, 100%);
+  height: var(--tex-h, 100%);
+  left: var(--tex-x, 0);
+  top: var(--tex-y, 0);
+  background: url("/main/img_07_bg01.webp") 0 0 / 100% 100% no-repeat;
   mix-blend-mode: color-burn;
   pointer-events: none;
+  transform: var(--tex-flip, none);
+  transform-origin: left top;
+}
+
+.card[data-tex-cover]::before {
+  inset: 0;
+  width: auto;
+  height: auto;
+  background-size: cover;
+  background-position: center;
+  transform: none;
 }
 
 /* --- 확장 카드 배경 사진 (Figma 8:5199~8:5229) -----------------------------
@@ -121,6 +143,7 @@
 .media {
   position: absolute;
   inset: 0;
+  overflow: hidden;
   /* 정지 요소(라벨·본문)보다 뒤에 그려지도록 스태킹 컨텍스트를 만든다 */
   z-index: 0;
   opacity: 0;
@@ -129,10 +152,26 @@
 }
 
 .photo {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* 세로 크롭 지점은 카드마다 다르다 — 시안 실측값을 인라인으로 받는다 */
+  position: absolute;
+  /* globals `img { max-width: 100% }` 가 시안 크롭(100% 초과)을 잘라 먹는다 */
+  max-width: none;
+  width: var(--photo-w, 100%);
+  height: var(--photo-h, 100%);
+  left: var(--photo-x, 0);
+  top: var(--photo-y, 0);
+  object-fit: fill;
+}
+
+/* 드림렌즈 PC 만 Figma FILL(cover). 모바일은 CROP 이라 위 변수를 그대로 쓴다. */
+@media (min-width: 769px) {
+  .card[data-photo-cover] .photo {
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    object-fit: cover;
+    object-position: center;
+  }
 }
 
 /* Figma 8:5199 — linear-gradient(90deg, rgba(207,233,255,.6) 0%, rgba(232,243,255,0) 41.391%).
@@ -193,7 +232,7 @@
 }
 
 /* 활성 카드만 링크로 바로 이동한다(다른 카드는 1탭이 '펼치기')는 걸
-   커서로 알려준다. */
+   커서로 알려준다. 아래 hoverable 블록에서 `+` 커서로 덮어쓴다. */
 .item:not(.itemActive) .card {
   cursor: pointer;
 }
@@ -314,7 +353,8 @@
   transform: translateX(4px);
 }
 
-/* 접힌 카드는 통째로 눌리는 버튼이라 커서를 손가락으로 */
+/* 접힌 카드는 통째로 눌리는 버튼이라 커서를 손가락으로.
+   hoverable 에서는 `+` 커서가 이 값을 덮는다. */
 .item:not(.itemExpanded) .card {
   cursor: pointer;
 }
@@ -397,6 +437,23 @@
   outline: 3px solid var(--color-white);
   outline-offset: -6px;
   border-radius: var(--center-card-radius);
+}
+
+/**
+ * 카드 영역 호버 커서 = 시안의 `+` (Figma 2:1984 축소판).
+ * 폭이 아니라 `pointer: fine` 으로 가드한다 — 터치 노트북에서 커스텀 커서가
+ * 손가락 제스처를 가리면 안 된다.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .item .card,
+  .item .card *,
+  .item:not(.itemActive) .card,
+  .item:not(.itemExpanded) .card,
+  .selectHit,
+  .plus,
+  .itemExpanded .plus {
+    cursor: url("/main/cursor-plus.svg") 20 20, pointer;
+  }
 }
 
 /* 그룹 모드(392)에서는 `+` 가 카피를 덮는다 */
@@ -533,11 +590,16 @@
   background: var(--primary-500);
 }
 
-/* --- 태블릿 (1024 이하) — 3열 그리드 ---------------------------------------
+/* --- 태블릿 (769–1024) — 3열 그리드 ---------------------------------------
    클릭 아코디언이라 터치에서도 동작은 하지만, 이 폭에서는 창 3장 구성이
    1120:240 비율을 유지할 수 없다. 폭이 원인이므로 여기서만 그리드로 바꾼다.
-   그리드에는 '활성 인덱스'가 없으므로 컨트롤도 감춘다. */
-@media (max-width: 1024px) {
+   그리드에는 '활성 인덱스'가 없으므로 컨트롤도 감춘다.
+
+   ⚠️ `max-width: 1024px` 만 걸면 768 모바일까지 이 규칙이 남는다.
+      `.itemExpanded .card[data-tone="dark"]` 가 모바일보다 특이도가 높아
+      드림렌즈 카드가 192×480 으로 쪼그라들고(aspect 240/600 × height 480),
+      카피는 space-between 으로 카드 상단에 붙는다. 시안 `8:4548` 과 다르다. */
+@media (max-width: 1024px) and (min-width: 769px) {
   .track {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -590,24 +652,20 @@
    중앙 카드 240×480(= center Image_mo), 좌우 peek 64×480(= center card_mo).
    `≡` 는 Figma 주석대로 제거(컴포넌트에서 렌더 자체를 하지 않는다). */
 /* --- 모바일 — Figma `8:4548` (375×712) 실측 -------------------------------
-     트랙 컨테이너 8:4549 : x −12.5 / w 400 / h 480
-       축소 8:4550  x 0    w 64
-       확장 8:4551  x 80   w 240      → gap 16
-       축소 8:4552  x 336  w 64
-       64 + 16 + 240 + 16 + 64 = 400  (프레임 375 → 좌우 12.5 씩 화면 밖으로 블리드)
-     컨트롤 8:4553 : w 272 = 화살표 40 + 도트 160 + 화살표 40, gap 16
+     트랙 8:4549 : x −12.5 / w 400 / h 480
+       64 + 16 + 240 + 16 + 64 = 400  (프레임 375 → 좌우 12.5 씩 블리드)
+     중간 슬라이드는 이 구성이 정상이다.
 
-   ⚠️ 예전 구현은 `overflow-x: auto` + scroll-snap 가로 스크롤러였다. 시안과 다르다.
-      시안은 데스크톱과 같은 **3장 창**이고 좌우 축소 카드가 화면 밖으로 살짝 잘려
-      "더 있다"를 알린다. 스크롤러로 두면 네 번째 카드가 어정쩡하게 걸쳐 보인다.
-      (실제로 375 에서 "백내장센터"가 오른쪽 끝에 반쯤 잘린 채 멈춰 있었다) */
+     첫·끝만 확장 카드가 화면 끝에 붙으므로 거터(20) 만큼만 안쪽으로 민다.
+     컨트롤 8:4553 : 화살표 40 + 도트 + 화살표 40, gap 16 */
 @media (max-width: 768px) {
-  /* 트랙이 좌우로 12.5 씩 넘치므로 페이지에 가로 스크롤바가 생기지 않게 가둔다 */
   .section {
     overflow: hidden;
     /* 시안 `2:4671`(375×712): 트랙 y 80, 컨트롤 하단 632 → 아래 여백도 80.
-       모바일 시안에는 섹션 헤더가 아예 없다(제목은 sr-only 로만 남긴다). */
-    padding-block: 80px;
+       모바일 시안에는 섹션 헤더가 아예 없다(제목은 sr-only 로만 남긴다).
+       하단 고정 퀵바(60) + 그 위 마스코트(60+8) 가 오른쪽 화살표를
+       가리지 않게 도크 높이만큼 더 연다. */
+    padding-block: 80px calc(80px + var(--mobile-bottombar-height) + 68px + 24px);
   }
 
   .trackWrap {
@@ -619,16 +677,27 @@
     grid-template-columns: none;
     gap: 16px;
     height: 480px;
-    /* 8:4549 의 x −12.5 / w 400 을 뷰포트 폭에 비례해 재현한다 */
     width: calc(100% + 25px);
     margin-inline: -12.5px;
     padding-inline: 0;
     overflow: visible;
   }
 
-  /* 64 : 240 = 4 : 15 (데스크톱은 240 : 1120 = 3 : 14) */
+  /* 블리드 −12.5 를 거터 20 만큼만 거둔다. peek 한 칸(80) 을 밀면 과하다.
+     끝은 margin-right 가 위치를 안 바꾸므로 왼쪽을 더 뺀다. */
+  .track[data-edge="start"] {
+    margin-left: calc(-12.5px + var(--mobile-gutter));
+  }
+
+  .track[data-edge="end"] {
+    margin-left: calc(-12.5px - var(--mobile-gutter));
+  }
+
+  /* 보이는 카드는 최소 64. 창 밖이었다가 들어오는 카드가 basis 0 이면
+     폭이 0 에서 안 살아나고, grow 4↔15 모션도 안 보인다. */
   .item {
-    flex: 4 1 0;
+    flex: 4 1 64px;
+    min-width: 64px;
   }
 
   .itemExpanded,
@@ -636,17 +705,18 @@
     flex-grow: 15;
   }
 
-  .itemHidden {
-    flex: 0 0 0;
+  .item.itemHidden {
+    flex: 0 1 0;
+    min-width: 0;
+    max-width: 0;
+    overflow: hidden;
     margin-right: -16px;
   }
 
   /* 좌우 16 이다(20 아님). `2:4678`(240×480) 실측: 한글 제목 잉크가 x 17 에서
      시작하고, "Vision Correction Center"(Belleza 20, 실폭 202)가 **한 줄**로 들어간다.
      20 이면 콘텐츠 폭이 200 이라 영문이 두 줄로 접힌다. */
-  .card,
-  .itemExpanded .card {
-    aspect-ratio: auto;
+  .card {
     padding: 32px 16px;
   }
 
@@ -665,9 +735,16 @@
     color: var(--color-white);
   }
 
-  /* 모바일 확장 카드(240×480)에도 시안 8:5265~8:5290 처럼 사진이 깔린다 */
-  .itemExpanded .media {
-    display: block;
+  /* 모바일 확장 카드는 시안처럼 사진이 깔리되, PC CROP 행렬(277~364%)을
+     그대로 쓰면 얼굴·장비가 과하게 확대된다. cover 로 카드 안에 앉힌다. */
+  .photo {
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    object-fit: cover;
+    object-position: center;
+    transform: none;
   }
 
   /* 64px 로 좁아지면 가로쓰기가 불가능하다 → 세로쓰기 */
@@ -677,11 +754,13 @@
 
   .itemExpanded .shortLabel {
     position: absolute;
+    writing-mode: horizontal-tb;
     opacity: 0;
   }
 
-  .expanded {
-    display: flex;
+  /* 시안 `2:4678` — 영문 Belleza 20 이어야 240 카드에 한 줄로 들어간다 */
+  .nameEn {
+    font-size: 20px;
   }
 
   /* 240px 폭에 본문 18px 을 넣으면 카드 높이를 넘긴다 — 시안도 제목까지만 나온다 */
@@ -695,6 +774,11 @@
   }
 
   .itemExpanded .arrow {
+    display: none;
+  }
+
+  /* 모바일 시안은 `+` 가 없다 (Figma 주석 "모바일에선 제거") */
+  .plus {
     display: none;
   }
 

@@ -7,31 +7,51 @@
 
 .footer {
   position: relative;
-  /* 시안 프레임 높이 792px */
+  /* 시안 프레임 높이 792px — PC pin 구간에서는 뷰포트를 채워 지구를 먼저 보여 준다 */
   min-height: 49.5rem;
   overflow: hidden;
-  /* .decor 의 screen 블렌드가 푸터 밖(위 섹션)까지 섞이지 않게 합성 그룹을 닫는다.
-     푸터 자신의 배경은 이 그룹 안에서 칠해지므로 블렌드 대상은 그대로 남는다. */
+  /* .decor 의 plus-lighter 가 푸터 바깥까지 번지지 않게 합성 그룹을 연다 */
   isolation: isolate;
   /**
-   * 배경 = **시안 프레임(8:2770) 에서 뽑은 판**(`img_12_bg01.webp`, 1920×792).
-   * 그 위에 실제 에셋인 와이어프레임 라인아트와 발광체(`.decor`)를 얹는다.
-   *
-   * ⚠️ 예전 그라데이션은 **빛의 방향이 시안과 반대**였다.
-   *      시안   좌하단이 가장 밝고 따뜻(#978e98) / 우상단이 가장 어두운 블루(#56739a)
-   *      예전   좌상단이 어둡고 우하단이 밝음  ← 대각선이 뒤집혀 있었다
-   *    프레임에 건물·타워·대표번호가 함께 구워져 있어서, 그 영역을 뺀 바깥
-   *    픽셀로만 배경장을 회귀해 만들었다. 다시 뽑을 땐 같은 처리가 필요하다.
-   *
-   * 중앙 글로우는 `img_12_sphere01.webp` 가 그리므로 배경에서는 뺀다 — 겹치면
-   * 대표번호 뒤가 시안보다 두 배로 밝아진다.
-   *
-   * 그라데이션은 지우지 않고 이미지 아래 폴백으로 남긴다.
+   * 연출 단계를 **세 축으로 분리**한다. 예전에는 블러와 어두워짐이 같은
+   * `--earth-recede` 하나에 묶여 동시에 걸렸다. 시안 의도는 순차다:
+   *   ① 지도를 선명하게 보여 주고 → ② 블러 → ③ 어두워짐 → ④ 카피 페이드인
+   */
+  --earth-blur: 0;
+  --earth-dim: 0;
+  --copy-in: 0;
+  /**
+   * 레이어는 3단만 쓴다. z-index 만으로 고정한다.
+   *   배경판 + 선화(`.decor`)  →  지구 블러(`.earth`)  →  텍스트(`.inner`)
    */
   background:
     url("/main/img_12_bg01.webp") center / cover no-repeat,
     linear-gradient(200deg, #56739a 0%, var(--bg-footer) 55%, #978e98 100%);
   color: var(--color-white);
+}
+
+/**
+ * PC 스크롤 예산. pin 된 푸터가 뷰포트에 머무는 동안
+ * 지구 홀드 → 어둡게/블러 → 카피 페이드인이 돌아간다.
+ */
+/* 홀드 0.30 / 블러 0.25 / 디밍 0.28 / 카피 0.34 — 240vh 는 홀드 구간이 지루했다 */
+.stage {
+  height: 200vh;
+}
+
+.stage .footer {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/**
+ * pin 구간에서 푸터는 뷰포트 높이다. 카피·선화는 시안 792 프레임을 유지해
+ * 건물 좌표가 늘어나지 않게 한다. 지구만 100vh 를 채운다.
+ */
+.stage .inner {
+  min-height: 49.5rem;
 }
 
 /**
@@ -50,6 +70,7 @@
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
   background: radial-gradient(
     47% 107% at 100% 100%,
@@ -69,13 +90,99 @@
 
 /* --- 장식 원 (시안 2:3005 / 2:2903 / 2:2902) -------------------------------
    전부 stroke 만 있는 정원이라 이미지 없이 border 로 재현할 수 있다. */
+.earth {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /**
+   * ⚠️ 여기서 `--earth-*` 를 **다시 선언하지 말 것.**
+   *    예전에 `--earth-recede: 0` 이 이 자리에 있었다. 커스텀 프로퍼티는 상속이라
+   *    자식(`.earthInner`)이 푸터의 애니메이션 값이 아니라 항상 이 0 을 읽었고,
+   *    그래서 블러·축소 단계가 통째로 죽어 있었다(`.dim` 만 형제라서 살아 있었다).
+   */
+}
+
+.earthInner {
+  position: absolute;
+  inset: 0;
+  /* 홀드는 선명하되 히어로만큼 밝지 않다. dim 이 올라가면 더 가라앉는다. */
+  transform: scale(calc(1.02 - var(--earth-blur) * 0.14));
+  filter: blur(calc(var(--earth-blur) * 18px))
+    brightness(calc(0.92 - var(--earth-dim) * 0.32));
+  will-change: transform, filter;
+}
+
+.earthInner :global(canvas) {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.dim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: rgb(6 14 28 / calc(var(--earth-dim) * 0.52));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .earthInner {
+    transform: scale(0.88);
+    filter: blur(10px) brightness(0.88);
+    will-change: auto;
+  }
+
+  .footer {
+    --copy-in: 1;
+    --earth-blur: 1;
+    --earth-dim: 1;
+  }
+}
+
+/**
+ * ⚠️ `z-index` 를 주지 말 것 — 여기 `z-index: 0` 이 있었던 게 **건물이 흰색으로
+ *    안 나오던 원인**이다.
+ *
+ * `position: absolute` + `z-index: 0` 은 스택 컨텍스트를 만든다. 그러면 자식의
+ * `mix-blend-mode: plus-lighter` 가 푸터 배경이 아니라 **빈 그룹**을 상대로
+ * 합성돼 사실상 무효가 되고, 와이어프레임 원본(회색 평균 49~84)이 그대로
+ * source-over 로 얹혀 밝은 배경 위에서 **어두운 건물**로 읽힌다.
+ *
+ * `z-index: auto` 면 스택 컨텍스트가 안 생겨 배경과 제대로 가산되고(흰 선화가
+ * 빛으로 읽힌다), 위치상으로는 여전히 `.earth`(z-index 1) 아래에 그려진다
+ * — 문서 순서가 앞이기 때문이다.
+ */
 .decor {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
 
-.decor span {
+/**
+ * 좌우 선화. 카피(`--copy-in`)와 같이 페이드인한다.
+ * 지구·dim 위에 올려 plus-lighter 가 배경+지구를 상대로 흰 선이 되게 한다.
+ * z-index 는 이 레이어에만 주고, 자식 이미지에는 블렌드를 두지 않는다
+ * (그룹이 격리되면 선화가 회색 원본으로 읽힌다).
+ */
+.wires {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  mix-blend-mode: plus-lighter;
+  opacity: var(--copy-in);
+  will-change: opacity;
+}
+
+.stage .wires {
+  inset: auto 0;
+  top: 50%;
+  height: 49.5rem;
+  margin-top: -24.75rem;
+}
+
+.wires span {
   position: absolute;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: var(--radius-full);
@@ -86,7 +193,8 @@
    와이어프레임은 검은 배경 위에 그린 흰 선화라 알파 버전(wire-3/4)을 쓰면
    블렌드 없이 그대로 얹힌다. 시안에서 선이 배경에 잠겨 있어 opacity 로 낮춘다. */
 
-.decor img {
+.decor img,
+.wires img {
   position: absolute;
   display: block;
   /* globals.css 의 `img { max-width: 100% }` 를 푼다. 장식 선화는 프레임 밖으로
@@ -134,7 +242,7 @@
   top: 13.4375rem; /* 215 */
   width: 37.125rem; /* 594 */
   height: auto;
-  mix-blend-mode: plus-lighter;
+  mix-blend-mode: normal;
   /**
    * 시안은 아래로 갈수록 건물이 **사라진다**. 행 표준편차로 잰 감쇠:
    *   y400 26.3(=100%) / 460 19.8(75%) / 520 13.0(49%) / 580 7.4(28%) / 640 2.6(0%)
@@ -178,7 +286,7 @@
    * 상쇄하고 있었기 때문이다. 페이드를 넣은 뒤 다시 맞춘 값이 0.9 다.
    */
   opacity: 0.9;
-  mix-blend-mode: plus-lighter;
+  mix-blend-mode: normal;
   /* ① 가로 — 시안에서 도심은 오른쪽 끝에만 남고 가운데로 갈수록 사라진다.
         원본은 가운데가 석촌호수라 그대로 두면 하단에 물결 띠가 가로로 남는다.
      ② 세로 — 시안은 y520 부터 흐려져 y645 에 완전히 사라진다(표준편차
@@ -228,6 +336,10 @@
   margin-inline: auto;
   /* 시안: SNS 아이콘 top 55 / 하단 바 top 629. 바 높이가 92 라 아래 여백은 71. */
   padding: 3.4375rem var(--content-side-pad) 4.4375rem;
+  opacity: var(--copy-in);
+  transform: translateY(calc((1 - var(--copy-in)) * 1.4rem));
+  pointer-events: none;
+  will-change: opacity, transform;
 }
 
 /* --- SNS (시안 2:2996) ---------------------------------------------------- */
@@ -533,6 +645,20 @@
 }
 
 @media (max-width: 768px) {
+  .footer {
+    --copy-in: 1;
+    --earth-recede: 1;
+  }
+
+  .dim {
+    display: none;
+  }
+
+  .inner {
+    transform: none;
+    pointer-events: auto;
+    will-change: auto;
+  }
   /* 배경 장식은 1920 기준 실측이라 375 에서는 그대로 쓰면 화면의 4배가 된다.
      모바일 시안(2:5207)에서도 건물은 좌하단, 도심은 우하단 귀퉁이에만 걸린다.
      rem 이 아니라 vw 로 두는 이유: 1024 이하는 root 가 16px 고정이라
@@ -582,7 +708,7 @@
    * `2:5207` 은 글자 밴드를 뺀 모든 행의 표준편차가 1~4(= 완전히 매끄럽다).
    * 우리는 같은 구간이 4.5~10.4 였고, 그 차이가 전부 이 호(arc)들이다.
    */
-  .decor span {
+  .wires span {
     display: none;
   }
 
@@ -622,8 +748,10 @@
   /* 시안 모바일 2:5207 — SNS 가 상단 중앙, 이하 전부 중앙 정렬 */
   .footer {
     min-height: 53.3125rem; /* 853 */
-    /* 하단 고정 퀵바에 가리지 않게 여백 확보 */
-    padding-bottom: var(--mobile-bottombar-height);
+    /* 하단 고정 퀵바(바 60 + 마스코트 60 + gap 8 + 하단 24)에 가리지 않게 */
+    padding-bottom: calc(
+      var(--mobile-bottombar-height) + 60px + 8px + 24px + env(safe-area-inset-bottom, 0px)
+    );
   }
 
   .inner {
@@ -638,6 +766,7 @@
   }
 
   .info {
+    width: 100%;
     margin-top: 2.5rem;
   }
 
@@ -651,17 +780,29 @@
     display: none;
   }
 
+  /* 시안 2:5207 — 지점 필은 세로 스택, 콘텐츠 335 폭을 꽉 채운다.
+     `.info` 가 shrink-wrap 이라 버튼이 273 에 묶여 하단 335 바와 안 맞았다. */
   .branchTabs {
     flex-direction: column;
     align-self: stretch;
+    width: 100%;
+    gap: 0.75rem;
   }
 
   .branchTab {
-    padding-inline: 1.5rem;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .hoursBlock {
+    width: 100%;
   }
 
   .hours {
     align-self: stretch;
+    width: 100%;
     grid-template-columns: auto auto;
     justify-content: space-between;
   }

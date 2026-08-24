@@ -43,47 +43,64 @@ export interface CentersSectionProps {
 }
 
 /**
- * 확장 카드 배경 사진의 크롭/톤 — Figma `8:5199`~`8:5229` 실측.
+ * 확장 카드 배경 사진의 크롭/톤 — Figma `center card` 컴포넌트(`205:5345`) IMAGE fill.
  *
- * 시안은 이미지 fill 을 카드(1120×600)보다 크게 잡고 세로 위치를 카드마다 다르게 준다.
- * 그 값을 그대로 옮기면(퍼센트 좌표) 카드 종횡비가 1120:600 이 아닌 뷰포트에서 사진이
- * 찌그러지므로, **보이는 영역의 중심**을 계산해 `object-position` 으로 환산했다.
- *   예) 스마일 8:5199 = h 124.44% / top −5.2% → 세로 21%
- *       백내장 8:5211 = h 124.88% / top −10.76% → 세로 38%
- *       건성안 8:5223 = h 116.25% / top −2.79% → 세로 13%
- *       안종합 8:5229 = h 206.29% / top −97%   → 하단(계산값이 100% 를 넘는다)
+ * 시안은 `object-fit: cover` + 한 점 앵커가 아니다. 카드마다 scaleMode=CROP 의
+ * imageTransform 으로 **보이는 창**을 잘라 쓴다. 그 행렬을 카드 % 로 풀면
+ *   width  = 1/sx · height = 1/sy · left = −tx/sx · top = −ty/sy
+ * `object-position` 으로 환산하면 줌이 사라져 얼굴·장비가 밀린다.
  *
- * `src` 는 전부 i18n 값(`center.image`)을 쓴다. 예전에 시력교정센터만 여기서
- * 덮어썼는데, 원인이던 `vision.webp`(= exam.webp 와 같은 컷) 문제를 i18n 쪽에서
- * `consult.webp` 로 고쳤으므로 오버라이드는 걷어냈다. 사진 선택은 사전이,
- * 크롭 좌표는 여기가 담당한다 — 책임이 두 곳으로 갈리지 않게.
+ * pc = 상태=on / 1120×600, mo = 상태=on / 240×480.
  */
-const CENTER_PHOTO: Record<string, { src?: string; position: string; tone?: "dark" }> = {
-  "/center/smile": { position: "center 21%" },
-  "/center/vision-correction": { position: "center bottom" },
-  "/center/cataract": { position: "center 38%" },
-  // 8:5217 만 사진이 어두워 워시·카피가 다크 톤으로 뒤집힌다
-  "/center/dream-lens": { position: "center center", tone: "dark" },
-  "/center/dry-eye": { position: "center 13%" },
-  "/center/examination": { position: "center bottom" },
+type PhotoCrop = { w: string; h: string; x: string; y: string };
+
+const CENTER_PHOTO: Record<
+  string,
+  { src?: string; pc: PhotoCrop; mo: PhotoCrop; tone?: "dark"; cover?: boolean }
+> = {
+  "/center/smile": {
+    pc: { w: "100%", h: "124.44%", x: "0%", y: "-5.2%" },
+    mo: { w: "300%", h: "100%", x: "-165.66%", y: "0%" },
+  },
+  "/center/vision-correction": {
+    pc: { w: "116.1%", h: "147.31%", x: "-0.36%", y: "-6.06%" },
+    mo: { w: "277.96%", h: "100%", x: "-71.85%", y: "0%" },
+  },
+  "/center/cataract": {
+    pc: { w: "110.88%", h: "124.88%", x: "0.06%", y: "-10.76%" },
+    mo: { w: "364.64%", h: "110%", x: "-113.48%", y: "-9.96%" },
+  },
+  "/center/dream-lens": {
+    pc: { w: "100%", h: "100%", x: "0%", y: "0%" },
+    mo: { w: "246.82%", h: "100.06%", x: "-109.26%", y: "-0.06%" },
+    tone: "dark",
+    cover: true,
+  },
+  "/center/dry-eye": {
+    pc: { w: "101.68%", h: "116.25%", x: "0.05%", y: "-2.79%" },
+    mo: { w: "326.54%", h: "100%", x: "-142.0%", y: "0%" },
+  },
+  "/center/examination": {
+    pc: { w: "147.35%", h: "206.29%", x: "-11.17%", y: "-96.99%" },
+    mo: { w: "340.23%", h: "130.05%", x: "-103.75%", y: "-30.12%" },
+  },
 };
 
 /**
- * 축소 카드 실크 텍스처의 크롭 — 시안은 같은 실크 원본(`/main/img_07_bg01.webp`)을
- * 카드마다 다르게 잘라 color-burn 으로 얹어서 결이 전부 다르다.
- * 실측: 스마일 `8:5169` = 426%×128% / x 69%, 백내장 `8:5163` = 382%×111% / x 50%,
- *       시력교정 `8:5181` = cover.
- * 나머지 3장은 노드를 열어보지 않았고 순수 장식이라, 이웃 카드와 결이 겹치지
- * 않도록 같은 범위 안에서 고른 값이다.
+ * 축소 카드 실크 텍스처 — Figma `center card` off (`205:5352`~`205:5376`).
+ * 같은 `/main/img_07_bg01.webp` 를 카드마다 CROP 좌표가 다르다.
+ * 건성안만 imageTransform sx 가 음수라 좌우 반전(`flip`).
  */
-const CARD_TEXTURE: { size: string; pos: string }[] = [
-  { size: "426% 128%", pos: "69% 50%" },
-  { size: "cover", pos: "50% 50%" },
-  { size: "382% 111%", pos: "50% 50%" },
-  { size: "320% 120%", pos: "18% 50%" },
-  { size: "cover", pos: "84% 50%" },
-  { size: "360% 115%", pos: "36% 50%" },
-];
+type TexCrop = { w: string; h: string; x: string; y: string; cover?: boolean; flip?: boolean };
+
+const CARD_TEXTURE: Record<string, TexCrop> = {
+  "/center/smile": { w: "426.06%", h: "127.56%", x: "-223.61%", y: "-13.82%" },
+  "/center/vision-correction": { w: "100%", h: "100%", x: "0%", y: "0%", cover: true },
+  "/center/cataract": { w: "381.94%", h: "111.41%", x: "-140.96%", y: "0.07%" },
+  "/center/dream-lens": { w: "381.94%", h: "111.41%", x: "-105.79%", y: "0.07%" },
+  "/center/dry-eye": { w: "406.13%", h: "108.27%", x: "152.14%", y: "0.05%", flip: true },
+  "/center/examination": { w: "497.92%", h: "111.67%", x: "-303.53%", y: "0%" },
+};
 
 /** arrow-detail 48×48 (Figma 2:5403) — 원형 배경 없는 가는 선 화살표 */
 function ArrowDetailIcon() {
@@ -121,8 +138,17 @@ export function CentersSection({ messages }: CentersSectionProps) {
   const sectionRef = useSectionReveal<HTMLElement>();
   const isMobile = useIsMobileLayout();
   const centers = messages.centers;
-  const { activeIndex, groupOpen, trackRef, isExpanded, isVisible, select, step, toggleGroup } =
-    useCentersAccordion(centers.length);
+  const {
+    activeIndex,
+    groupOpen,
+    trackRef,
+    isExpanded,
+    isVisible,
+    select,
+    step,
+    toggleGroup,
+    dragProps,
+  } = useCentersAccordion(centers.length);
 
   /* 창(window)으로 접는 건 PC 아코디언에서만이다. 태블릿은 3열 그리드,
      모바일은 스와이퍼라 6장이 전부 보인다 — 거기서 창 밖 카드를
@@ -146,6 +172,14 @@ export function CentersSection({ messages }: CentersSectionProps) {
         <ul
           ref={trackRef}
           className={styles.track}
+          data-edge={
+            isMobile && activeIndex === 0
+              ? "start"
+              : isMobile && activeIndex === centers.length - 1
+                ? "end"
+                : undefined
+          }
+          {...dragProps}
           /* ⚠️ `data-lenis-prevent` 를 달지 않는다.
              예전에는 모바일에서 트랙을 `overflow-x: auto` 스크롤 컨테이너로 만들어
              이 속성이 필요했지만, 시안(`8:4549`)은 스크롤이 아니라 **3장 창**이다
@@ -157,7 +191,7 @@ export function CentersSection({ messages }: CentersSectionProps) {
             const expanded = isExpanded(i);
             const collapsed = windowed && !isVisible(i);
             const photo = CENTER_PHOTO[center.href];
-            const texture = CARD_TEXTURE[i % CARD_TEXTURE.length] ?? CARD_TEXTURE[0]!;
+            const texture = CARD_TEXTURE[center.href];
             return (
               <li
                 key={center.href}
@@ -175,10 +209,23 @@ export function CentersSection({ messages }: CentersSectionProps) {
                 <div
                   className={styles.card}
                   data-tone={photo?.tone}
+                  data-photo-cover={photo?.cover || undefined}
+                  data-tex-cover={texture?.cover || undefined}
                   style={
                     {
-                      "--tex-size": texture.size,
-                      "--tex-pos": texture.pos,
+                      "--tex-w": texture?.w,
+                      "--tex-h": texture?.h,
+                      "--tex-x": texture?.x,
+                      "--tex-y": texture?.y,
+                      "--tex-flip": texture?.flip ? "scaleX(-1)" : "none",
+                      "--photo-w": photo?.pc.w,
+                      "--photo-h": photo?.pc.h,
+                      "--photo-x": photo?.pc.x,
+                      "--photo-y": photo?.pc.y,
+                      "--photo-w-mo": photo?.mo.w,
+                      "--photo-h-mo": photo?.mo.h,
+                      "--photo-x-mo": photo?.mo.x,
+                      "--photo-y-mo": photo?.mo.y,
                     } as CSSProperties
                   }
                 >
@@ -194,7 +241,7 @@ export function CentersSection({ messages }: CentersSectionProps) {
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      style={{ objectPosition: photo?.position }}
+                      draggable={false}
                     />
                   </span>
 

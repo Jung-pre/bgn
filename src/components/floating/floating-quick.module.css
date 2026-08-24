@@ -9,7 +9,7 @@
    토큰(--primary-sub-500 / --primary-500)이 정확히 같은 두 끝값이라 토큰을 쓴다.
    중간 스톱은 시안 그대로 두 색의 보간이라 생략해도 육안 차이가 없다. */
 .fanRoot,
-.bottomBar {
+.bottomDock {
   --quick-brand-gradient: radial-gradient(
     120% 120% at 0% 0%,
     var(--primary-sub-500) 20%,
@@ -41,7 +41,7 @@
    퀵바·챗봇 pill 을 남겨 두면 시안에 없는 요소 두 개가 영상 위에 그대로 떠 있게 된다.
    토글 주체는 brand-film 섹션(<body data-gnb-hide="true">) 이고 여기서는 받기만 한다. */
 :global(body[data-gnb-hide="true"]) .fanRoot,
-:global(body[data-gnb-hide="true"]) .bottomBar {
+:global(body[data-gnb-hide="true"]) .bottomDock {
   opacity: 0;
   pointer-events: none;
 }
@@ -220,6 +220,24 @@
 }
 
 /* 시안: whitebg-90 + backdrop-blur 6, 테두리 gray-100, 글자는 그라데이션 클립 */
+/**
+ * ## ⚠️ 알약 배경과 글자 그라데이션은 **다른 요소**여야 한다
+ *
+ * 수정요청(26.08.24) p3 "박스 컬러 디자인 확인필요".
+ * 원인은 이 한 줄이었다 — 같은 요소에 흰 배경과 글자 그라데이션을 같이 걸었다:
+ *
+ *   background: var(--whitebg-90);            // 흰 알약
+ *   background-image: linear-gradient(...);   // 뒤에 와서 위를 덮는다
+ *   background-clip: text;                    // 배경 **전체**를 글자 모양으로 자른다
+ *
+ * `background-clip: text` 는 그 요소의 배경을 통째로 글자 실루엣에 가둔다.
+ * 흰 알약도 같이 잘려서 사라지고 테두리만 남았다 — 그래서 시안의 흰 박스가
+ * 화면에서는 비치는 회색으로 보였다.
+ *
+ * 시안(48:312 / I48:312;318:259) 값:
+ *   배경 rgba(255,255,255,.9) · 테두리 1px #f2f2f2 · radius 9999 · 패딩 10/16
+ *   blur 6px · 글자 13 SemiBold, #8d79ff → #0072ec 그라데이션
+ */
 .bubble {
   margin: 0;
   padding: 10px 16px;
@@ -232,13 +250,17 @@
   line-height: 1.25;
   letter-spacing: -0.65px;
   white-space: nowrap;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+/** 글자 그라데이션 전용 — clip 이 여기서만 걸려야 알약이 안 잘린다 */
+.bubbleText {
   background-image: linear-gradient(90deg, var(--primary-sub-500), var(--primary-500));
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  transition:
-    opacity 0.25s ease,
-    transform 0.25s ease;
 }
 
 .bubbleHidden {
@@ -274,33 +296,64 @@
 /* ==========================================================================
    모바일 — 하단 고정 바 (Figma `2:3412` 실측: 335×60, 좌우 거터 20, 하단 21)
    ========================================================================== */
-.bottomBar {
+/**
+ * 수정요청 p4 — 마스코트와 바를 **한 세로 스택**으로 묶는다(`48:3099`).
+ * 예전에는 바만 fixed 로 두고 마스코트를 바 안에 절대배치했는데,
+ * 최신 시안은 마스코트가 바 바깥(위 8px, 오른쪽 끝)에 있으므로
+ * 둘을 감싸는 도크가 있어야 gap 8 / align-items:flex-end 가 그대로 성립한다.
+ */
+.bottomDock {
   position: fixed;
   left: var(--mobile-gutter);
   right: var(--mobile-gutter);
-  /* 홈 인디케이터 회피 — 시안의 하단 21px 여백이 이 용도 */
-  bottom: calc(21px + env(safe-area-inset-bottom, 0px));
+  /* 홈 인디케이터 회피 — 시안 `48:3099` 하단 24 */
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   z-index: var(--z-bottombar);
-  /* 토큰이 시안 실측(60)과 어긋나 있어 여기서 박아 뒀었다. 토큰을 60 으로 고쳤으니 되돌린다. */
-  height: var(--mobile-bottombar-height);
-  padding: 8px 12px;
-  background: var(--whitebg-90);
-  backdrop-filter: blur(25px);
-  border: 1px solid var(--color-white);
-  border-radius: var(--radius-sm);
-  /* 시안 실측: 1px 2px 8px rgba(16,106,170,0.12) */
-  box-shadow: 1px 2px 8px rgba(16, 106, 170, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
   transition: opacity 0.35s ease;
+  pointer-events: none; /* 도크 자체는 빈 공간 — 자식만 받는다 */
 }
 
-/* 마스코트 FAB 이 바 위로 8px 튀어나온다 — grid 로 폭을 시안대로 고정한다.
-   (space-between 로 5등분하면 좌/우 짝의 4px 간격이 무너진다) */
+.bottomDock > * {
+  pointer-events: auto;
+}
+
+/* 바 위에 뜨는 마스코트 60×60 — 원판·테두리 없이 캐릭터만 (`48:3100`) */
+.mascotButtonMo {
+  display: block;
+  width: 60px;
+  height: 60px;
+}
+
+.mascotButtonMo .mascotImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: contain;
+}
+
+.bottomBar {
+  width: 100%;
+  /* 토큰이 시안 실측(60)과 어긋나 있어 여기서 박아 뒀었다. 토큰을 60 으로 고쳤으니 되돌린다. */
+  height: var(--mobile-bottombar-height);
+  padding: 8px 16px;
+  border: 1px solid var(--color-white);
+  background: var(--whitebg-80);
+  box-shadow: var(--gnb-shadow);
+  backdrop-filter: blur(var(--gnb-blur));
+  -webkit-backdrop-filter: blur(var(--gnb-blur));
+  border-radius: var(--radius-sm);
+}
+
+/* 항목 4개 균등 배치 — 시안 `48:3101` 은 `justify-between` 이다 */
 .bottomList {
-  display: grid;
-  grid-template-columns: 54px 54px 1fr 54px 54px;
-  column-gap: 4px;
-  align-items: end;
-  justify-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   height: 100%;
   margin: 0;
   padding: 0;
@@ -332,41 +385,10 @@
   white-space: nowrap;
 }
 
-/* 그리드 1fr 칸을 차지하는 자리표시자. FAB 자체는 아래에서 바 기준으로 띄운다 */
-.bottomCenter {
-  width: 100%;
-}
-
-/* 중앙 마스코트 FAB — 바 위로 돌출 (시안 지름 60, 흰 테두리 4).
-   그리드 흐름에 두면 60px 이 행 높이를 밀어 올려 바 **아래**로 삐져나간다.
-   그래서 바(position: fixed)를 기준으로 절대 배치해 위로만 튀어나오게 한다. */
-.mascotFab {
-  position: absolute;
-  left: 50%;
-  bottom: 8px;
-  transform: translateX(-50%);
-  display: grid;
-  place-items: center;
-  width: 60px;
-  height: 60px;
-  overflow: hidden;
-  border: 4px solid var(--color-white);
-  border-radius: var(--radius-full);
-  background-image: var(--quick-brand-gradient);
-  /* 시안 실측: 0 2px 6px rgba(0,0,0,0.06) */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-.mascotFab .mascotImage {
-  width: 40px;
-  height: 40px;
-  margin: 0;
-}
-
 /* 전역 리셋에 focus 스타일이 없다. 원형 컨트롤이라 링도 원형으로 맞춰 준다 */
 .fanButton:focus-visible,
 .fanToggle:focus-visible,
-.mascotFab:focus-visible {
+.mascotButtonMo:focus-visible {
   outline: 2px solid var(--brand-primary);
   outline-offset: 3px;
   border-radius: var(--radius-full);

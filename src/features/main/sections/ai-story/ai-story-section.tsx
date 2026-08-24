@@ -13,14 +13,18 @@ import styles from "./ai-story-section.module.css";
  *
  * 세그먼트 탭 3개 + 대형 비디오 카드 1장(854×484).
  *
+ * ## 유튜브 (기획 슬라이드 12)
+ * 세 탭이 같은 클립(`1tH-JIn9oKI`)을 다른 시점부터 재생한다.
+ *   0 밝은눈안과 AI 히스토리          0s
+ *   1 AI 기반 맞춤형 진단 시스템     65s
+ *   2 AI 기술 미래 전망             151s
+ * 탭 클릭·재생 버튼이 재생을 연다. 첫 페인트에서 자동재생하지 않는다.
+ *
  * ## 썸네일 = `/main/img_06_card01.webp` (854×484 — 카드와 1:1 동일 치수)
  * 시안의 카드는 **한 장의 영상 썸네일**이고 카피(아이브로우 + 2줄 타이틀)가
  * 이미지에 **구워져 있다**. 그래서 같은 문구를 DOM 텍스트로 또 얹으면 이중으로
  * 겹쳐 보인다 → 카피는 `<img alt>` 로만 전달한다. 이미지가 못 뜨면 alt 가
  * 그 자리에 그대로 노출되므로 정보 손실도 없다.
- *
- * 탭 3개인데 썸네일 에셋은 1장뿐이다(에셋 추가 필요 — 보고 참조).
- * 지금은 세 탭이 같은 썸네일을 공유하고, 교체 크로스페이드만 돈다.
  *
  * ## 역할 분담 (CLAUDE.md "역할 경계")
  *   · GSAP(`useSectionReveal`) — 섹션 진입 등장. 대상은 **스테이지 래퍼**.
@@ -48,21 +52,50 @@ export interface AiStorySectionProps {
   messages: AiStorySectionMessages;
 }
 
+/** 기획 슬라이드 12. 번역 대상이 아니라 섹션 상수로 둔다. */
+const YOUTUBE_ID = "1tH-JIn9oKI";
+const TAB_STARTS = [0, 65, 151] as const;
+
+function youtubeSrc(start: number) {
+  const params = new URLSearchParams({
+    autoplay: "1",
+    start: String(start),
+    rel: "0",
+    modestbranding: "1",
+    playsinline: "1",
+    enablejsapi: "1",
+    origin: window.location.origin,
+  });
+  return `https://www.youtube-nocookie.com/embed/${YOUTUBE_ID}?${params}`;
+}
+
+function pauseYoutube(frame: HTMLIFrameElement) {
+  frame.contentWindow?.postMessage(
+    JSON.stringify({ event: "command", func: "pauseVideo", args: [] }),
+    "https://www.youtube-nocookie.com",
+  );
+}
+
 export function AiStorySection({ messages }: AiStorySectionProps) {
   const sectionRef = useSectionReveal<HTMLElement>();
   const tabStripRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<HTMLIFrameElement>(null);
   const reduceMotion = usePrefersReducedMotion();
 
   // 시안 기본 활성은 2번째 탭
   const [activeTab, setActiveTab] = useState(1);
+  const [playing, setPlaying] = useState(false);
+  /** 같은 탭을 다시 눌러도 iframe 을 다시 심어 그 시점부터 재생한다. */
+  const [playKey, setPlayKey] = useState(0);
 
   /**
-   * 탭 전환. 같은 값이면 setState 를 건너뛴다 — 리렌더뿐 아니라
-   * `AnimatePresence` 가 key 동일 판정을 다시 하는 비용도 없앤다.
+   * 탭 전환. 같은 값이면 인덱스는 유지하되, 클릭이면 그 시점부터 다시 재생한다.
    */
   const selectTab = useCallback(
     (next: number, moveFocus: boolean) => {
       setActiveTab((prev) => (prev === next ? prev : next));
+      setPlaying(true);
+      setPlayKey((key) => key + 1);
 
       const strip = tabStripRef.current;
       const button = strip?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next];
@@ -95,6 +128,23 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
     strip.scrollLeft = button.offsetLeft - (strip.clientWidth - button.clientWidth) / 2;
   }, [activeTab]);
 
+  // 화면 밖으로 나가면 소리를 끊는다. 돌아오면 YouTube 컨트롤로 이어 보면 된다.
+  useEffect(() => {
+    if (!playing) return;
+    const frame = playerRef.current;
+    if (!frame || typeof IntersectionObserver === "undefined") return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry || entry.isIntersecting) return;
+        pauseYoutube(frame);
+      },
+      { threshold: 0.15 },
+    );
+    io.observe(frame);
+    return () => io.disconnect();
+  }, [playing, activeTab]);
+
   /** WAI-ARIA Tabs 패턴 — 좌우 화살표로 탭 이동 */
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const count = messages.tabs.length;
@@ -111,12 +161,7 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
     selectTab(next, true);
   };
 
-  const handlePlay = () => {
-    // TODO: 영상 소스가 확정되면 재생 처리.
-    //   시안에는 플레이어 UI 가 없고 카드 전체가 썸네일이다 →
-    //   (a) 모달 오버레이 재생 / (b) 카드 자리 인라인 <video> 교체 중
-    //   어느 쪽인지 기획 확인 필요. 확정 전까지 UI 만 완성해 둔다.
-  };
+  const startAt = TAB_STARTS[activeTab] ?? 0;
 
   return (
     <section ref={sectionRef} className={styles.section} aria-label="BGN AI 브랜드 스토리">
@@ -161,48 +206,69 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
         })}
       </div>
 
-      {/* 스테이지 = GSAP 등장 대상. 안쪽 카드 = Motion 교체 대상. */}
+      {/* 스테이지 = GSAP 등장 대상. 안쪽 카드 = Motion 교체 대상.
+          재생 중에는 iframe 을 크로스페이드하지 않는다 — 영상이 두 장 겹치면 소리가 두 번 난다. */}
       <div className={styles.stage} data-reveal-item>
-        <AnimatePresence initial={false} mode="wait">
-          <motion.div
-            key={activeTab}
+        {playing ? (
+          <div
             id="ai-story-panel"
             role="tabpanel"
             aria-labelledby={`ai-story-tab-${activeTab}`}
             className={styles.card}
-            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.02 }}
-            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.99 }}
-            transition={
-              reduceMotion ? { duration: 0.2 } : { duration: 0.42, ease: [0.33, 1, 0.68, 1] }
-            }
           >
-            {/* 카피가 구워진 썸네일. 카드(854×484)와 같은 치수라 크롭 없이 딱 맞는다.
-                TODO: 영상 소스가 오면 이 <img> 를 <video poster={...}> 로 바꾼다. */}
-            {/* eslint-disable-next-line @next/next/no-img-element -- 카드 치수(854×484)와 1:1 인 확정 크기 에셋이라 next/image 리사이즈 이점이 없다 */}
-            <img
-              className={styles.cardBg}
-              src="/main/img_06_card01.webp"
-              alt={`${messages.videoEyebrow}. ${messages.videoTitle.replace(/\n/g, " ")}`}
-              width={854}
-              height={484}
-              loading="lazy"
-              decoding="async"
+            <iframe
+              key={`${YOUTUBE_ID}-${startAt}-${playKey}`}
+              ref={playerRef}
+              className={styles.player}
+              src={youtubeSrc(startAt)}
+              title={messages.tabs[activeTab] ?? messages.playLabel}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
             />
-
-            <button
-              type="button"
-              className={styles.play}
-              aria-label={messages.playLabel}
-              onClick={handlePlay}
+          </div>
+        ) : (
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div
+              key={activeTab}
+              id="ai-story-panel"
+              role="tabpanel"
+              aria-labelledby={`ai-story-tab-${activeTab}`}
+              className={styles.card}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.02 }}
+              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.99 }}
+              transition={
+                reduceMotion ? { duration: 0.2 } : { duration: 0.42, ease: [0.33, 1, 0.68, 1] }
+              }
             >
-              {/* 글리프(▶)는 폰트마다 크기·정렬이 달라 중앙이 안 맞는다 → SVG 고정 */}
-              <svg viewBox="0 0 24 24" aria-hidden focusable="false">
-                <path d="M9 6.5 18 12l-9 5.5z" fill="currentColor" />
-              </svg>
-            </button>
-          </motion.div>
-        </AnimatePresence>
+              {/* eslint-disable-next-line @next/next/no-img-element -- 카드 치수(854×484)와 1:1 인 확정 크기 에셋이라 next/image 리사이즈 이점이 없다 */}
+              <img
+                className={styles.cardBg}
+                src="/main/img_06_card01.webp"
+                alt={`${messages.videoEyebrow}. ${messages.videoTitle.replace(/\n/g, " ")}`}
+                width={854}
+                height={484}
+                loading="lazy"
+                decoding="async"
+              />
+
+              <button
+                type="button"
+                className={styles.play}
+                aria-label={messages.playLabel}
+                onClick={() => {
+                  setPlaying(true);
+                  setPlayKey((key) => key + 1);
+                }}
+              >
+                {/* 글리프(▶)는 폰트마다 크기·정렬이 달라 중앙이 안 맞는다 → SVG 고정 */}
+                <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+                  <path d="M9 6.5 18 12l-9 5.5z" fill="currentColor" />
+                </svg>
+              </button>
+            </motion.div>
+          </AnimatePresence>
+        )}
       </div>
     </section>
   );

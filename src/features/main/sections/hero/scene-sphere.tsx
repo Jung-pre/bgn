@@ -12,7 +12,6 @@ import {
   GLOBE_RADIUS,
   lonLatToVector,
   makeHaloPoints,
-  makeOrbitPoints,
   makeLandPoints,
   makeShellPoints,
   type PointCloud,
@@ -72,8 +71,8 @@ const COUNTS = {
    * **색과 빛**으로 올리는 쪽이 맞다(아래 POINT_FRAGMENT 의 팔레트).
    * 궤도 고리(orbit)만 남긴다 — 이건 구체를 안 건드리고 바깥에 장식만 더한다.
    */
-  desktop: { land: 120000, shell: 78000, halo: 16000, orbit: 5200 },
-  mobile: { land: 26000, shell: 16000, halo: 4500, orbit: 1600 },
+  desktop: { land: 120000, shell: 78000, halo: 16000 },
+  mobile: { land: 26000, shell: 16000, halo: 4500 },
 } as const;
 
 /** 지축 기울기 23.4°(rad). 정확히 기울여야 "지구"로 읽힌다. */
@@ -195,7 +194,6 @@ function Globe({
 
   const land = useMemo(() => makeLandPoints(counts.land, 0x1a5eed), [counts.land]);
   const shell = useMemo(() => makeShellPoints(counts.shell, 0x2b17e5), [counts.shell]);
-  const orbit = useMemo(() => makeOrbitPoints(counts.orbit, 0x1d5b3f, 4), [counts.orbit]);
   const halo = useMemo(() => makeHaloPoints(counts.halo, 0x3c0ffe), [counts.halo]);
 
   /** 코어 글로우의 로컬 위치 — 한반도 방향, 껍질 안쪽 */
@@ -258,7 +256,12 @@ function Globe({
    * 375×812 모바일에서는 그 높이의 82% 가 666px 라 가로 375px 를 훌쩍 넘는다.
    * 가로가 세로보다 좁을 때만 그 비율만큼 줄인다. 데스크톱에서는 항상 1 이다.
    */
-  const fitScale = Math.min(1, (size.width / size.height) * 1.05);
+  /**
+   * 수정요청(26.08.24 후속) "지구본의 사이즈를 조정" + p7 "지구가 뒤로 가게".
+   * 기존엔 데스크톱에서 항상 1 이라 구체 지름이 화면 높이의 87% 를 먹었다.
+   * 0.86 을 곱해 한 걸음 뒤로 물린다 — 카피·마퀴와의 여백이 시안에 가까워진다.
+   */
+  const fitScale = Math.min(1, (size.width / size.height) * 1.05) * 0.86;
 
   /** demand 모드(동작 줄이기)에서는 한 번은 그려야 화면이 빈 채로 남지 않는다 */
   useEffect(() => {
@@ -331,6 +334,23 @@ function Globe({
     <>
       {/* 회전 그룹 밖 — 껍질의 산란광이라 구체와 같이 돌면 안 된다 */}
       <group scale={fitScale}>
+        {/**
+         * ## ⚠️ 젤리 바디는 **회전 그룹 밖**이어야 한다
+         *
+         * 처음엔 아래 `groupRef` 안(파티클과 같은 그룹)에 넣었다. 그 그룹은 매
+         * 프레임 Y 축으로 돌기 때문에 **평판이 같이 뒤집힌다** — 옆으로 서는 순간
+         * 화면에는 선으로 눌려 아무것도 못 가린다.
+         *
+         * 실측이 그대로 나왔다: 마퀴가 구체 **안에서 오히려 더 잘 보였다**
+         * (실효 투과율 140%). 알파를 아무리 올려도 안 되던 이유가 이거다.
+         * 산란광(GlobeHaze)이 같은 이유로 이미 여기 있다.
+         *
+         * renderOrder -3 → 헤이즈(-2)·파티클보다 먼저 깔린다.
+         */}
+        <mesh renderOrder={-3} frustumCulled={false}>
+          <planeGeometry args={[GLOBE_RADIUS * 1.97, GLOBE_RADIUS * 1.97]} />
+          <GlobeBodyMaterial intensity={intensity} instant={reduced} />
+        </mesh>
         <GlobeHaze intensity={haze} instant={reduced} />
       </group>
       <group ref={groupRef} rotation={[0, FOCUS_ROTATION_Y, AXIAL_TILT]} scale={fitScale}>
@@ -338,7 +358,7 @@ function Globe({
           cloud={halo}
           color="#ffffff"
           size={0.03}
-          opacity={0.55 * intensity}
+          opacity={0.20 * intensity}
           instant={reduced}
           tint={1.0}
           pointerRef={push}
@@ -348,7 +368,7 @@ function Globe({
           cloud={shell}
           color="#eef4ff"
           size={0.024}
-          opacity={0.95 * intensity}
+          opacity={0.36 * intensity}
           instant={reduced}
           tint={1.0}
           pointerRef={push}
@@ -358,24 +378,16 @@ function Globe({
           cloud={land}
           color="#ffffff"
           size={0.03}
-          opacity={1.0 * intensity}
+          opacity={0.42 * intensity}
           instant={reduced}
           tint={1.0}
           pointerRef={push}
           pushScale={interactive ? 0.85 : 0}
         />
 
-        {/* 궤도 고리 — 구 바깥을 도는 점선. 시안에 3~4 개 보인다 */}
-        <PointLayer
-          cloud={orbit}
-          color="#ffffff"
-          size={0.022}
-          opacity={0.7 * intensity}
-          instant={reduced}
-          tint={0.9}
-          pointerRef={push}
-          pushScale={interactive ? 1.4 : 0}
-        />
+        {/* 수정요청(26.08.24) "지구 주변에 둘러져있는 행성같은 띠는 빼주세요" — 궤도 고리 제거 */}
+
+
 
         {/* 코어 글로우 — 매 프레임 카메라를 향하도록 돌린다(빌보드).
           drei `<Billboard>` 를 쓰지 않은 이유: 이건 회전 그룹의 자식이라
@@ -527,11 +539,9 @@ const POINT_FRAGMENT = /* glsl */ `
     float y = vScreen.y * 0.5 + 0.5;
     /* 세로로 살구 → 금빛 → 라벤더, 가로로 그 결과 → 하늘 → (끝에만) 민트.
        두 축을 곱하지 않고 순차로 섞어야 중간에 탁한 회색이 안 생긴다. */
-    /* 시안 구체는 **따뜻한 쪽이 주인공**이다 — 분홍·라벤더가 화면의 2/3 를 먹고
-       하늘색은 오른쪽 끝에만 걸친다. 예전엔 가로 그라디언트를 0.28 부터 하늘로
-       넘겨서 구체 전체가 파랗게 읽혔다(“우리건 너무 약하다”의 실체). */
+    /* 좌측은 피치·라벤더, 하늘은 중반부터. 끝만 섞으면 파랑이 사라진다. */
     vec3 left = mix(mix(WARM, GOLD, smoothstep(0.02, 0.38, y)), LAV, smoothstep(0.34, 0.90, y));
-    vec3 tint = mix(left, COOL, smoothstep(0.58, 1.00, x));
+    vec3 tint = mix(left, COOL, smoothstep(0.36, 1.00, x));
     tint = mix(tint, MINT, smoothstep(0.88, 1.00, x) * 0.35);
 
     /* ⚠️ 밝기를 정규화한다 — 가장 밝은 채널을 1.0 으로 끌어올린다.
@@ -551,7 +561,10 @@ const POINT_FRAGMENT = /* glsl */ `
        그게 "구"로 읽히게 만드는 핵심이다. vScreen 이 NDC 라 원점에서의 거리가
        곧 실루엣까지의 거리다(구체가 화면 중앙에 있으므로). */
     float rim = smoothstep(0.42, 0.95, length(vScreen));
-    col *= 1.0 + rim * 0.5;
+    col *= 1.0 + rim * 0.18;
+    /* 좌상단 가산 파티클이 대륙을 흰 덩어리로 만든다 */
+    float hot = smoothstep(0.52, 0.0, x) * smoothstep(0.36, 0.95, y);
+    col *= 1.0 - hot * 0.46;
 
     gl_FragColor = vec4(col, a * vScale * uOpacity);
   }
@@ -690,7 +703,7 @@ const CORE_FRAGMENT = /* glsl */ `
     float core = pow(max(0.0, 1.0 - d * 2.6), 2.0);
     float halo = pow(max(0.0, 1.0 - d), 2.4);
     vec3 c = mix(uOuter, uInner, core);
-    float a = (halo * 0.18 + core * 0.42) * uOpacity;
+    float a = (halo * 0.14 + core * 0.32) * uOpacity;
     if (a < 0.004) discard;
     gl_FragColor = vec4(c, a);
   }
@@ -734,7 +747,7 @@ const HAZE_FRAGMENT = /* glsl */ `
 
   const vec3 WARM = vec3(1.00, 0.78, 0.76);
   const vec3 LAV  = vec3(0.84, 0.79, 1.00);
-  const vec3 COOL = vec3(0.72, 0.88, 1.00);
+  const vec3 COOL = vec3(0.58, 0.82, 1.00);
 
   void main() {
     float r = length(vUv - 0.5) * 2.0;
@@ -763,7 +776,8 @@ const HAZE_FRAGMENT = /* glsl */ `
     float x = vScreen.x * 0.5 + 0.5;
     float y = vScreen.y * 0.5 + 0.5;
     vec3 left = mix(WARM, LAV, smoothstep(0.15, 0.85, y));
-    vec3 tint = mix(left, COOL, smoothstep(0.30, 0.95, x));
+    /* 하늘은 우측 절반. 0.30부터면 전체가 파랗고, 0.62부터면 파랑이 안 보인다. */
+    vec3 tint = mix(left, COOL, smoothstep(0.42, 1.00, x));
     /* ⚠️ 최대 채널을 1.0 으로 끌어올리면 광량은 지키지만 **채도가 같이 날아간다**.
        (1,0.58,0.62) 를 그대로 두면 예쁜 로즈인데 정규화하면 그대로고, 반대로
        (0.74,0.62,1.0) 같은 건 1.0 으로 올라가며 옅어진다. 절반만 정규화해서
@@ -812,6 +826,157 @@ function GlobeHaze({ intensity, instant }: { intensity: number; instant: boolean
       <primitive ref={matRef} object={material} attach="material" />
     </mesh>
   );
+}
+
+/**
+ * ## 젤리 바디 — 구체를 **채우는** 층
+ *
+ * 수정요청(26.08.24): "지구가 지금은 투명한 느낌이라 빛 요소, 지구 자체의 밀도가
+ * 채워져있어야 합니다 (레퍼처럼 젤리같은 느낌에 글자가 보이지 않도록)".
+ *
+ * 기존 헤이즈 층은 **가산 합성**이라 원리적으로 뒤를 가릴 수 없다 — 빛을 더하기만
+ * 한다. 그래서 파티클을 아무리 늘려도 뒤 글자가 비쳤다. 이 층은 일반 합성으로
+ * 가운데를 실제로 덮고, 가장자리에서만 알파가 빠진다.
+ *
+ * 파티클 껍질 **안쪽**(0.985R)에 두어 점들이 이 위에 표면 디테일로 얹히게 한다.
+ */
+const BODY_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const BODY_FRAGMENT = /* glsl */ `
+  precision highp float;
+  varying vec2 vUv;
+  uniform vec3 uLit;
+  uniform vec3 uShade;
+  uniform float uOpacity;
+
+  /* 시안(205:421 / img_01_sphere01) 안쪽은 강철 블루가 아니다.
+     좌 피치·라벤더 → 가운데 진주 → 우측에만 하늘.
+     채도를 세게 잡고 알파를 0.98로 두면 밝은 동시에 무거운 원반이 된다. */
+  const vec3 WARM  = vec3(0.90, 0.78, 0.82);
+  const vec3 LAV   = vec3(0.80, 0.78, 0.90);
+  const vec3 PEARL = vec3(0.84, 0.88, 0.96);
+  const vec3 COOL  = vec3(0.42, 0.70, 0.98);
+
+  void main() {
+    vec2 p = vUv * 2.0 - 1.0;
+    float r = length(p);
+    if (r > 1.0) discard;
+
+    /* 구면 법선을 복원해 한쪽에서 빛이 드는 젤리로 만든다 */
+    float z = sqrt(max(0.0, 1.0 - r * r));
+    vec3 n = vec3(p, z);
+    /* 예전 (-0.42, 0.46) 은 좌상단이 하이라이트로 하얗게 날아갔다. */
+    float lit = clamp(dot(n, normalize(vec3(0.18, 0.12, 0.96))), 0.0, 1.0);
+
+    /**
+     * ## 불투명한 원반이 아니라 **반투명 젤**
+     *
+     * 수정요청(26.08.24 후속): "밀도 즉 안이 차보이는 느낌 … 약간 투명 젤리같은 느낌".
+     * 앞 버전은 심 알파가 0.97 이라 그냥 **불투명한 공**이었다. 뒤가 안 비치니
+     * 요구는 만족했지만 젤리가 아니라 플라스틱으로 보였다.
+     *
+     * 젤은 빛이 **통과하면서 산란**한다. 그래서 세 가지를 같이 준다:
+     *  ① 두께에 따라 알파가 변한다 — 가장자리는 얇아 비치고 심은 막힌다.
+     *     (원형 div + backdrop-filter 로 "비치되 안 읽히게" 하려던 시도는
+     *      CSS 쪽 주석대로 무효였다. 그래서 심은 알파로 막는다.)
+     *  ② 두께에 비례한 내부 산란 — 가운데가 두꺼우니 더 밝고 뿌옇다 (밀도감)
+     *  ③ 굴절 반점(caustic) — 젤 안에서 빛이 몰린 자리. 이게 있어야 속이
+     *    "차 있다"로 읽힌다. 없으면 그냥 옅은 원이다.
+     */
+    /* 두께 — 구면이라 가운데가 가장 두껍다. 그대로 산란량이 된다. */
+    float thick = z;
+
+    /**
+     * ## ⚠️ 알파에 **두께를 곱하면 안 된다**
+     *
+     * 알파 = (0.16 + 0.84 x thick^0.62) 로 뒀더니 가장자리로 갈수록 투명해져서,
+     * 마퀴가 구체 **좌우 림에서 그대로 새어 나왔다**(r=0.9 에서 알파 0.62).
+     * 화면 정가운데만 막히고 양옆에서 글자가 보이니 "여전히 잘 보인다" 가 된다.
+     *
+     * 두께감은 **색**(아래 lit·cau)이 이미 만들고 있다. 알파는 실루엣까지
+     * 평평하게 두고 마지막 6% 반경에서만 떨어뜨린다.
+     */
+    float fill = smoothstep(1.0, 0.94, r);
+
+    /**
+     * ③ 굴절 반점.
+     * ⚠️ 주파수를 7 대로 두면 반점이 **흰 타원 얼룩**으로 뭉친다(렌즈 플레어처럼
+     * 보였다). 젤 속 굴절은 그보다 훨씬 잘다 — 주파수를 두 배로 올리고 세기를
+     * 절반으로 내려야 "속이 차 있다"로 읽힌다.
+     */
+    float cau = sin(n.x * 15.3 + n.y * 11.7) * sin(n.y * 13.1 - n.z * 9.4);
+    cau = pow(clamp(cau * 0.5 + 0.5, 0.0, 1.0), 3.0) * thick;
+
+    /* 림 라이트 — 젤리의 가장자리가 밝게 서는 그 느낌 */
+    float rim = pow(smoothstep(0.70, 1.0, r), 2.2);
+
+    /* 안쪽 팔레트 — 평판 UV라 구체가 돌아도 색이 따라 돌지 않는다 */
+    float x = p.x * 0.5 + 0.5;
+    float y = p.y * 0.5 + 0.5;
+    vec3 left = mix(WARM, LAV, smoothstep(0.10, 0.82, y));
+    vec3 tint = mix(left, PEARL, smoothstep(0.20, 0.48, x) * 0.35);
+    tint = mix(tint, COOL, smoothstep(0.30, 0.92, x) * 0.82);
+
+    /* 색은 tint, 조명은 명암만. 대비를 세게 주면 속이 돌처럼 무거워진다. */
+    vec3 shade = mix(tint, uShade, 0.10);
+    vec3 highlight = mix(mix(tint, PEARL, 0.12), uLit, 0.05);
+    vec3 col = mix(shade, highlight, pow(lit, 1.7));
+    col = mix(col, PEARL, pow(thick, 2.2) * 0.06);
+    col += cau * 0.03;
+    col += rim * 0.05;
+    /* 좌상단 핫스팟 — 대륙이 흰 덩어리로 뭉개지지 않게 */
+    float hot = smoothstep(0.52, 0.0, x) * smoothstep(0.36, 0.95, y);
+    col *= 1.0 - hot * 0.28;
+
+    /* 0.98은 볼링공. 0.8이면 밀도는 남기고 마퀴는 흐려진다. */
+    float a = clamp(fill * 0.80 + rim * 0.04, 0.0, 1.0) * uOpacity;
+    gl_FragColor = vec4(col * a, a);
+  }
+`;
+
+function GlobeBodyMaterial({ intensity, instant }: { intensity: number; instant: boolean }) {
+  const matRef = useRef<THREE.ShaderMaterial>(null);
+  const fade = useRef(instant ? 1 : 0);
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: BODY_VERTEX,
+        fragmentShader: BODY_FRAGMENT,
+        uniforms: {
+          /* 조명 폭만. 색은 BODY_FRAGMENT 의 이리데선트 tint 가 맡는다.
+             강철 블루(#a8c0e4/#5e7fb4)로 두면 안쪽이 통째로 파랗게 읽힌다. */
+          uLit: { value: new THREE.Color("#ebe0e8") },
+          uShade: { value: new THREE.Color("#c8b8c2") },
+          uOpacity: { value: instant ? intensity : 0 },
+        },
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        /* ⚠️ 가산이 아니라 **일반 합성**. 가산이면 뒤가 절대 안 가려진다. */
+        blending: THREE.NormalBlending,
+        premultipliedAlpha: true,
+        toneMapped: false,
+      }),
+    [intensity, instant],
+  );
+
+  useEffect(() => () => material.dispose(), [material]);
+
+  useFrame((_state, delta) => {
+    const m = matRef.current;
+    if (!m || instant) return;
+    if (fade.current < 1) fade.current = Math.min(1, fade.current + delta / 1.1);
+    const o = m.uniforms.uOpacity;
+    if (o) o.value = fade.current * intensity;
+  });
+
+  return <primitive ref={matRef} object={material} attach="material" />;
 }
 
 function CoreGlowMaterial() {

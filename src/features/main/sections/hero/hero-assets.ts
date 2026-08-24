@@ -31,6 +31,14 @@
 export const HERO_ASSETS = {
   /** 프레임 fill 로 깔린 하늘. 그라데이션이라 풀블리드 cover 로 늘려도 안 깨진다 */
   sky: "/main/img_01_bg01.webp",
+  /**
+   * 타워 씬 뒤판 — 하늘·구름·타워·워터마크를 한 장으로 구운 플레이트.
+   * 납품본은 `img_02_bg01.png` 3840×1840(시안 2배). 의료진이 이미
+   * `img_02_bg01.webp` 를 쓰므로 히어로 네이밍으로 바꿔 넣었다.
+   * 모바일은 375×812(2x 750×1624) 전용판 — PC 플레이트를 cover 하면 4배 확대된다.
+   */
+  backdrop: "/main/img_01_bg02.webp",
+  backdropMo: "/main/img_01_bg02_mo.webp",
   /** 8:2880 — soft-light 50% 로 깔리는 파티클 텍스처 */
   particles: "/main/img_01_particles01.webp",
   /** 8:2948 — 롯데타워 + 스카이라인 (알파) */

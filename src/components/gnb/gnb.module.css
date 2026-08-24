@@ -20,6 +20,19 @@
   pointer-events: none;
 }
 
+/**
+ * 전체메뉴가 열리면 pill 을 숨긴다. 메뉴 패널이 반투명이라 뒤 GNB 네비가
+ * 카테고리 글자와 겹쳐 보이고, 시안에도 떠 있는 pill 은 없다
+ * (오버레이가 상단 유틸을 다시 그린다). 모바일·PC 공통.
+ */
+.header[data-mega-open] {
+  opacity: 0;
+  pointer-events: none;
+  /* 메뉴가 밀려 오는 동안 pill 이 한 프레임이라도 비치지 않게 빨리 끈다.
+     닫힐 때는 이 규칙이 빠져 `.header` 의 0.25s 페이드로 돌아온다. */
+  transition: opacity 0.12s ease;
+}
+
 /* 브랜드 필름 섹션에서만 GNB 를 숨긴다 (시안 p1_04 — UI 전무).
    섹션 쪽에서 <body data-gnb-hide="true"> 를 토글한다. */
 :global(body[data-gnb-hide="true"]) .header {
@@ -47,28 +60,19 @@
   -webkit-backdrop-filter: blur(var(--gnb-blur));
 }
 
-/* 로고 202×36 (vectorized SVG). 텍스트 폴백은 SVG 교체 시 제거. */
+/* 로고 202×36 — 시안 `48:570` 실측(수정요청 p7-①에서 텍스트 → 이미지) */
 .logo {
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem;
+  display: block;
   flex-shrink: 0;
   width: 202px;
   height: 36px;
 }
 
-.logoMark {
-  font-family: var(--font-display-stack);
-  font-size: 24px;
-  font-weight: var(--weight-regular);
-  letter-spacing: var(--tracking-eng);
-  color: var(--primary-900);
-}
-
-.logoText {
-  font-size: 18px;
-  font-weight: var(--weight-semibold);
-  color: var(--primary-900);
+.logoImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* --- 인라인 네비 — pc/title/title 4 (SemiBold 20 / 1.5 / -3%), gap 32 ------ */
@@ -188,9 +192,9 @@
 }
 
 /**
- * 메가메뉴가 열리면 오버레이가 같은 좌표에 로그인/회원가입/지구본/X 를 다시 그린다.
- * 헤더 쪽 유틸을 그대로 두면 아이콘이 두 겹으로 비쳐 보인다(시안에는 한 겹뿐).
- * 네비 라벨은 시안처럼 오버레이 뒤로 은은히 비쳐야 하므로 유틸만 숨긴다.
+ * 메가메뉴가 열리면 오버레이가 로그인/회원가입/지구본/X 를 다시 그린다.
+ * 유틸을 그대로 두면 아이콘이 두 겹이다. 헤더 자체도 `data-mega-open` 으로
+ * 숨기지만, 페이드 한 프레임 동안 겹치지 않게 유틸은 즉시 끈다.
  */
 .utilsHidden {
   visibility: hidden;
@@ -254,22 +258,22 @@
     right: var(--mobile-gutter);
   }
 
+  /* 시안 `2:3451` 실측: 335×60 / padding-inline 20 / radius 8
+     `whitebg-80` + blur 25 + `1px 2px 8px rgba(16,106,170,.12)` */
   .pill {
     height: var(--gnb-height-mo);
-    padding-inline: 16px;
-    border-radius: 12px; /* 모바일 실측 */
+    padding-inline: 20px;
+    border-radius: var(--gnb-radius-mo);
+    background: var(--gnb-bg-mo);
+    box-shadow: var(--gnb-shadow);
+    backdrop-filter: blur(var(--gnb-blur));
+    -webkit-backdrop-filter: blur(var(--gnb-blur));
   }
 
+  /* 모바일 로고는 168×30 — 시안 `48:3386` 실측 */
   .logo {
-    width: auto;
-    height: auto;
-  }
-
-  .logoMark {
-    font-size: 20px;
-  }
-  .logoText {
-    font-size: 15px;
+    width: 168px;
+    height: 30px;
   }
 
   .utilLink,
@@ -277,8 +281,9 @@
     display: none;
   }
 
+  /* `2:3478` — 지구본 32 · 햄버거 32 사이 gap 8 */
   .utils {
-    gap: 4px;
+    gap: 8px;
   }
 }
 

@@ -99,9 +99,27 @@
     linear-gradient(150deg, #c9d9f2 0%, #b3c9ec 55%, #a2bce6 100%);
 }
 
+/**
+ * ## ❌ backdrop-filter 로 젤리 산란을 만들려던 시도 — **폐기**
+ *
+ * 구체 크기에 맞춘 원형 div 에 `backdrop-filter: blur()` 를 걸어 뒤 마퀴만
+ * 흐리게 하려 했다. 물리적으로는 정확한 접근인데 두 겹으로 막혔다:
+ *  ① Lightning CSS 가 선언을 표준·-webkit- **둘 다 통째로 삭제**한다
+ *     (인라인 style 로 우회하면 computed 값은 살아난다)
+ *  ② 그렇게 살려도 **화면에는 아무 변화가 없다.** 마스크를 빼도, 부모의
+ *     will-change 를 꺼도 마찬가지였다 — 마퀴 고주파 성분이 원 안 3.34 /
+ *     원 밖 3.32 로 사실상 동일했다.
+ *
+ * 그래서 밀도는 셰이더(GlobeBodyMaterial)가 전담한다. 젤리로 읽히는 건
+ * 투과율이 아니라 **내부 굴절 반점 + 두께 산란 + 림 라이트** 쪽이다.
+ */
+
 .canvasHost {
   position: absolute;
   inset: 0;
+  /* 공용 Marquee 가 --z-marquee(5) 를 들고 있어서 DOM 순서만으로는
+     캔버스가 글자 아래로 깔린다. 구체가 롤링 텍스트를 덮어야 한다. */
+  z-index: 6;
 }
 
 /* R3F 가 canvas 에 인라인 크기를 넣으므로 :global 로 덮어쓴다 */
@@ -143,6 +161,12 @@
   object-fit: cover;
   /* 세로 뷰포트에서 잘릴 때 시안의 오른쪽 푸른 하늘을 남긴다 */
   object-position: 68% 50%;
+}
+
+.px picture {
+  position: absolute;
+  inset: 0;
+  display: block;
 }
 
 /* 시안 프레임을 뷰포트에 cover 로 채운다. bottom 기준이라 지평선이 흔들리지 않는다.
@@ -464,12 +488,26 @@
  *
  * top: 시안 잉크 밴드가 y610~688, 우리가 600~678 이라 1.1%p 내린다.
  */
+/**
+ * ⚠️ 마퀴는 **구체 씬 레이어 안**, 배경과 캔버스 **사이**에 있다.
+ *
+ * 수정요청(26.08.24) "지구가 뒤로 가게 … 글자가 보이지 않도록".
+ * 예전엔 캔버스(z 0) 위 z 5 라 문구가 구체를 가로질렀다. 구체 밀도를 아무리
+ * 채워도 DOM 에서 위면 소용이 없다.
+ *
+ * 그렇다고 `.sphereLayer` 를 통째로 올리면 그 안의 배경 이미지(.sphereBg)까지
+ * 같이 올라가 문구가 배경에 덮인다 — 실제로 그렇게 했다가 마퀴가 통째로
+ * 사라졌다. `.sphereLayer` 가 `will-change: transform` 으로 **쌓임 맥락**을
+ * 만들기 때문에 자식 z-index 로는 형제 위로 못 올라간다.
+ * 그래서 z 가 아니라 **DOM 순서**로 푼다: 배경 → 마퀴 → 캔버스.
+ */
 .marquee {
   position: absolute;
   left: 0;
   right: 0;
   top: 64.5%;
-  z-index: var(--z-marquee);
+  /* 공용 .root 의 --z-marquee 를 이 씬에서만 내린다. 구체(.canvasHost z 6) 뒤. */
+  z-index: 1;
 }
 
 .marquee :global(*) {
@@ -639,19 +677,20 @@
     display: none;
   }
 
-  /* 타워 씬 — 세로 뷰포트에서 시안(2.09:1)을 cover 로 채우면 확대율이 4배가 돼
-     타워가 화면 밖으로 밀려난다. 폭 기준으로만 오버스캔하고 타워가 있는
-     오른쪽에 붙인 뒤, 아래를 비워 도시 스카이라인이 하단에 앉게 한다. */
-  .towerStage {
-    left: auto;
-    right: -30cqw;
-    bottom: 3cqh;
-    width: 300cqw;
-    margin-left: 0;
+  /* 모바일 뒤판은 375×812 전용(`img_01_bg02_mo.webp`). PC 플레이트(1920×920)를
+     cover/오버스캔하면 타워가 4배로 확대돼 화면 밖으로 밀려난다. */
+  .towerSkyImg {
+    object-position: center;
   }
 
-  .towerSkyImg {
-    object-position: 72% 50%;
+  .towerStage {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    margin-left: 0;
+    aspect-ratio: auto;
+    height: 100%;
   }
 
   /* 스테이지가 화면보다 작아서, 광선을 스테이지에 자르면 하늘 한복판에

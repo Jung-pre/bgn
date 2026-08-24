@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 
 /**
  * 의료진 "교차 스와이퍼"의 상태 + 드래그 + 카드 배치 계산.
@@ -51,11 +52,9 @@ export interface CrossCardLayout {
  * (이전 구현의 부채꼴 코버플로우는 시안에 근거가 없어 걷어냈다. 근거로 삼았던
  *  2:3143 은 히어로 2안 잔재인 의료진 컷아웃 띠였고, 이 섹션 프레임이 아니다.)
  *
- * ## 레인은 카드 인덱스 홀짝에 묶는다
- * offset 홀짝에 묶으면 덱이 한 칸 밀릴 때마다 **같은 카드가 위아래로 까딱거린다**
- * (교차가 아니라 진동). 인덱스 홀짝에 묶으면 각 카드는 제 높이를 유지한 채
- * 옆으로 흐르고, 이웃과 항상 다른 높이라 서로 엇갈려 지나간다.
- * 활성 인덱스 0(짝수)일 때 활성 카드가 위 레인 — 시안 초기 상태와 같다.
+ * ## 레인은 오프셋 홀짝에 묶는다
+ * 검수: "위 아래 위치 고정하지 않고 교차하며". 한 칸 밀릴 때마다 카드가
+ * 옆 자리 높이로 부드럽게 바뀐다. 활성(offset 0)은 항상 위 레인.
  */
 export function crossLayout(index: number, activeIndex: number, count: number): CrossCardLayout {
   const offset = signedOffset(index, activeIndex, count);
@@ -67,7 +66,7 @@ export function crossLayout(index: number, activeIndex: number, count: number): 
     style: {
       "--offset": offset,
       // 0 = 위 레인, 1 = 아래 레인. 실제 간격은 CSS `--lane-y` 가 정한다.
-      "--lane": index % 2 === 0 ? 0 : 1,
+      "--lane": Math.abs(offset) % 2 === 0 ? 0 : 1,
       "--opacity": hidden ? 0 : 1,
       // 페이지 레이어(globals.css --z-*)와 무관한 덱 내부 순서다.
       zIndex: count - depth,
@@ -86,10 +85,15 @@ function signedOffset(index: number, activeIndex: number, count: number): number
   return raw > count / 2 ? raw - count : raw;
 }
 
+/** 자동 롤링 간격. 카드 transition(0.62s) 이 끝난 뒤 읽을 시간을 남긴다. */
+const AUTO_MS = 3200;
+
 export interface CrossCarouselResult {
   activeIndex: number;
   select: (index: number) => void;
   step: (direction: -1 | 1) => void;
+  pause: () => void;
+  resume: () => void;
   stageRef: RefObject<HTMLDivElement | null>;
   /** 스테이지에 그대로 스프레드하는 포인터 핸들러 묶음 */
   dragProps: {
@@ -109,8 +113,12 @@ export interface CrossCarouselResult {
  */
 export function useCrossCarousel(count: number): CrossCarouselResult {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ pointerId: -1, startX: 0, dx: 0, moved: false, raf: 0 });
+
+  const pause = useCallback(() => setPaused(true), []);
+  const resume = useCallback(() => setPaused(false), []);
 
   const select = useCallback(
     (index: number) => {
@@ -198,5 +206,16 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
     };
   }, []);
 
-  return { activeIndex, select, step, stageRef, dragProps };
+  useEffect(() => {
+    if (count < 2 || paused || prefersReducedMotionSync()) return;
+
+    const tick = () => {
+      if (document.hidden || drag.current.pointerId !== -1) return;
+      setActiveIndex((prev) => (prev + 1) % count);
+    };
+    const id = window.setInterval(tick, AUTO_MS);
+    return () => window.clearInterval(id);
+  }, [count, paused]);
+
+  return { activeIndex, select, step, pause, resume, stageRef, dragProps };
 }

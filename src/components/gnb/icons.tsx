@@ -239,3 +239,154 @@ export function SnsIcon({ id, size = 40 }: { id: GnbSnsId; size?: number }) {
     </svg>
   );
 }
+
+/* ── SNS — 배지 안에 얹는 **심볼만** (24×24) ────────────────────────────────
+ * 수정요청 p5: 시안 `48:663` 의 SNS 는 위 `SnsIcon` 처럼 아이콘 자체가 원판인
+ * 형태가 아니다. **배지(48px 원)와 심볼(24px)이 분리**되어 있고, 배지 색이
+ * 유튜브만 흰색·나머지 셋은 `blackbg-50` 이다. 그래서 원판을 그리지 않는
+ * 심볼 전용 세트를 따로 둔다 — 기존 `SnsIcon` 은 푸터가 계속 쓴다.
+ */
+
+function YoutubeSymbol() {
+  return (
+    <>
+      <rect x="1" y="4.25" width="22" height="15.5" rx="4.6" fill="#ff0000" />
+      <path d="M9.9 8.3 16 12l-6.1 3.7Z" fill="#fff" />
+    </>
+  );
+}
+
+function InstagramSymbol() {
+  const gradientId = `gnb-igs-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  return (
+    <>
+      <defs>
+        <radialGradient id={gradientId} cx="30%" cy="107%" r="140%">
+          <stop offset="0%" stopColor="#fdf497" />
+          <stop offset="25%" stopColor="#fd5949" />
+          <stop offset="55%" stopColor="#d6249f" />
+          <stop offset="100%" stopColor="#285aeb" />
+        </radialGradient>
+      </defs>
+      <rect x="3" y="3" width="18" height="18" rx="5.4" fill={`url(#${gradientId})`} />
+      <rect
+        x="6.6"
+        y="6.6"
+        width="10.8"
+        height="10.8"
+        rx="3.4"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="1.7"
+      />
+      <circle cx="12" cy="12" r="2.7" fill="none" stroke="#fff" strokeWidth="1.7" />
+      <circle cx="16.5" cy="7.6" r="1" fill="#fff" />
+    </>
+  );
+}
+
+function KakaoSymbol() {
+  return (
+    <>
+      <circle cx="12" cy="12" r="9.5" fill="#fae100" />
+      <path
+        d="M12 6.4c-3.4 0-6.2 2.1-6.2 4.7 0 1.7 1.2 3.1 2.9 3.9l-.6 2.3c-.1.3.2.5.4.3l2.7-1.8c.3 0 .5.1.8.1 3.4 0 6.2-2.1 6.2-4.8S15.4 6.4 12 6.4Z"
+        fill="#3c1e1e"
+      />
+    </>
+  );
+}
+
+function FacebookSymbol() {
+  return (
+    <>
+      <circle cx="12" cy="12" r="11" fill="#1877f2" />
+      <path
+        d="M13.6 22.9v-8.2h2.2l.4-2.7h-2.6v-1.7c0-.8.2-1.3 1.3-1.3h1.4V6.6c-.2 0-1-.1-2-.1-2 0-3.4 1.2-3.4 3.5V12H8.6v2.7h2.3v8.2Z"
+        fill="#fff"
+      />
+    </>
+  );
+}
+
+const SNS_SYMBOLS: Record<GnbSnsId, () => React.JSX.Element> = {
+  youtube: YoutubeSymbol,
+  instagram: InstagramSymbol,
+  kakao: KakaoSymbol,
+  facebook: FacebookSymbol,
+};
+
+/* ── SNS — 모노(검정) 심볼. 모바일 전체메뉴(`48:3752`)는 흰 배지 + 검정 심볼이다 ── */
+
+function YoutubeMono() {
+  return (
+    <>
+      <rect x="1" y="4.25" width="22" height="15.5" rx="4.6" fill="currentColor" />
+      <path d="M9.9 8.3 16 12l-6.1 3.7Z" fill="#fff" />
+    </>
+  );
+}
+
+function InstagramMono() {
+  return (
+    <>
+      <rect
+        x="3.4"
+        y="3.4"
+        width="17.2"
+        height="17.2"
+        rx="5.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="17" cy="7" r="1.2" fill="currentColor" />
+    </>
+  );
+}
+
+function KakaoMono() {
+  return (
+    <path
+      d="M12 4.6c-4.4 0-8 2.7-8 6.1 0 2.2 1.5 4 3.7 5.1l-.8 3c-.1.3.2.6.5.4l3.5-2.3c.4 0 .7.1 1.1.1 4.4 0 8-2.7 8-6.2S16.4 4.6 12 4.6Z"
+      fill="currentColor"
+    />
+  );
+}
+
+function FacebookMono() {
+  return (
+    <>
+      <circle cx="12" cy="12" r="10" fill="currentColor" />
+      <path
+        d="M13.4 21.9v-7.5h2l.4-2.5h-2.4v-1.6c0-.7.2-1.2 1.2-1.2h1.3V6.9c-.2 0-.9-.1-1.8-.1-1.8 0-3.1 1.1-3.1 3.2v1.9H8.9v2.5h2.1v7.5Z"
+        fill="#fff"
+      />
+    </>
+  );
+}
+
+const SNS_MONO: Record<GnbSnsId, () => React.JSX.Element> = {
+  youtube: YoutubeMono,
+  instagram: InstagramMono,
+  kakao: KakaoMono,
+  facebook: FacebookMono,
+};
+
+export function SnsSymbol({
+  id,
+  size = 24,
+  tone = "color",
+}: {
+  id: GnbSnsId;
+  size?: number;
+  tone?: "color" | "mono";
+}) {
+  const Symbol = tone === "mono" ? SNS_MONO[id] : SNS_SYMBOLS[id];
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden focusable="false">
+      <Symbol />
+    </svg>
+  );
+}

@@ -20,8 +20,7 @@ import styles from "./main-page.module.css";
  *   8  히스토리           연혁 5스텝
  *   9  Web blog          pinned 가로 스크롤 + **영상 배경**
  *  10  이벤트            최대 8장, 버튼당 1장
- *  11  클로징 스피어       히어로 구체 재사용
- *  12  컨택트 + 푸터      지점 탭 + 진료시간
+ *  11  컨택트 + 푸터      배경판 + 히어로 지구(블러 후퇴) + 텍스트
  *
  * ## dynamic import 경계
  * 히어로와 브랜드 슬로건만 static. 나머지는 전부 dynamic 이다.
@@ -61,11 +60,6 @@ const WebBlogSection = dynamic(() =>
 const EventSection = dynamic(() =>
   import("@/features/main/sections/event/event-section").then((m) => m.EventSection),
 );
-const ClosingSphereSection = dynamic(() =>
-  import("@/features/main/sections/closing-sphere/closing-sphere-section").then(
-    (m) => m.ClosingSphereSection,
-  ),
-);
 const FooterContactSection = dynamic(() =>
   import("@/features/main/sections/footer-contact/footer-contact-section").then(
     (m) => m.FooterContactSection,
@@ -93,7 +87,6 @@ export function MainPage({ dict }: MainPageProps) {
       <HistorySection messages={dict.historySection} />
       <WebBlogSection messages={dict.blogSection} />
       <EventSection messages={dict.eventSection} />
-      <ClosingSphereSection />
       <FooterContactSection messages={dict.footer} />
     </main>
   );

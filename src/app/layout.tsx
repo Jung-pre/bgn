@@ -28,6 +28,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "BGN 밝은눈안과 잠실", template: "%s | BGN 밝은눈안과 잠실" },
   description: "세상을 선명하게 — BGN 밝은눈안과 잠실",
+  icons: {
+    icon: [{ url: "/favicon.ico", type: "image/x-icon" }],
+  },
 };
 
 /** viewportFit: cover — 모바일 하단 고정 퀵바가 홈 인디케이터를 피하려면 필수 */

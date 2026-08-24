@@ -2,6 +2,8 @@
   position: relative;
   min-height: 100vh;
   overflow: hidden;
+  /* OverlapPair 가 푸터와 겹치는 동안 0→1 로 밀어 준다 */
+  --overlap-out: 0;
   /**
    * 배경 = **시안 프레임(8:2762) 에서 뽑은 하늘**(`img_11_bg01.webp`, 1920×920).
    *
@@ -36,18 +38,25 @@
 .canvasHost {
   position: absolute;
   inset: 0;
-  /* 시안 대비 지름 비율 0.79 vs 히어로 0.86 → 약 0.92 */
-  transform: scale(0.92);
-
-  /* ⚠️ 예전에 여기서 `opacity: .52` + `filter: blur(3px)` 로 흐리게 만들었었다.
-     지금은 `SphereScene` 의 `intensity` / `showCore` prop 이 같은 일을 셰이더
-     단계에서 한다. CSS 로 누르면
-       ① 캔버스가 통째로 반투명해져 뒤 배경 그라데이션이 비쳐 색이 탁해지고,
-       ② 풀스크린 blur 가 스크롤마다 재래스터를 유발한다.
-     둘 다 실제로 겪은 문제라 되돌리지 말 것. */
+  /* 시안 대비 지름 비율 0.79 vs 히어로 0.86 → 약 0.92.
+     푸터가 올라오면 히어로 1→2 처럼 원이 뒤로 빠지며 흐려진다.
+     --overlap-out 은 OverlapPair 가 스크럽한다. */
+  transform: scale(calc(0.92 - var(--overlap-out) * 0.28));
+  filter: blur(calc(var(--overlap-out) * 14px));
+  opacity: calc(1 - var(--overlap-out) * 0.2);
+  will-change: transform, filter, opacity;
 }
 
 .canvasHost :global(canvas) {
   width: 100% !important;
   height: 100% !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvasHost {
+    transform: scale(0.92);
+    filter: none;
+    opacity: 1;
+    will-change: auto;
+  }
 }
