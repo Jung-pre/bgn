@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
 import {
@@ -124,6 +124,24 @@ export interface HeroSectionProps {
   messages: HeroSectionMessages;
 }
 
+/** 구독할 게 없는 정적 값 — useSyncExternalStore 규약상 해제 함수만 돌려준다 */
+const subscribeNever = () => () => {};
+
+/** WebGL 지원 프로브 결과 캐시. 캔버스를 만드는 작업이라 한 번만 돌린다. */
+let glProbe: boolean | null = null;
+function glRibbonsSnapshot() {
+  if (glProbe !== null) return glProbe;
+  if (!USE_GL_RIBBONS) return (glProbe = false);
+  if (prefersReducedMotionSync()) return (glProbe = false); // 동작 줄이기면 정지 DOM 판
+  try {
+    const probe = document.createElement("canvas");
+    glProbe = Boolean(probe.getContext("webgl2") ?? probe.getContext("webgl"));
+  } catch {
+    glProbe = false;
+  }
+  return glProbe;
+}
+
 export function HeroSection({ messages }: HeroSectionProps) {
   const isMobile = useIsMobileLayout();
   const canvasHostRef = useRef<HTMLDivElement>(null);
@@ -188,7 +206,15 @@ export function HeroSection({ messages }: HeroSectionProps) {
    * 갈리면 하이드레이션이 깨진다. 타워 레이어 자체가 `towerMounted`(진행도
    * 0.12) 전까지 마운트되지 않으므로, 그 전에 이 효과가 먼저 돌아 깜빡임이 없다.
    */
-  const [glRibbons, setGlRibbons] = useState(false);
+  /**
+   * WebGL 띠를 쓸 수 있는지. **effect 안에서 setState 하지 않는다** —
+   * `react-hooks/set-state-in-effect` 가 막고, 실제로도 한 프레임 늦게 뒤집혀
+   * DOM 판이 깜빡 보였다 사라진다.
+   *
+   * 서버 스냅샷은 항상 false 라 하이드레이션 불일치가 없고, 클라이언트 스냅샷은
+   * 한 번만 재서 캐시한다(프로브가 캔버스를 만들기 때문에 매 렌더 돌면 안 된다).
+   */
+  const glRibbons = useSyncExternalStore(subscribeNever, glRibbonsSnapshot, () => false);
 
   /**
    * 히어로는 첫 화면이라 "보이면 켜기"로 충분해 보이지만, 여유를 준다.
@@ -277,19 +303,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
      */
     dependencies: [],
   });
-
-  useEffect(() => {
-    if (!USE_GL_RIBBONS) return;
-    if (prefersReducedMotionSync()) return; // 동작 줄이기면 정지 DOM 판을 쓴다
-    let ok = false;
-    try {
-      const probe = document.createElement("canvas");
-      ok = Boolean(probe.getContext("webgl2") ?? probe.getContext("webgl"));
-    } catch {
-      ok = false;
-    }
-    setGlRibbons(ok);
-  }, []);
 
   /**
    * 띠 노드 수집 — 타워 레이어가 마운트된 뒤 한 번만.
