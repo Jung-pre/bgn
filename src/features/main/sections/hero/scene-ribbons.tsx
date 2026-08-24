@@ -261,6 +261,13 @@ const FRAG = /* glsl */ `
     return 0.66 * snoise(p) + 0.34 * snoise(p * 2.13 + 5.7);
   }
 
+  /**
+   * 1옥타브 판. **저주파 필드에는 2옥타브가 낭비**다 — 두 번째 옥타브는 주파수가
+   * 2.13배라, u 스케일이 1~2 인 곳에서는 화면에 거의 기여하지 않으면서 비용만
+   * 두 배다. 프래그먼트 전체 snoise 호출의 절반이 여기서 나왔다.
+   */
+  float fbm1(vec2 p) { return snoise(p); }
+
   /** 한 판이 그리는 실크 겹 수. 시안 띠는 2~3겹이 겹쳐 지나간다 */
   const int SHEETS = 2;
 
@@ -274,7 +281,7 @@ const FRAG = /* glsl */ `
        크게 주면 다시 얼룩이 된다. 이 사이가 "흐르는 결"이다. */
     float fold =
       0.62 * fbm(vec2(u * 2.3 + seed, v * 0.35 + t * 0.30)) +
-      0.24 * fbm(vec2(u * 5.4 - seed, v * 0.30 - t * 0.21));
+      0.24 * fbm1(vec2(u * 5.4 - seed, v * 0.30 - t * 0.21));
 
     /**
      * ② 실크 겹.
@@ -291,6 +298,20 @@ const FRAG = /* glsl */ `
     vec3 col = vec3(0.0);
     float wsum = 0.0;
 
+    /**
+     * ## ⚡ 결의 길이방향 밝기는 **루프 밖에서 두 번만** 잰다
+     *
+     * 원래는 결마다(2겹 × 7가닥 = 14회) fbm 을 따로 불렀다. 전부 같은 필드를
+     * x 오프셋만 바꿔 훑는 거라, 픽셀당 노이즈 호출이 42회까지 치솟았다
+     * (1.6M 픽셀 × 2메쉬 기준 프레임당 1억 3천만 회). 이게 이 씬이 무거웠던
+     * 실질적인 이유다 — 지구본의 21만 포인트보다 훨씬 비싸다.
+     *
+     * 두 개만 재고 결마다 다른 비율로 섞은 뒤 사인 한 항으로 흩는다.
+     * 결끼리 상관관계가 생기지 않을 만큼 충분히 어긋나고, 화면 결과는 같다.
+     */
+    float alongA = fbm1(vec2(u * 3.4, t * 0.3));
+    float alongB = fbm1(vec2(u * 3.4 + 17.3, t * 0.3 + 4.1));
+
     for (int k = 0; k < SHEETS; k++) {
       float fk = float(k);
       float r1 = fract(sin(fk * 12.9898 + seed) * 43758.5453);
@@ -305,7 +326,7 @@ const FRAG = /* glsl */ `
 
       /* 반폭 — 화면 높이의 6~13%. 길이 방향으로 두꺼워졌다 얇아진다 */
       float hw = mix(0.21, 0.40, r2)
-        * (0.72 + 0.42 * (0.5 + 0.5 * fbm(vec2(u * 1.9 + fk * 3.3 + seed, t * 0.2))));
+        * (0.72 + 0.42 * (0.5 + 0.5 * fbm1(vec2(u * 1.9 + fk * 3.3 + seed, t * 0.2))));
 
       float dv = (v - c) / max(hw, 0.001);
       float m = clamp(1.0 - abs(dv), 0.0, 1.0);
@@ -331,7 +352,7 @@ const FRAG = /* glsl */ `
 
       /* 길이 방향 존재감 — 겹이 화면 밖에서 들어와 지나간다 */
       float along = smoothstep(0.0, 0.13, u) * smoothstep(1.0, 0.87, u);
-      along *= 0.42 + 0.58 * clamp(0.5 + 0.75 * fbm(vec2(u * 2.2 + fk * 5.0 + seed, t * 0.24)), 0.0, 1.0);
+      along *= 0.42 + 0.58 * clamp(0.5 + 0.75 * fbm1(vec2(u * 2.2 + fk * 5.0 + seed, t * 0.24)), 0.0, 1.0);
       sheet *= along;
 
       /**
@@ -358,7 +379,8 @@ const FRAG = /* glsl */ `
         float line = exp(-ld * ld);
 
         /* 길이 방향 존재감 */
-        float along2 = 0.42 + 0.58 * clamp(0.5 + 0.85 * fbm(vec2(u * 3.4 + q * 9.0, t * 0.3)), 0.0, 1.0);
+        float an = mix(alongA, alongB, fract(q * 3.1)) + 0.30 * sin(u * 5.3 + q * 6.2832);
+        float along2 = 0.42 + 0.58 * clamp(0.5 + 0.85 * an, 0.0, 1.0);
         if (warm || navy) {
           /**
            * 색 결은 **구간**이어야 한다. 끝에서 끝까지 그으면 붓으로 그은 선이 되고,
@@ -404,7 +426,7 @@ const FRAG = /* glsl */ `
        * 장미와 금은 서로 반대 부호를 써서 같은 자리에서 겹치지 않는다.
        * edgeBias 로 금은 아래 모서리, 장미는 위쪽에 붙인다(시안 배치).
        */
-      float tone = fbm(vec2(u * 1.15 + seed * 0.7 + fk * 2.0, t * 0.09));
+      float tone = fbm1(vec2(u * 1.15 + seed * 0.7 + fk * 2.0, t * 0.09));
       float edgeBias = smoothstep(-0.9, 0.3, dvo);
       float goldZone = smoothstep(0.05, 0.55, tone) * edgeBias;
       float roseZone = smoothstep(0.02, 0.50, -tone) * (1.0 - edgeBias * 0.65);
