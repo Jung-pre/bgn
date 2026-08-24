@@ -116,6 +116,38 @@
   backdrop-filter: blur(6px);
   box-shadow: var(--shadow-pill); /* 1px 2px 8px rgba(16,106,170,.12) */
   overflow: hidden;
+  /* 호버 전환 — filter/backdrop-filter 는 넣지 않는다(blur 재합성 비용) */
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    translate 0.3s ease;
+}
+
+/**
+ * 수정요청(2차) "호버했을때 진해진다던가 효과가 있으면" —
+ * 카드 유리의 **아래쪽 하늘색 알파만** 올리고(0.32 → 0.52) 살짝 띄운다.
+ *
+ * · hover 미디어쿼리로 감싼다 — 모바일은 가로 스와이프 캐러셀이라 터치 뒤
+ *   호버 상태가 눌어붙는다(프로젝트 공통 hover 가드 규칙).
+ * · transform 이 아니라 translate 를 쓴다 — 등장 트윈(GSAP)이 transform 을
+ *   소유하고 있어서 hover 가 transform 을 만지면 트윈 도중 값이 서로 덮는다.
+ */
+@media (hover: hover) {
+  .card:hover {
+    translate: 0 -6px;
+    border-color: rgba(255, 255, 255, 0.9);
+    background: linear-gradient(180deg, var(--whitebg-80) 18%, rgba(131, 205, 255, 0.52) 100%);
+    box-shadow: 2px 10px 24px 0 rgba(16, 106, 170, 0.2);
+  }
+
+  /* 4번 연보라 카드는 같은 원리로 연보라 쪽을 올린다 */
+  .card.cardLavender:hover {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8) 18%, rgba(223, 219, 249, 0.55) 100%),
+      var(--whitebg-50);
+    box-shadow: 2px 10px 24px 0 rgba(96, 86, 190, 0.18);
+  }
 }
 
 /* 4번 카드 — 시안은 하늘색이 아니라 연보라 유리 */

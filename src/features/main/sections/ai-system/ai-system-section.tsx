@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import clsx from "clsx";
+import { MQ } from "@/shared/config/breakpoints";
 import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 import { Marquee } from "@/components/marquee/marquee";
@@ -215,6 +216,63 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         const counter = counters.find((entry) => entry.card === card);
         if (counter) tl.add(countUpTween(counter.value, counter.spec), at + 0.2);
       });
+
+      /**
+       * 등장 때 쓰던 그래프 드로잉·카운트업을 호버마다 한 번 더 그린다.
+       * 카드 이동(translate)은 CSS hover 가 맡고, GSAP 는 stroke/숫자만 건드린다.
+       * `MQ.hoverable` — 터치 노트북에서 호버가 눌어붙으면 계속 다시 그려진다.
+       */
+      const hoverTls = new Map<HTMLElement, gsap.core.Timeline>();
+      const hoverable = window.matchMedia(MQ.hoverable);
+
+      const replayViz = (card: HTMLElement) => {
+        if (!hoverable.matches || prefersReducedMotionSync()) return;
+        if (tl.isActive() || tl.progress() < 1) return;
+
+        hoverTls.get(card)?.kill();
+
+        const cardDraws = pick<SVGGeometryElement>(card, "[data-draw]");
+        const counter = counters.find((entry) => entry.card === card);
+        if (cardDraws.length === 0 && !counter) return;
+
+        const hoverTl = gsap.timeline({ defaults: { ease: "power3.out" } });
+        hoverTls.set(card, hoverTl);
+
+        if (cardDraws.length > 0) {
+          hoverTl.fromTo(
+            cardDraws,
+            { strokeDashoffset: (_i, target) => drawLength(target as Element) },
+            {
+              strokeDashoffset: 0,
+              duration: 1.05,
+              ease: "power2.inOut",
+              stagger: 0.08,
+            },
+            0,
+          );
+        }
+
+        if (counter) {
+          counter.value.textContent = formatNumeric(0, counter.spec);
+          hoverTl.add(countUpTween(counter.value, counter.spec, 1.15), 0.06);
+        }
+      };
+
+      const onPointerEnter = (event: Event) => {
+        replayViz(event.currentTarget as HTMLElement);
+      };
+
+      for (const card of cards) {
+        card.addEventListener("pointerenter", onPointerEnter);
+      }
+
+      return () => {
+        for (const card of cards) {
+          card.removeEventListener("pointerenter", onPointerEnter);
+        }
+        for (const hoverTl of hoverTls.values()) hoverTl.kill();
+        hoverTls.clear();
+      };
     },
     { scope: sectionRef, dependencies: [messages.steps.length] },
   );

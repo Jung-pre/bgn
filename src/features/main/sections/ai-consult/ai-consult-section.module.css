@@ -49,8 +49,8 @@
   background-blend-mode: screen;
   mask-image:
     linear-gradient(180deg, transparent 0%, #000 42%, #000 100%),
-    /* 시안에서 도트는 우측 유리 오브젝트에 닿기 전에 사라진다 → 55% 부터 페이드 */
-    linear-gradient(100deg, #000 0%, #000 34%, transparent 72%);
+    /* 로고 multiply 가 메시를 누르게 우측 페이드를 오브젝트 뒤까지 연장 */
+    linear-gradient(100deg, #000 0%, #000 42%, transparent 96%);
   mask-composite: intersect;
   pointer-events: none;
 }
@@ -298,15 +298,15 @@
   outline-offset: 4px;
 }
 
+/*
+  로고 클립(`video_03_logo`)은 알파가 없고 바탕이 순백이다.
+  multiply 를 VideoSlot 안쪽 video 에 주면 `.root { overflow: hidden }` 이
+  스태킹을 끊어 흰 사각형이 그대로 남는다. 호스트에 올려야 섹션 흰 배경과
+  하단 메시만 눌리고, B 본체(회청)는 흰 위에서는 톤이 거의 그대로다.
+*/
 .objectVideo {
   border-radius: var(--radius-lg);
   background: transparent;
-}
-
-/* 납품 영상·포스터 모두 알파가 없고 모서리가 순백이다.
-   multiply 는 흰 픽셀을 뒤 레이어(섹션/메시)로 바꾸므로 정사각 카드가 사라진다.
-   유리 B 본체는 회청색이라 흰 바탕 위에서는 톤이 거의 그대로다. */
-.objectVideo :is(img, video) {
   mix-blend-mode: multiply;
 }
 

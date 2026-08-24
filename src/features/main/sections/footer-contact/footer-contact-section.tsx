@@ -85,18 +85,15 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
 
       const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
       /**
-       * 단계별 구간(진행도 0~1). 앞 단계가 거의 끝날 때 다음이 시작하도록
-       * 살짝만 물린다 — 완전히 끊으면 계단처럼 보이고, 많이 겹치면 예전처럼
-       * "블러와 어두워짐이 한꺼번에" 가 된다.
+       * 단계별 구간(진행도 0~1).
        *   ① 홀드   0.00 ~ 0.30   지도 선명
-       *   ② 블러   0.30 ~ 0.55
-       *   ③ 디밍   0.50 ~ 0.78
-       *   ④ 카피   0.60 ~ 0.94
+       *   ② 블러+딤 0.30 ~ 0.62  작아지고 어두워지며 배경이 된다
+       *   ③ 카피   0.55 ~ 0.92
        */
       const map = (p: number) => {
-        const blur = clamp01((p - 0.3) / 0.25);
-        const dim = clamp01((p - 0.5) / 0.28);
-        const copyLin = clamp01((p - 0.6) / 0.34);
+        const blur = clamp01((p - 0.3) / 0.28);
+        const dim = clamp01((p - 0.3) / 0.32);
+        const copyLin = clamp01((p - 0.55) / 0.37);
         const copy = 1 - (1 - copyLin) ** 3;
         paint(blur, dim, copy, p);
       };
@@ -156,10 +153,11 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
             <SphereScene
               active={earthActive}
               progressRef={earthProgressRef}
-              intensity={0.72}
-              haze={0.55}
+              intensity={0.82}
+              haze={0.7}
               showCore={false}
               interactive={false}
+              fitSize={0.81}
             />
           </div>
         </div>
@@ -192,8 +190,10 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
           loading="lazy"
           decoding="async"
         />
-        {/* 시안 2:3005 / 2:2903 / 2:2902 — 얇은 원형 라인 3개.
-            건물과 같이 카피 페이드인 때 나온다. */}
+      </div>
+      {/* 시안 2:2903 / 2:2902 장식 원. 선화와 같이 카피 페이드인 때 나온다.
+          plus-lighter 그룹 밖에 둔다 — 같이 넣으면 1px 선이 빛줄기처럼 굵어진다. */}
+      <div className={styles.rings} aria-hidden>
         <span className={styles.ringLarge} />
         <span className={styles.ringMid} />
         <span className={styles.ringSmall} />

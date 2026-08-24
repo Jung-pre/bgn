@@ -106,11 +106,12 @@
 .earthInner {
   position: absolute;
   inset: 0;
-  /* 홀드는 선명하되 히어로만큼 밝지 않다. dim 이 올라가면 더 가라앉는다. */
-  transform: scale(calc(1.02 - var(--earth-blur) * 0.14));
-  filter: blur(calc(var(--earth-blur) * 18px))
-    brightness(calc(0.92 - var(--earth-dim) * 0.32));
-  will-change: transform, filter;
+  /* 홀드 1 → 푸터에서 2/3. 블러와 함께 어둡게 물러난다. */
+  transform: scale(calc(1 - var(--earth-blur) * 0.33));
+  filter: blur(calc(var(--earth-blur) * 14px))
+    brightness(calc(1 - var(--earth-dim) * 0.58));
+  opacity: calc(1 - var(--earth-dim) * 0.24);
+  will-change: transform, filter, opacity;
 }
 
 .earthInner :global(canvas) {
@@ -123,13 +124,15 @@
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  background: rgb(6 14 28 / calc(var(--earth-dim) * 0.52));
+  /* 지구를 배경으로 깔되, 카피 앞에서 한 톤 내려 준다. */
+  background: rgb(6 14 28 / calc(var(--earth-dim) * 0.58));
 }
 
 @media (prefers-reduced-motion: reduce) {
   .earthInner {
-    transform: scale(0.88);
-    filter: blur(10px) brightness(0.88);
+    transform: scale(0.67);
+    filter: blur(12px) brightness(0.42);
+    opacity: 0.76;
     will-change: auto;
   }
 
@@ -175,17 +178,36 @@
   will-change: opacity;
 }
 
-.stage .wires {
+/**
+ * 장식 원 — 시안 푸터의 얇은 타원 3개.
+ * 예전 892/410/221 은 히어로 스케일이라 792 프레임에서 화면을 가로질렀다.
+ * 건물·타워 선화 옆을 스치는 호로 줄인다. plus-lighter 밖이라 선 굵기가 유지된다.
+ */
+.rings {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: var(--copy-in);
+  will-change: opacity;
+}
+
+/* 선화·코너 글로우만 시안 792 프레임에 맞춘다.
+   지구는 핀된 100vh 를 채워야 히어로와 비슷한 크기가 나온다. */
+.stage .wires,
+.stage .rings,
+.stage .footer::after {
   inset: auto 0;
   top: 50%;
   height: 49.5rem;
   margin-top: -24.75rem;
 }
 
-.wires span {
+.rings span {
   position: absolute;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: var(--radius-full);
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
 }
 
 /* --- 배경 에셋 (시안 8:2770) ------------------------------------------------
@@ -304,24 +326,24 @@
 }
 
 .ringLarge {
-  width: 55.75rem; /* 892 */
-  height: 55.75rem;
-  left: -15.1875rem; /* -243 */
-  top: 13.25rem; /* 212 */
+  width: 28.5rem; /* 456 — 건물(594)보다 한 둘레 작은 호 */
+  height: 28.5rem;
+  left: -7.25rem;
+  top: 16.5rem;
 }
 
 .ringMid {
-  width: 25.625rem; /* 410 */
-  height: 25.625rem;
-  right: -3.875rem; /* 1920 - 1572 - 410 */
-  top: -5.6875rem; /* -91 */
+  width: 15.25rem; /* 244 */
+  height: 15.25rem;
+  right: -2.125rem;
+  top: -1.75rem;
 }
 
 .ringSmall {
-  width: 13.8125rem; /* 221 */
-  height: 13.8125rem;
-  right: -2.8125rem; /* 1920 - 1744 - 221 */
-  top: 14.875rem; /* 238 */
+  width: 8.25rem; /* 132 */
+  height: 8.25rem;
+  right: -1.375rem;
+  top: 18.25rem;
 }
 
 .inner {
@@ -708,7 +730,7 @@
    * `2:5207` 은 글자 밴드를 뺀 모든 행의 표준편차가 1~4(= 완전히 매끄럽다).
    * 우리는 같은 구간이 4.5~10.4 였고, 그 차이가 전부 이 호(arc)들이다.
    */
-  .wires span {
+  .rings {
     display: none;
   }
 

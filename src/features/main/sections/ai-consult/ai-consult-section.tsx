@@ -30,8 +30,8 @@ import styles from "./ai-consult-section.module.css";
  * 3D 유리 `B` 를 만들 자리가 아니라 **영상 슬롯**이다. 클릭하면 왼쪽 카피가
  * 자리를 유지한 채 카메라 쪽으로 커지며 중앙 확대 상태(`8:1118`)로 간다.
  *
- * 납품 클립은 알파가 없다(모서리 RGB 255, a 255). WebM/MP4 로는 진짜 투명이
- * 안 되므로 흰 픽셀은 `mix-blend-mode: multiply` 로 섹션/메시에 녹인다.
+ * 우측 슬롯은 `video_03_logo`(흰 바탕 알파벳 B). 알파가 없으므로
+ * 흰 픽셀은 `mix-blend-mode: multiply` 로 섹션/메시에만 눌린다.
  *
  * 확대 상태에서 폼을 **복제하지 않는다.** 같은 DOM 에 클래스만 얹어 위치를 바꾼다.
  * 복제하면 입력값·동의 체크가 두 벌로 갈라진다.
@@ -42,6 +42,11 @@ import styles from "./ai-consult-section.module.css";
 export interface AiConsultSectionProps {
   messages: AiConsultSectionMessages;
 }
+
+/** 흰 바탕 유리 B 로고. 알파 없음 — 섹션 CSS 의 multiply 가 흰 픽셀을 녹인다. */
+const LOGO_VIDEO = "/main/video_03_logo.mp4";
+const LOGO_VIDEO_WEBM = "/main/video_03_logo.webm";
+const LOGO_POSTER = "/main/img_05_logo-glass01.webp";
 
 /** 확대 상태 열기/닫기 라벨. i18n 사전에 항목이 없어 임시 리터럴 — 문구 추가 필요(보고 참조). */
 const EXPAND_LABEL = "상담 신청 크게 보기";
@@ -229,9 +234,9 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
           <div className={styles.media} data-reveal-item>
             <VideoSlot
               decorative
-              src="/main/video_main02.mp4"
-              srcWebm="/main/video_main02.webm"
-              poster="/main/img_05_logo-glass01.webp"
+              src={LOGO_VIDEO}
+              srcWebm={LOGO_VIDEO_WEBM}
+              poster={LOGO_POSTER}
               className={styles.objectVideo}
             />
           </div>
@@ -246,9 +251,9 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
           >
             <VideoSlot
               decorative
-              src="/main/video_main02.mp4"
-              srcWebm="/main/video_main02.webm"
-              poster="/main/img_05_logo-glass01.webp"
+              src={LOGO_VIDEO}
+              srcWebm={LOGO_VIDEO_WEBM}
+              poster={LOGO_POSTER}
               className={styles.objectVideo}
             />
           </button>

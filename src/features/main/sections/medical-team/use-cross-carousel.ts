@@ -209,9 +209,10 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
   }, []);
 
   /**
-   * 롤링은 **스테이지가 화면에 들어온 뒤**에만 시작한다.
+   * 롤링은 의료진이 **화면의 주인공이 된 뒤**에만 시작한다.
    * 마운트와 동시에 interval 을 켜면 히어로 pin(200vh) 을 지나오는 동안
    * 이미 한 칸 이상 넘어, 도착했을 때 2번 카드가 켜져 있다.
+   * 등장 트윈(`top 50%`)과 맞춰 스테이지가 반 이상 보인 뒤에만 켠다.
    */
   useEffect(() => {
     const el = stageRef.current;
@@ -221,7 +222,7 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
     }
     const io = new IntersectionObserver(
       ([entry]) => setInView(Boolean(entry?.isIntersecting)),
-      { threshold: 0.35 },
+      { threshold: 0.5 },
     );
     io.observe(el);
     return () => io.disconnect();

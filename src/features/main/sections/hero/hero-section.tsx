@@ -12,10 +12,15 @@ import type { HeroSectionMessages } from "@/shared/i18n/messages";
 import {
   HERO_ASSETS,
   HERO_ASSETS_READY,
+  TOWER_CLOUD_BANDS,
+  TOWER_CLOUD_TOP_OFFSET,
+  TOWER_CLOUDS_TOP,
   TOWER_LINES,
   TOWER_STAGE,
+  TOWER_WATERMARK,
   type TowerSprite,
 } from "./hero-assets";
+import { getGlobeTune } from "./globe-tune";
 import styles from "./hero-section.module.css";
 
 /**
@@ -38,9 +43,9 @@ import styles from "./hero-section.module.css";
  * → **로딩 화면 금지.** 텍스트는 즉시 렌더하고 3D 만 준비되면 페이드인한다.
  *
  * ## 진행도 분배
- *   0.00 ~ 0.45  구체 유지 (회전 + 포인터 추종)
- *   0.45 ~ 0.70  크로스페이드 (구체 out / 타워 in)
- *   0.70 ~ 1.00  타워 유지 (회전)
+ *   0.00 ~ fadeStart  구체 유지 (회전 + 포인터 추종)
+ *   fadeStart ~ fadeEnd  구체가 확대되며 배경이 되고, 타워·물결이 들어온다
+ *   fadeEnd ~ 1.00    타워 유지
  *
  * 매 프레임 값은 `progressRef` 로만 흐른다. state 는 장면 인덱스가 바뀔 때만.
  */
@@ -69,10 +74,6 @@ const SphereScene = dynamic(() => import("./scene-sphere").then((m) => m.SphereS
  * 복구된 컨텍스트에 텍스처가 없어 띠가 빈 채로 남는다).
  */
 const USE_GL_RIBBONS = true;
-
-/** 크로스페이드 구간 경계 */
-const FADE_START = 0.45;
-const FADE_END = 0.7;
 
 /**
  * 광선 스프라이트를 겹침(`repeat`)까지 펼친 평면 목록.
@@ -216,24 +217,50 @@ export function HeroSection({ messages }: HeroSectionProps) {
     scrub: 1,
     onProgress: (p) => {
       // ⚠️ 매 프레임 호출된다. setState 금지. 스타일만 직접 쓴다.
-      const t = clamp01((p - FADE_START) / (FADE_END - FADE_START));
+      if (reducedRef.current === null) reducedRef.current = prefersReducedMotionSync();
+      const { fadeStart, fadeEnd } = getGlobeTune();
+      const span = Math.max(0.02, fadeEnd - fadeStart);
+      const t = clamp01((p - fadeStart) / span);
       const sphere = sphereLayerRef.current;
       const tower = towerLayerRef.current;
-      if (sphere) {
-        sphere.style.opacity = String(1 - t);
-        sphere.style.transform = `scale(${1 + t * 0.12})`;
-      }
-      if (tower) {
-        tower.style.opacity = String(t);
-        tower.style.transform = `scale(${1.08 - t * 0.08})`;
+      const host = canvasHostRef.current;
+      const reduced = reducedRef.current === true;
+      if (reduced) {
+        if (sphere) {
+          sphere.style.opacity = String(1 - t);
+          sphere.style.transform = "none";
+        }
+        if (host) host.style.transform = "scale(1)";
+        if (tower) {
+          tower.style.opacity = String(t);
+          tower.style.transform = "scale(1)";
+        }
+      } else {
+        /* 확대는 캔버스 CSS 가 아니라 3D 그룹이 맡는다(scene-sphere).
+           여기서 키우면 픽셀이 늘어나 흐려진다. */
+        if (host) host.style.transform = "scale(1)";
+        /* 구체가 화면을 채운 뒤에야 투명해진다. 타워와 겹치지 않는다. */
+        const dump = clamp01((t - 0.58) / 0.2);
+        const dumpEase = dump * dump * (3 - 2 * dump);
+        if (sphere) {
+          sphere.style.opacity = String(1 - dumpEase);
+          sphere.style.transform = "none";
+        }
+        /* 구체가 거의 사라진 뒤에 타워가 조금 큰 채로 들어와 자리 잡는다. */
+        const rise = clamp01((t - 0.74) / 0.2);
+        const riseEase = rise * rise * (3 - 2 * rise);
+        if (tower) {
+          tower.style.opacity = String(riseEase);
+          tower.style.transform = `scale(${1.38 - riseEase * 0.38})`;
+        }
       }
       const cs = copySphereRef.current;
       const ct = copyTowerRef.current;
-      if (cs) cs.style.opacity = String(1 - clamp01(t * 1.6));
-      if (ct) ct.style.opacity = String(clamp01((t - 0.35) * 2));
+      if (cs) cs.style.opacity = String(1 - clamp01(t * 1.9));
+      if (ct) ct.style.opacity = String(clamp01((t - 0.72) * 3.2));
       // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)
       const mq = marqueeRef.current;
-      if (mq) mq.style.opacity = String(1 - clamp01(t * 1.6));
+      if (mq) mq.style.opacity = String(1 - clamp01(t * 2.4));
 
       // 타워 에셋을 미리 마운트해 크로스페이드 때 디코딩이 안 걸리게 한다
       if (!towerMountedRef.current && p > 0.12) {
@@ -242,11 +269,12 @@ export function HeroSection({ messages }: HeroSectionProps) {
       }
 
       /**
-       * 패럴랙스 — 타워가 등장한 뒤 구간(0.45~1)을 다시 0~1 로 편다.
+       * 패럴랙스 — 타워가 등장한 뒤 구간을 다시 0~1 로 편다.
        * 뒤판은 한 장(가장 멀다), 광선만 더 빨리 흘린다.
        */
-      if (reducedRef.current === null) reducedRef.current = prefersReducedMotionSync();
-      const u = reducedRef.current ? 0 : clamp01((p - FADE_START) / (1 - FADE_START));
+      /* 물결은 타워가 받기 시작할 때 같이 착지한다 */
+      const ribbonIn = fadeStart + span * 0.7;
+      const u = reducedRef.current ? 0 : clamp01((p - ribbonIn) / (1 - ribbonIn));
       shift(pxBackdropRef.current, 0.6 * u, -1.1 * u);
       /* 셰이더 판은 그룹 이동까지 캔버스 안에서 처리한다 — 여기서 또 밀면 두 배가 된다 */
       ribbonProgressRef.current = u;
@@ -443,7 +471,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
                     srcSet={HERO_ASSETS.backdropMo}
                     type="image/webp"
                   />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     className={styles.towerSkyImg}
                     src={HERO_ASSETS.backdrop}
@@ -455,6 +482,75 @@ export function HeroSection({ messages }: HeroSectionProps) {
               </div>
 
               <div className={styles.towerStage}>
+                {/* 파티클 텍스처 — 8:2880. soft-light 50% 로 하늘 전체에 결을 깐다.
+                    블렌드는 반드시 .px(스태킹 컨텍스트) 자신에 건다 — 자식에 걸면
+                    투명한 자기 그룹 안에서만 섞여 통째로 죽는다. */}
+                <div className={clsx(styles.px, styles.softLight, styles.particlesPx)}>
+                  <div className={styles.particlesBox}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className={styles.particlesImg}
+                      src={HERO_ASSETS.particles}
+                      alt=""
+                      decoding="async"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+
+                {/* 상단 구름 — 8:2881 + 평행이동 복사본 8:2892. 타워 첨탑 주변
+                    하늘을 뿌옇게 만든다(스프라이트 opacity 40%, 블렌드 없음). */}
+                <div className={styles.cloudTop} aria-hidden>
+                  {TOWER_CLOUDS_TOP.map((c) => (
+                    <TowerSpriteImg key={c.node} sprite={c} />
+                  ))}
+                  {TOWER_CLOUDS_TOP.map((c) => (
+                    <TowerSpriteImg
+                      key={`${c.node}-b`}
+                      sprite={{
+                        ...c,
+                        node: `${c.node}-b`,
+                        x: c.x + TOWER_CLOUD_TOP_OFFSET.x,
+                        y: c.y + TOWER_CLOUD_TOP_OFFSET.y,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* BGN 워터마크 — 8:759. **타워 뒤**(상단 구름과 하단 구름 띠 사이) */}
+                <TowerSpriteImg sprite={TOWER_WATERMARK} />
+
+                {/* 롯데타워 — 8:2946. 시안(2:493)의 우측 기둥.
+                    직전 리팩터링에서 빠져 하늘만 남아 있었다(2차 수정 확인 중 발견).
+                    8:2947 `bg` 사각형이 마스크라 그 박스로 먼저 자르고 사진을 넣는다.
+                    띠(stageClip·WebGL 캔버스)보다 **앞에 두면 안 된다** — 시안에서
+                    띠가 타워를 가로질러 지나간다. */}
+                <div className={styles.towerCrop}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className={styles.towerPic}
+                    src={HERO_ASSETS.tower}
+                    alt=""
+                    decoding="async"
+                    loading="lazy"
+                  />
+                </div>
+
+                {/* 하단 구름 띠 — 8:2904 세 덩어리, soft-light. 타워 밑동과
+                    스카이라인을 안개로 감싼다(시안에서 타워 **앞**이다). */}
+                {TOWER_CLOUD_BANDS.map((band, bi) => (
+                  <div
+                    key={`band-${bi}`}
+                    className={clsx(styles.px, styles.cloudBand)}
+                    data-band={bi}
+                    aria-hidden
+                  >
+                    {band.map((c) => (
+                      <TowerSpriteImg key={c.node} sprite={c} />
+                    ))}
+                  </div>
+                ))}
+
                 {/* 광선/웨이브 — 8:2949. 시안에서 프레임 마스크로 잘려 있다.
                     clip 을 패럴랙스 래퍼 바깥에 둬야 잘리는 사각형이 안 움직인다.
 

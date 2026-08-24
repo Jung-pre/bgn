@@ -12,33 +12,24 @@
   overflow: hidden;
 }
 
-/* ① Figma 8:2268 — 풀블리드 배경(현재는 bg.webp poster).
-   주석 2:2401 `영상에 색상블러 넣어두었습니다` 의 블러를 **여기서** 건다.
-   덮개에 backdrop-filter 로 걸면 합성 레이어가 없는 환경에서 통째로 무시돼
-   원본 실크 무늬가 선명하게 드러난다(시안은 형체를 알아볼 수 없을 만큼 흐리다).
-   블러 대상이 매체 자신이므로 지원 여부와 무관하게 항상 같은 그림이 나온다.
-
-   rem 인 이유: root font-size 가 뷰포트 비례(1920→16px)라 4.6875rem 이
-   시안 기준 75px 이고, 창이 줄면 블러 반경도 같은 비율로 준다. px 로 박으면
-   1440 에서 시안보다 훨씬 뭉개진다.
-
-   inset 을 음수로 넓히지 않는 이유: blur 가장자리의 투명 번짐을 지우려고 밖으로
-   빼면 object-fit:cover 의 크롭 기준이 함께 밀려 시안 왼쪽의 금빛 덩어리가
-   화면 밖으로 사라진다. 번짐은 섹션 폴백색(--brand-navy)과 같은 어두운 톤이라
-   가장자리 비네팅처럼 보일 뿐이므로 크롭을 지키는 쪽을 택했다. */
+/* ① Figma 8:2268 / 2:2400 — 풀블리드 배경 영상. 블러·틴트는 바로 위 ②. */
 .bgVideo {
   position: absolute;
   inset: 0;
   z-index: 0;
-  filter: blur(4.6875rem);
 }
 
-/* ② Figma 2:2401 — "색상블러" 중 색 레이어. 블러는 ① 이 담당한다 */
+/* ② Figma 2:2401 — 영상 위 색상블러.
+   backdrop-blur 75px + rgba(0,114,236,0.2). rem 인 이유: root font-size 가
+   뷰포트 비례(1920→16px)라 4.6875rem = 시안 75px.
+   -webkit- 를 같이 적지 않는다. LightningCSS 가 접두사만 남기면 모던 크롬에서
+   블러가 빠진다(다른 섹션은 표준 속성만 두고 컴파일러가 접두사를 붙인다). */
 .colorBlur {
   position: absolute;
   inset: 0;
   z-index: 1;
   background: rgba(0, 114, 236, 0.2);
+  backdrop-filter: blur(4.6875rem);
   pointer-events: none;
 }
 
@@ -138,18 +129,21 @@
   color: var(--color-white);
 }
 
-/* 심볼 4종 — 시안에서 타일마다 다른 장식이 들어간다(별·꽃·스파클·꽃잎원).
-   전부 **가는 흰 선의 아웃라인**이다. 인덱스로 고정 배정한다(랜덤 금지). */
+/* 심볼 4종 — Figma 원문 패스(채움/스트로크). 인덱스로 고정 배정한다(랜덤 금지).
+   회전은 CSS 무한 루프가 아니라 스크롤 관성(tile-symbol.tsx). */
 .tileSymbol {
-  width: 7.3rem;
-  height: 7.3rem;
-  color: var(--whitebg-80);
+  display: block;
+  width: 7.5rem;
+  height: 7.5rem;
+  color: var(--color-white);
+  will-change: transform;
 }
 
 .tileSymbol svg {
   display: block;
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
 /* --- 블로그 카드 -------------------------------------------------------------- */

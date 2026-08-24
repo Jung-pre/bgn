@@ -40,35 +40,25 @@ import styles from "./brand-film-section.module.css";
  * 느낌은 **가속도**에서 나온다 — 튀어나가고, 감속하고, 떨어진다. 그건 그릴 수
  * 없고 계산해야 한다(`fireworks.ts`).
  *
- * ## 영상이 도착하면
- * `VIDEO_SRC` 만 채우면 된다. 그때는 이 합성 스택을 통째로 걷고 영상만 재생한다
- * (아래 `hasVideo` 분기). 지금 만든 연출은 영상의 **대역**이지 영상 위에 얹는
- * 장식이 아니다 — 둘을 겹치면 같은 글씨가 두 번 보인다.
+ * ## 영상
+ * `video_03_film` / `_mo` 가 들어오면 합성 스택을 걷고 영상만 재생한다.
+ * 필름 안에 이미 BGn·스파크가 들어 있으므로 로고 영상(`video_03_logo`)을
+ * 위에 얹지 않는다 — 겹치면 글씨가 두 번 보인다.
  *
  * ## UI 전체 숨김
  * 시안에서 이 프레임만 GNB·퀵바가 전부 없다. 섹션이 뷰포트를 채우는 동안
  * `<body data-gnb-hide="true">` 를 세운다. GNB 쪽은 이 속성을 CSS 로 받는다
  * (컴포넌트 간 결합을 만들지 않으려고 context 대신 data 속성을 쓴다).
  */
-/**
- * 1번 영상 — 한강·롯데타워 위로 BGN 글자가 그려지는 브랜드 필름.
- * 이게 채워지면 `composite` 가 false 로 떨어져 아래 합성 스택(plate/spark/typo
- * + 불꽃 캔버스)이 통째로 빠지고 영상만 남는다. 둘을 겹치면 같은 글씨가
- * 두 번 보이므로 **절대 동시에 켜지 않는다.**
- *
- * 납품본은 1280×720 / 24fps / 10.9초 / AAC 포함 8.2MB 였다. 자동재생은 어차피
- * 무음이라 오디오 트랙은 버리고 CRF 24 로 다시 떠서 1.4MB 로 줄였다
- * (원본은 저장소 밖 `_video_src/` 에 보관).
- */
-const VIDEO_SRC: string | undefined = "/main/video_main01.mp4";
-/** VP9 판본 — 크롬 계열이 이걸 받는다(1.4MB → 908KB) */
-const VIDEO_SRC_WEBM = "/main/video_main01.webm";
+/** PC 노을 필름 (`BGN잠실 메인페이지 영상_노을 버전`) */
+const VIDEO_SRC = "/main/video_03_film.mp4";
+/** 모바일 노을 필름 (`…노을 버전_mo`, 1440×3200) */
+const VIDEO_SRC_MO = "/main/video_03_film_mo.mp4";
+const POSTER = "/main/img_03_poster02.webp";
 
 const PLATE = "/main/img_03_poster01.webp";
 const OVERLAY_SPARK = "/main/img_03_overlay01.webp";
 const OVERLAY_TYPO = "/main/img_03_overlay02.webp";
-/** 영상이 없을 때 `<video poster>` 대신 쓰이는 최종 합성본(폴백 경로 전용) */
-const VIDEO_POSTER = "/main/img_03_poster02.webp";
 
 /** 타이포 중심 — `overlay-typo.webp` 실측(정규화 좌표). 폭죽이 여기서 터진다 */
 const TYPO_CENTER = { x: 0.535, y: 0.36 } as const;
@@ -336,14 +326,22 @@ export function BrandFilmSection() {
             <canvas ref={canvasRef} className={styles.fireworks} aria-hidden />
           </>
         ) : (
-          <VideoSlot
-            src={VIDEO_SRC}
-            srcWebm={VIDEO_SRC_WEBM}
-            poster={VIDEO_POSTER}
-            decorative
-            className={styles.video}
-            rootMargin="400px 0px"
-          />
+          <>
+            <VideoSlot
+              src={VIDEO_SRC}
+              poster={POSTER}
+              decorative
+              className={`${styles.film} ${styles.filmPc}`}
+              rootMargin="400px 0px"
+            />
+            <VideoSlot
+              src={VIDEO_SRC_MO}
+              poster={POSTER}
+              decorative
+              className={`${styles.film} ${styles.filmMo}`}
+              rootMargin="400px 0px"
+            />
+          </>
         )}
       </div>
     </section>

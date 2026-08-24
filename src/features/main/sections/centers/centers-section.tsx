@@ -48,7 +48,8 @@ export interface CentersSectionProps {
  * 시안은 `object-fit: cover` + 한 점 앵커가 아니다. 카드마다 scaleMode=CROP 의
  * imageTransform 으로 **보이는 창**을 잘라 쓴다. 그 행렬을 카드 % 로 풀면
  *   width  = 1/sx · height = 1/sy · left = −tx/sx · top = −ty/sy
- * `object-position` 으로 환산하면 줌이 사라져 얼굴·장비가 밀린다.
+ * `object-position` 만 쓰면 줌이 사라져 얼굴·장비가 밀린다.
+ * 박스는 이 % 로 깔되, 이미지 자체는 cover 로 비율을 지킨다(fill 은 짜부).
  *
  * pc = 상태=on / 1120×600, mo = 상태=on / 240×480.
  */

@@ -131,14 +131,27 @@
   background: linear-gradient(0deg, rgb(248, 248, 249) 0%, rgba(248, 248, 249, 0) 100%);
 }
 
-.video {
+.film {
   position: absolute;
   inset: 0;
 }
 
+.filmMo {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .section[data-composite="false"] {
-    min-height: 60vh;
+    aspect-ratio: unset;
+    min-height: 100svh;
+  }
+
+  .filmPc {
+    display: none;
+  }
+
+  .filmMo {
+    display: block;
   }
   /* 모바일은 스크롤 예산을 줄인다 — 같은 220vh 면 엄지로 넘기기에 너무 길다 */
   .section[data-composite="true"] {

@@ -65,6 +65,7 @@
   inset: 0;
   z-index: var(--z-canvas-bg);
   will-change: opacity, transform;
+  transform-origin: 50% 48%;
 }
 
 .towerLayer {
@@ -120,6 +121,8 @@
   /* 공용 Marquee 가 --z-marquee(5) 를 들고 있어서 DOM 순서만으로는
      캔버스가 글자 아래로 깔린다. 구체가 롤링 텍스트를 덮어야 한다. */
   z-index: 6;
+  transform-origin: 50% 48%;
+  will-change: transform;
 }
 
 /* R3F 가 canvas 에 인라인 크기를 넣으므로 :global 로 덮어쓴다 */
@@ -145,16 +148,24 @@
 .towerSky {
   position: absolute;
   inset: 0;
+  /* 시안 68:732 실측 — 하늘이 y306 까지 짙은 블루(137,183,231)로 남는다.
+     예전 값은 52% 지점에서 이미 라벤더로 풀려 화면 전체가 washed-out 됐다
+     (12×6 영역 비교 r1 행 +39~+57). 34% 까지 블루를 끌고 내려간다. */
   background: linear-gradient(
     180deg,
-    rgb(140, 180, 234) 0%,
-    rgb(186, 197, 226) 52%,
-    rgb(214, 216, 226) 100%
+    rgb(150, 196, 240) 0%,
+    rgb(140, 182, 232) 34%,
+    rgb(168, 192, 224) 66%,
+    rgb(205, 216, 232) 100%
   );
 }
 
 .towerSkyImg {
   position: absolute;
+  /* 납품 플레이트(img_01_bg02)는 창백한 라벤더라 그대로 깔면 .towerSky 의
+     블루를 전부 덮어 하늘이 하얗게 뜬다. 텍스처만 살리고 톤은 그라데이션이
+     쥐도록 0.3 — 스윕 계측에서 MAE 19.55 → 18.0. */
+  opacity: 0.3;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -265,11 +276,15 @@
    스프라이트마다 걸면 합성 횟수만 늘고 결과는 같다. */
 .cloudBand {
   mix-blend-mode: soft-light;
+  /* 시안 r4 행(y613~766)은 블루가 남아 있다 — 0.9 로 두면 하단 좌측이
+     +54~+69 만큼 하얗게 뜬다. 스프라이트 자체 opacity 0.9 에 곱해진다. */
+  opacity: 0.45;
 }
 
-/* 파티클 그룹 투명도 — Figma 8:2880 실측 50% */
+/* 파티클 그룹 — 8:2880 실측은 50% 지만 현행 시안(68:732)의 하단 도트 웨이브는
+   더 옅다. 0.5 면 하단 좌측 r4 가 +60 대로 뜬다 — 0.35 로. */
 .particlesPx {
-  opacity: 0.5;
+  opacity: 0.35;
 }
 
 /* 상단 구름 덩어리 — 8:2881 / 8:2892. 블렌드 없이 opacity 40% 로만 얹힌다.

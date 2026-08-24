@@ -7,6 +7,8 @@ import { gsap, ScrollTrigger, useGSAP } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
 import { VideoSlot } from "@/components/video-slot/video-slot";
 import type { BlogPostMessages, BlogSectionMessages } from "@/shared/i18n/messages";
+import { SHAPE_COUNT } from "./tile-symbol-paths";
+import { TileSymbol } from "./tile-symbol";
 import styles from "./web-blog-section.module.css";
 
 /**
@@ -253,24 +255,22 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
     { kind: "tile", key: "tile-0", symbol: 0 },
     { kind: "brand", key: "brand" },
     ...posts.flatMap((post, i): TrackItem[] => [
-      { kind: "tile", key: `tile-${i + 1}`, symbol: (i + 1) % SYMBOLS.length },
+      { kind: "tile", key: `tile-${i + 1}`, symbol: (i + 1) % SHAPE_COUNT },
       { kind: "post", key: post.href, post },
     ]),
   ];
 
   return (
     <section ref={sectionRef} className={styles.section} aria-labelledby="blog-title">
-      {/* ① Figma 8:2268 — 배경 영상. 영상 도착 전에는 poster 가 화면을 채운다.
-          **원본 컷(bg.webp)** 을 쓴다. 시안의 배경은 이 컷에 ②의 blur 75 가 먹은
-          모습이라, 이미 블러된 `video-poster.webp` 를 넣으면 두 번 흐려지면서
-          시안보다 밝고 밋밋해진다(왼쪽 금빛 덩어리가 사라진다). */}
+      {/* ① Figma 8:2268 / 2:2400 — 배경 영상. 블러·틴트는 바로 위 ②. */}
       <VideoSlot
         decorative
         className={styles.bgVideo}
+        src="/main/bg_blog.mp4"
         poster="/main/img_09_bg01.webp"
         rootMargin="400px 0px"
       />
-      {/* ② Figma 2:2401 — 색상블러. blur 75 + 블루 0.2 오버레이 */}
+      {/* ② Figma 2:2401 — 영상 위 색상블러. 타이틀·타일·카드는 이 위(③④). */}
       <div className={styles.colorBlur} aria-hidden />
 
       {/* ③ Figma 2:2571 / 8:4891 — 글자 모양으로 뚫린 덮개. 구멍 사이로 ①②가 비친다 */}
@@ -293,7 +293,7 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
                   BGN
                 </span>
                 {/* 장식은 인덱스로 지정된 도형. 랜덤 금지 — 시안에서 순서가 정해져 있다 */}
-                <span className={styles.tileSymbol}>{SYMBOLS[item.symbol]}</span>
+                <TileSymbol variant={item.symbol} className={styles.tileSymbol} />
                 <span className={styles.tileBrand} lang="en">
                   Eye Clinic Jamsil
                 </span>
@@ -352,38 +352,6 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
     </section>
   );
 }
-
-/* --- 타일 장식 4종 -------------------------------------------------------------
-   시안 2:2457 / 2:2550 / 2:2634 / 2:2739 순서. 전부 가는 흰 선의 아웃라인이다.
-   회전 각도는 상수 배열로 미리 계산한다(렌더마다 같은 값이어야 한다). */
-
-/**
- * ⚠️ `Math.sin/cos` 결과를 **반드시 반올림**해서 쓴다.
- *
- * ECMAScript 는 삼각함수의 정확도를 강제하지 않는다. 그래서 서버(Node)와
- * 브라우저(V8)가 **마지막 자리에서 갈릴 수 있다** — 실제로 이 파일의 꽃잎 좌표가
- *   서버 `cy="35.277568135664545"` / 클라이언트 `cy={35.27756813566455}`
- * 로 어긋나 **하이드레이션 불일치 경고**를 매 페이지 로드마다 띄우고 있었다.
- * 소수 3자리면 100 단위 viewBox 에서 0.001% 오차라 눈에 보이지 않는다.
- */
-const round3 = (v: number) => Math.round(v * 1000) / 1000;
-
-const BURST_RAYS = Array.from({ length: 16 }, (_, i) => {
-  const angle = (i * Math.PI) / 8;
-  const inner = i % 2 === 0 ? 6 : 10;
-  const outer = i % 2 === 0 ? 48 : 34;
-  return {
-    x1: round3(50 + Math.cos(angle) * inner),
-    y1: round3(50 + Math.sin(angle) * inner),
-    x2: round3(50 + Math.cos(angle) * outer),
-    y2: round3(50 + Math.sin(angle) * outer),
-  };
-});
-
-const PETALS = Array.from({ length: 6 }, (_, i) => {
-  const angle = (i * Math.PI) / 3;
-  return { cx: round3(50 + Math.cos(angle) * 17), cy: round3(50 + Math.sin(angle) * 17) };
-});
 
 /**
  * 글자 구멍이 뚫린 덮개판.
@@ -448,30 +416,3 @@ function MaskPlate({ title, mobile }: { title: string; mobile: boolean }) {
     </svg>
   );
 }
-
-const SYMBOLS = [
-  // ① 가는 빛살 별 (2:2457)
-  <svg key="burst" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.9">
-    {BURST_RAYS.map((r) => (
-      <line key={`${r.x1}-${r.y1}`} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />
-    ))}
-  </svg>,
-  // ② 겹친 꽃잎 (2:2550)
-  <svg key="flower" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.9">
-    {PETALS.map((p) => (
-      <circle key={`${p.cx}-${p.cy}`} cx={p.cx} cy={p.cy} r="20" />
-    ))}
-  </svg>,
-  // ③ 4각 스파클 (2:2634)
-  <svg key="sparkle" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.9">
-    <path d="M50 2C52 32 68 48 98 50C68 52 52 68 50 98C48 68 32 52 2 50C32 48 48 32 50 2Z" />
-    <path d="M20 20 80 80M80 20 20 80" strokeWidth="0.6" />
-  </svg>,
-  // ④ 생명의 꽃 (2:2739)
-  <svg key="seed" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="0.9">
-    <circle cx="50" cy="50" r="20" />
-    {PETALS.map((p) => (
-      <circle key={`${p.cx}-${p.cy}`} cx={p.cx} cy={p.cy} r="20" />
-    ))}
-  </svg>,
-];

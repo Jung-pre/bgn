@@ -12,14 +12,14 @@ import {
 /**
  * 의료진 섹션 등장.
  *
- * `useSectionReveal` 을 쓰지 않는 이유: 이 섹션은 **핀된 히어로(200vh) 바로 다음**이다.
- * 트리거를 섹션 박스(`start: top 82%`)에 걸면, 히어로가 아직 화면을 덮고 있는 동안
- * 등장 트윈이 끝나 버린다. 타이틀이 읽히는 자리에 왔을 때는 이미 `clearProps` 뒤라
- * 모션이 아예 안 보인다.
+ * `useSectionReveal` 기본값(`top 82%`)을 쓰지 않는다. 이 섹션은 핀된 히어로
+ * (200vh) 바로 다음이라, 섹션 상단이 뷰포트 하단에 걸리는 순간(= 타워가 아직
+ * 화면을 차지하는 때)에 트윈이 시작해 버린다. 의료진이 **화면의 주인공이 된
+ * 뒤**에 등장해야 하므로 섹션 top 이 뷰포트 한가운데에 왔을 때 건다.
  *
- * 헤더가 실제로 들어오는 순간을 트리거로 쓰고, 타이틀은 좌→우 wipe,
- * 카드는 가운데부터 스태거로 올린다. 카드 `<li>` 의 transform 은 캐러셀 배치라
- * 건드리지 않고, 안쪽 래퍼(`[data-team-card]`)만 움직인다.
+ * 타이틀은 좌→우 wipe, 카드는 **화면 왼쪽부터** 스태거. DOM 순서는 활성 카드가
+ * 0번이라 가운데부터 튀어 보인다. `--offset` 오름차순이 화면 좌→우다.
+ * 카드 `<li>` 의 transform 은 캐러셀 배치라 건드리지 않고, 안쪽 래퍼만 움직인다.
  */
 export function useTeamReveal<T extends HTMLElement>() {
   const sectionRef = useRef<T>(null);
@@ -29,7 +29,6 @@ export function useTeamReveal<T extends HTMLElement>() {
       const section = sectionRef.current;
       if (!section) return;
 
-      const header = section.querySelector<HTMLElement>("[data-team-header]");
       const wipes = gsap.utils.toArray<HTMLElement>("[data-team-wipe]", section);
       const fades = gsap.utils.toArray<HTMLElement>("[data-team-fade]", section);
       const cards = gsap.utils.toArray<HTMLElement>("[data-team-card]", section);
@@ -57,9 +56,17 @@ export function useTeamReveal<T extends HTMLElement>() {
       const tl = gsap.timeline({
         defaults: { ease: "power3.out" },
         scrollTrigger: {
-          trigger: header ?? section,
-          start: "top 78%",
+          trigger: section,
+          /**
+           * 히어로 pin 이 풀린 뒤에 걸리도록 기본(82%)보다는 늦게 — 단, 50% 는
+           * 너무 늦었다. pin 해제(스크롤 920)부터 발화(1380)까지 뷰포트 절반이
+           * 빈 섹션으로 지나가서 "칸이 안 나타난다"로 읽혔다(2차 수정 5p).
+           * 70% 면 헤더가 갓 들어온 시점(스크롤 1196)에 시작해 카드 스태거가
+           * 화면 안에서 **보이면서** 진행된다. 접근 캡처로 확인.
+           */
+          start: "top 70%",
           once: true,
+          invalidateOnRefresh: true,
         },
       });
 
@@ -91,14 +98,31 @@ export function useTeamReveal<T extends HTMLElement>() {
         );
       }
       if (cards.length > 0) {
+        const ranked = cards.map((el) => {
+          const li = el.closest("li");
+          const offset = Number(li?.style.getPropertyValue("--offset") || 0);
+          return { el, offset, hidden: li?.getAttribute("aria-hidden") === "true" };
+        });
+        const visible = ranked
+          .filter((card) => !card.hidden)
+          .sort((a, b) => a.offset - b.offset)
+          .map((card) => card.el);
+        const offstage = ranked.filter((card) => card.hidden).map((card) => card.el);
+
+        /* 화면 밖 카드는 스태거에 넣지 않는다. 넣으면 왼쪽 투명 장이 먼저
+           시간을 잡아먹고, 나중에 스와이프했을 때 y/alpha 가 0 으로 남아 있다. */
+        if (offstage.length > 0) {
+          gsap.set(offstage, { autoAlpha: 1, y: 0, scale: 1, clearProps: "opacity,visibility,transform" });
+        }
+
         tl.to(
-          cards,
+          visible,
           {
             autoAlpha: 1,
             y: 0,
             scale: 1,
-            duration: 0.85,
-            stagger: { each: 0.06, from: 0 },
+            duration: 0.7,
+            stagger: 0.09,
             clearProps: "opacity,visibility,transform",
           },
           0.28,

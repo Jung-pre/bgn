@@ -34,7 +34,10 @@
   display: flex;
   gap: var(--center-card-gap);
   width: 100%;
-  height: var(--center-card-height);
+  /* 폭이 줄어도 1120:600 비율을 유지한다. 높이를 600px 로 박으면
+     1440 이하에서 카드만 납작해지고, 아래 .photo 의 fill 이 사람을 짜부시킨다. */
+  aspect-ratio: 1760 / 600;
+  height: auto;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -159,7 +162,11 @@
   height: var(--photo-h, 100%);
   left: var(--photo-x, 0);
   top: var(--photo-y, 0);
-  object-fit: fill;
+  /* fill 은 박스 가로·세로를 따로 늘린다. 카드 비율이 시안 1120×600 에서
+     한 픽셀만 어긋나도 얼굴·장비가 짜부된다. cover 는 비율을 지키고,
+     박스 자체가 이미지와 같은 비면 fill 과 결과가 같다. */
+  object-fit: cover;
+  object-position: 0 0;
 }
 
 /* 드림렌즈 PC 만 Figma FILL(cover). 모바일은 CROP 이라 위 변수를 그대로 쓴다. */
@@ -464,7 +471,7 @@
 /* --- `≡` 그룹 토글 (Figma 2:1961) -----------------------------------------
    트랙의 마지막 칸. 64×600, radius 16, 카드와 같은 그라데이션. */
 .groupToggleItem {
-  flex: 0 0 var(--center-card-collapsed);
+  flex: 0 0 calc(64 / 1760 * 100%);
 }
 
 .groupToggle {
@@ -604,6 +611,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--gap-sm);
+    aspect-ratio: auto;
     height: auto;
   }
 
@@ -677,6 +685,7 @@
     display: flex;
     grid-template-columns: none;
     gap: 16px;
+    aspect-ratio: auto;
     height: 480px;
     width: calc(100% + 25px);
     /* margin-inline 과 margin-left 를 섞으면 논리/물리 속성이 서로 안 덮는다. */

@@ -16,6 +16,7 @@ import {
   makeShellPoints,
   type PointCloud,
 } from "./globe-points";
+import { GLOBE_TUNE_DEFAULTS, getGlobeTune } from "./globe-tune";
 
 /**
  * 히어로 — 지도 구체(파티클 지구).
@@ -78,6 +79,22 @@ const COUNTS = {
 /** 지축 기울기 23.4°(rad). 정확히 기울여야 "지구"로 읽힌다. */
 const AXIAL_TILT = 0.409;
 
+/**
+ * 수정요청(2차) "한국쪽 지도가 시작으로 보이게" — 정면 구도 보정 두 개.
+ *
+ * Euler 'XYZ'(Rx·Ry·Rz)라 지축 기울기(Rz)가 **먼저** 걸린다. 그 결과
+ * FOCUS_ROTATION_Y 만으로는 한국이 화면 (0.18, 0.81) — 꼭대기 가장자리로
+ * 밀려나고 정면 중앙은 호주가 차지했다(마스크를 그대로 투영해 확인).
+ *
+ *   · PITCH_X 0.55 : 위도 37.5°+기울기만큼 위로 밀린 한국을 화면 중앙대로 내린다
+ *   · YAW_TRIM -8° : 내린 뒤 남는 우측 치우침(x 0.18)을 0.10 으로
+ *
+ * 이 값에서 한국은 화면 (0.10, 0.39), z 0.92 — 정면 상단 중앙에 또렷이 온다.
+ * (검증 스크립트: 랜드마스크를 같은 회전으로 정사영해 픽셀로 확인했다)
+ */
+const FOCUS_PITCH_X = 0.55;
+const FOCUS_YAW_TRIM = -8 * (Math.PI / 180);
+
 /* --- 커서 반발 --------------------------------------------------------------
    Figma 주석: "마우스 포인터에 맞춰 빛 요소가 움직이도록"
    구체 전체 회전(= 시선 추종)만으로는 "빛 요소가 움직인다"가 약해서,
@@ -134,6 +151,11 @@ export interface SphereSceneProps {
    * 클로징은 스쳐 지나가는 전환 씬이라 조작 어포던스를 주지 않는다.
    */
   interactive?: boolean;
+  /**
+   * 비인터랙티브(푸터·클로징) 구체 크기 배수.
+   * 히어로 `size` 0.86 과 섞이지 않게 이쪽만 따로 둔다.
+   */
+  fitSize?: number;
 }
 
 export function SphereScene({
@@ -143,6 +165,7 @@ export function SphereScene({
   haze = intensity,
   showCore = true,
   interactive = true,
+  fitSize = 1,
 }: SphereSceneProps) {
   const reduced = usePrefersReducedMotion();
 
@@ -163,6 +186,7 @@ export function SphereScene({
         haze={haze}
         showCore={showCore}
         interactive={interactive}
+        fitSize={fitSize}
       />
     </CanvasShell>
   );
@@ -175,6 +199,7 @@ function Globe({
   haze,
   showCore,
   interactive,
+  fitSize,
 }: {
   progressRef?: RefObject<number>;
   reduced: boolean;
@@ -182,11 +207,14 @@ function Globe({
   haze: number;
   showCore: boolean;
   interactive: boolean;
+  fitSize: number;
 }) {
   const isMobile = useIsMobileLayout();
   const counts = isMobile ? COUNTS.mobile : COUNTS.desktop;
 
   const groupRef = useRef<THREE.Group>(null);
+  const bodyGroupRef = useRef<THREE.Group>(null);
+  const bodyMeshRef = useRef<THREE.Mesh>(null);
   const coreRef = useRef<THREE.Mesh>(null);
   const eased = useRef({ x: 0, y: 0 });
   /** 진입 회전 진행도 — "지구형태가 약간 돌면서 등장" */
@@ -255,13 +283,13 @@ function Globe({
    * `GLOBE_RADIUS` 는 **화면 높이** 기준으로 잡혀 있다(fov 는 수직 화각이니까).
    * 375×812 모바일에서는 그 높이의 82% 가 666px 라 가로 375px 를 훌쩍 넘는다.
    * 가로가 세로보다 좁을 때만 그 비율만큼 줄인다. 데스크톱에서는 항상 1 이다.
+   *
+   * 히어로만 `GLOBE_TUNE_DEFAULTS.size`(0.86) 로 한 걸음 물린다 — 카피·마퀴 여백.
+   * 클로징·푸터는 그 배율을 쓰면 안 된다. 배경 요소로 쓰던 원래 크기(1)를 유지한다.
    */
-  /**
-   * 수정요청(26.08.24 후속) "지구본의 사이즈를 조정" + p7 "지구가 뒤로 가게".
-   * 기존엔 데스크톱에서 항상 1 이라 구체 지름이 화면 높이의 87% 를 먹었다.
-   * 0.86 을 곱해 한 걸음 뒤로 물린다 — 카피·마퀴와의 여백이 시안에 가까워진다.
-   */
-  const fitScale = Math.min(1, (size.width / size.height) * 1.05) * 0.86;
+  const fitScale =
+    Math.min(1, (size.width / size.height) * 1.05) *
+    (interactive ? GLOBE_TUNE_DEFAULTS.size : fitSize);
 
   /** demand 모드(동작 줄이기)에서는 한 번은 그려야 화면이 빈 채로 남지 않는다 */
   useEffect(() => {
@@ -272,9 +300,32 @@ function Globe({
     const g = groupRef.current;
     if (!g) return;
 
+    /* 히어로만 라이브 스토어를 읽는다. 클로징·푸터는 코드 기본값. */
+    const tune = interactive ? getGlobeTune() : null;
+    const yawTrim = tune ? tune.yawTrimDeg * (Math.PI / 180) : FOCUS_YAW_TRIM;
+    const pitchX = tune ? tune.pitchX : FOCUS_PITCH_X;
+    const sizeMul = interactive ? (tune?.size ?? GLOBE_TUNE_DEFAULTS.size) : fitSize;
+    const fitted = Math.min(1, (_state.size.width / _state.size.height) * 1.05) * sizeMul;
+    const scrollNow = progressRef?.current ?? 0;
+    const fadeStartNow = tune?.fadeStart ?? 0.16;
+    const fadeEndNow = tune?.fadeEnd ?? 0.78;
+    const zoomTNow = interactive
+      ? Math.min(
+          1,
+          Math.max(0, (scrollNow - fadeStartNow) / Math.max(0.02, fadeEndNow - fadeStartNow)),
+        )
+      : 0;
+    /* 히어로만: 장면 2로 넘기기 전에 구체가 화면을 채운다. 클로징·푸터는 키우지 않는다. */
+    const zoomNow = zoomTNow * 0.78 + zoomTNow * zoomTNow * 0.22;
+    const grow = interactive && !reduced ? 1 + zoomNow * 3.45 : 1;
+    g.scale.setScalar(fitted * grow);
+    bodyGroupRef.current?.scale.setScalar(fitted * grow);
+    if (bodyMeshRef.current) bodyMeshRef.current.visible = tune ? tune.showBody : true;
+    if (coreRef.current) coreRef.current.visible = showCore && (tune ? tune.showCore : true);
+
     if (reduced) {
       // 정지 구도 — 기울기만 유지하고 애니메이션은 전부 건너뛴다.
-      g.rotation.set(0, FOCUS_ROTATION_Y, AXIAL_TILT);
+      g.rotation.set(pitchX, FOCUS_ROTATION_Y + yawTrim, AXIAL_TILT);
       if (showCore) updateCore(coreRef.current, g, camera, 1);
       return;
     }
@@ -312,20 +363,28 @@ function Globe({
     if (intro.current < 1) intro.current = Math.min(1, intro.current + delta / 1.8);
     const introEase = 1 - Math.pow(1 - intro.current, 3);
 
-    const scroll = progressRef?.current ?? 0;
-
     // 정면 경도(FOCUS_ROTATION_Y)를 기준으로 삼고, 인트로는 그 앞에서 살짝 돌다 멈춘다.
     // 클로징은 포인터가 없어서, 스크롤·느린 자전이 없으면 인트로 1.8초 뒤 완전히 멈춘다.
-    const idle = interactive ? 0 : _state.clock.elapsedTime * 0.07;
+    //
+    // 수정요청(2차): "한국쪽 지도가 시작으로 보이게".
+    //   · 진입 오프셋 0.55(≈31.5°)는 한국이 1.8초 뒤에야 정면에 오는 값이라 0.12 로.
+    //     첫 프레임에도 한반도가 구체 중앙 ±7° 안에 있고, "살짝 돌며 등장"은 남는다.
+    //   · scroll 0.9 도 같은 이유로 0.35 로 — 스크롤을 조금만 내려도 한국이 옆으로
+    //     달아나던 것을, 전환 끝(진행도 1)에 20° 만 돌게 줄인다.
+    const idle = interactive
+      ? _state.clock.elapsedTime * (tune?.spinRate ?? 0)
+      : _state.clock.elapsedTime * 0.07;
+    const yawKeep = interactive ? 1 - zoomTNow * 0.85 : 1;
     g.rotation.y =
       FOCUS_ROTATION_Y +
-      (1 - introEase) * 0.55 + // 등장하며 살짝 돌기
-      scroll * 0.9 + // 스크롤에 따라 추가 회전
-      eased.current.x * 0.3 + // 포인터 추종 (비인터랙티브면 eased 가 0 에 머문다)
+      yawTrim +
+      (1 - introEase) * (tune?.introYaw ?? 0.12) +
+      scrollNow * (tune?.scrollYaw ?? 0.35) * yawKeep +
+      eased.current.x * (tune?.pointerYaw ?? 0.3) +
       idle;
     // 지축 기울기를 고정으로 주고 그 위에 포인터 반응을 얹는다
     g.rotation.z = AXIAL_TILT;
-    g.rotation.x = eased.current.y * 0.16;
+    g.rotation.x = pitchX + eased.current.y * (tune?.pointerPitch ?? 0.16);
 
     if (showCore) updateCore(coreRef.current, g, camera, introEase);
   });
@@ -333,9 +392,9 @@ function Globe({
   return (
     <>
       {/* 회전 그룹 밖 — 껍질의 산란광이라 구체와 같이 돌면 안 된다 */}
-      <group scale={fitScale}>
+      <group ref={bodyGroupRef} scale={fitScale}>
         {/**
-         * ## ⚠️ 젤리 바디는 **회전 그룹 밖**이어야 한다
+         * ## ⚠️ 바디 평판은 **회전 그룹 밖**이어야 한다
          *
          * 처음엔 아래 `groupRef` 안(파티클과 같은 그룹)에 넣었다. 그 그룹은 매
          * 프레임 Y 축으로 돌기 때문에 **평판이 같이 뒤집힌다** — 옆으로 서는 순간
@@ -347,47 +406,59 @@ function Globe({
          *
          * renderOrder -3 → 헤이즈(-2)·파티클보다 먼저 깔린다.
          */}
-        <mesh renderOrder={-3} frustumCulled={false}>
+        <mesh ref={bodyMeshRef} renderOrder={-3} frustumCulled={false}>
           <planeGeometry args={[GLOBE_RADIUS * 1.97, GLOBE_RADIUS * 1.97]} />
-          <GlobeBodyMaterial intensity={intensity} instant={reduced} />
+          <GlobeBodyMaterial intensity={intensity} instant={reduced} live={interactive} />
         </mesh>
-        <GlobeHaze intensity={haze} instant={reduced} />
+        <GlobeHaze intensity={haze} instant={reduced} live={interactive} />
       </group>
-      <group ref={groupRef} rotation={[0, FOCUS_ROTATION_Y, AXIAL_TILT]} scale={fitScale}>
+      {/* 수정요청(2차) "질감이 더 투명같지않게" — 레이어 알파를 시안 실측값
+          (0.55/0.95/1.0)으로 복원. 직전 커밋에서 0.20/0.36/0.42 로 내려가
+          구체가 속이 비쳐 보였고, 클로징 스피어 튜닝(intensity 0.12)도
+          이 원본 알파를 기준으로 잰 값이라 복원이 곧 회귀 수정이다. */}
+      <group
+        ref={groupRef}
+        rotation={[FOCUS_PITCH_X, FOCUS_ROTATION_Y + FOCUS_YAW_TRIM, AXIAL_TILT]}
+        scale={fitScale}
+      >
         <PointLayer
           cloud={halo}
+          kind="halo"
           color="#ffffff"
           size={0.03}
-          opacity={0.20 * intensity}
+          opacity={1.0 * intensity}
           instant={reduced}
           tint={1.0}
           pointerRef={push}
           pushScale={interactive ? 1.2 : 0}
+          live={interactive}
         />
         <PointLayer
           cloud={shell}
+          kind="shell"
           color="#eef4ff"
           size={0.024}
-          opacity={0.36 * intensity}
+          opacity={0.8 * intensity}
           instant={reduced}
           tint={1.0}
           pointerRef={push}
           pushScale={interactive ? 1 : 0}
+          live={interactive}
         />
         <PointLayer
           cloud={land}
+          kind="land"
           color="#ffffff"
           size={0.03}
-          opacity={0.42 * intensity}
+          opacity={0.28 * intensity}
           instant={reduced}
           tint={1.0}
           pointerRef={push}
           pushScale={interactive ? 0.85 : 0}
+          live={interactive}
         />
 
         {/* 수정요청(26.08.24) "지구 주변에 둘러져있는 행성같은 띠는 빼주세요" — 궤도 고리 제거 */}
-
-
 
         {/* 코어 글로우 — 매 프레임 카메라를 향하도록 돌린다(빌보드).
           drei `<Billboard>` 를 쓰지 않은 이유: 이건 회전 그룹의 자식이라
@@ -541,7 +612,12 @@ const POINT_FRAGMENT = /* glsl */ `
        두 축을 곱하지 않고 순차로 섞어야 중간에 탁한 회색이 안 생긴다. */
     /* 좌측은 피치·라벤더, 하늘은 중반부터. 끝만 섞으면 파랑이 사라진다. */
     vec3 left = mix(mix(WARM, GOLD, smoothstep(0.02, 0.38, y)), LAV, smoothstep(0.34, 0.90, y));
-    vec3 tint = mix(left, COOL, smoothstep(0.36, 1.00, x));
+    /* 수정요청(2차) 젤리공 레퍼런스: 성에 도트는 어디서나 흰색이고 파랑은
+       심장(바디)뿐이다. 우측 COOL 램프를 절반 이하로 — 프린지도 같이 준다. */
+    vec3 tint = mix(left, COOL, smoothstep(0.36, 1.00, x) * 0.4);
+    /* 도트는 어디서나 **거의 흰색**이다(젤리공 레퍼런스). 림에 몰린 헤일로
+       도트가 램프색을 그대로 받아 위 보라·아래 주황 아크가 생겼었다. */
+    tint = mix(tint, vec3(1.0), 0.55);
     tint = mix(tint, MINT, smoothstep(0.88, 1.00, x) * 0.35);
 
     /* ⚠️ 밝기를 정규화한다 — 가장 밝은 채널을 1.0 으로 끌어올린다.
@@ -563,15 +639,38 @@ const POINT_FRAGMENT = /* glsl */ `
     float rim = smoothstep(0.42, 0.95, length(vScreen));
     col *= 1.0 + rim * 0.18;
     /* 좌상단 가산 파티클이 대륙을 흰 덩어리로 만든다 */
-    float hot = smoothstep(0.52, 0.0, x) * smoothstep(0.36, 0.95, y);
+    float hot = smoothstep(0.52, 0.0, x) * smoothstep(0.36, 0.82, y);
+    /* 윗호는 빼 둔다. y 0.95 까지 곱하면 머리 꼭대기가 배경으로 꺼져 빵구로 읽힌다. */
     col *= 1.0 - hot * 0.46;
 
     gl_FragColor = vec4(col, a * vScale * uOpacity);
   }
 `;
 
+const LAYER_SHOW = {
+  halo: "showHalo",
+  shell: "showShell",
+  land: "showLand",
+} as const;
+const LAYER_OPACITY = {
+  halo: "haloOpacity",
+  shell: "shellOpacity",
+  land: "landOpacity",
+} as const;
+const LAYER_SIZE = {
+  halo: "haloSize",
+  shell: "shellSize",
+  land: "landSize",
+} as const;
+const LAYER_PUSH = {
+  halo: "haloPush",
+  shell: "shellPush",
+  land: "landPush",
+} as const;
+
 function PointLayer({
   cloud,
+  kind,
   color,
   size,
   opacity,
@@ -579,8 +678,10 @@ function PointLayer({
   tint,
   pointerRef,
   pushScale,
+  live,
 }: {
   cloud: PointCloud;
+  kind: "halo" | "shell" | "land";
   color: string;
   /**
    * 파티클 크기 — **월드 단위**다(three 의 `PointsMaterial.size` 와 같은 의미).
@@ -605,8 +706,11 @@ function PointLayer({
    * 보이므로 1 을 기준으로 ±20% 안쪽에서만 흔든다.
    */
   pushScale: number;
+  /** 히어로만 라이브 스토어를 읽는다. */
+  live: boolean;
 }) {
   const fade = useRef(instant ? 1 : 0);
+  const groupRef = useRef<THREE.Group>(null);
   /**
    * 유니폼은 반드시 **ref 를 통해서만** 만진다.
    * `useMemo` 결과를 직접 mutate 하면 React Compiler 의 immutability 규칙에 걸린다
@@ -648,6 +752,21 @@ function PointLayer({
     const h = m.uniforms.uHeight;
     if (h) h.value = viewSize.height * viewport.dpr;
 
+    const t = live ? getGlobeTune() : null;
+    if (groupRef.current) {
+      groupRef.current.visible = t ? t[LAYER_SHOW[kind]] : true;
+    }
+    const layerOpacity = t ? t[LAYER_OPACITY[kind]] * t.intensity : opacity;
+    const layerSize = t ? t[LAYER_SIZE[kind]] : size;
+    const layerPush = t ? t[LAYER_PUSH[kind]] : pushScale;
+    const pMax = t?.pushMax ?? PUSH_MAX;
+    const pRad = t?.pushRadius ?? PUSH_RADIUS;
+
+    const us = m.uniforms.uSize;
+    if (us) us.value = layerSize;
+    const ur = m.uniforms.uPushRadius;
+    if (ur) ur.value = pRad;
+
     // ── 커서 반발 ────────────────────────────────────────────────
     const p = pointerRef.current;
     const up = m.uniforms.uPointer;
@@ -655,23 +774,28 @@ function PointLayer({
     const ua = m.uniforms.uAspect;
     if (ua) ua.value = viewSize.height > 0 ? viewSize.width / viewSize.height : 1;
     const upush = m.uniforms.uPush;
-    if (upush) upush.value = p.strength * pushScale * PUSH_MAX;
+    if (upush) upush.value = p.strength * layerPush * pMax;
 
-    if (instant) return;
+    const o = m.uniforms.uOpacity;
+    if (instant) {
+      if (o) o.value = layerOpacity;
+      return;
+    }
     // 로딩 화면 없이 텍스트가 먼저 뜨고, 3D 는 준비되는 대로 스며든다
     if (fade.current < 1) fade.current = Math.min(1, fade.current + delta / 1.1);
-    const o = m.uniforms.uOpacity;
-    if (o) o.value = fade.current * opacity;
+    if (o) o.value = fade.current * layerOpacity;
   });
 
   return (
-    <points frustumCulled={false}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[cloud.positions, 3]} />
-        <bufferAttribute attach="attributes-aScale" args={[cloud.scales, 1]} />
-      </bufferGeometry>
-      <primitive ref={matRef} object={material} attach="material" />
-    </points>
+    <group ref={groupRef}>
+      <points frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[cloud.positions, 3]} />
+          <bufferAttribute attach="attributes-aScale" args={[cloud.scales, 1]} />
+        </bufferGeometry>
+        <primitive ref={matRef} object={material} attach="material" />
+      </points>
+    </group>
   );
 }
 
@@ -746,7 +870,7 @@ const HAZE_FRAGMENT = /* glsl */ `
   varying vec2 vScreen;
 
   const vec3 WARM = vec3(1.00, 0.78, 0.76);
-  const vec3 LAV  = vec3(0.84, 0.79, 1.00);
+  const vec3 LAV  = vec3(0.90, 0.88, 1.00);
   const vec3 COOL = vec3(0.58, 0.82, 1.00);
 
   void main() {
@@ -777,7 +901,11 @@ const HAZE_FRAGMENT = /* glsl */ `
     float y = vScreen.y * 0.5 + 0.5;
     vec3 left = mix(WARM, LAV, smoothstep(0.15, 0.85, y));
     /* 하늘은 우측 절반. 0.30부터면 전체가 파랗고, 0.62부터면 파랑이 안 보인다. */
-    vec3 tint = mix(left, COOL, smoothstep(0.42, 1.00, x));
+    vec3 tint = mix(left, COOL, smoothstep(0.42, 1.00, x) * 0.45);
+    /* 젤리공 레퍼런스의 림은 무지개가 아니라 **흰 성에**다 — 헤이즈가 림
+       전용 레이어라 램프색이 그대로 아크로 보였다(위 보라·아래 주황).
+       채도를 절반 넘게 걷어낸다. */
+    tint = mix(tint, vec3(1.0), 0.58);
     /* ⚠️ 최대 채널을 1.0 으로 끌어올리면 광량은 지키지만 **채도가 같이 날아간다**.
        (1,0.58,0.62) 를 그대로 두면 예쁜 로즈인데 정규화하면 그대로고, 반대로
        (0.74,0.62,1.0) 같은 건 1.0 으로 올라가며 옅어진다. 절반만 정규화해서
@@ -790,8 +918,17 @@ const HAZE_FRAGMENT = /* glsl */ `
   }
 `;
 
-function GlobeHaze({ intensity, instant }: { intensity: number; instant: boolean }) {
+function GlobeHaze({
+  intensity,
+  instant,
+  live,
+}: {
+  intensity: number;
+  instant: boolean;
+  live: boolean;
+}) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
   const fade = useRef(instant ? 1 : 0);
 
   const material = useMemo(
@@ -812,16 +949,23 @@ function GlobeHaze({ intensity, instant }: { intensity: number; instant: boolean
 
   useFrame((_state, delta) => {
     const m = matRef.current;
-    if (!m || instant) return;
-    if (fade.current < 1) fade.current = Math.min(1, fade.current + delta / 1.1);
+    if (!m) return;
+    const t = live ? getGlobeTune() : null;
+    if (meshRef.current) meshRef.current.visible = t ? t.showHaze : true;
+    const target = t ? t.haze : intensity;
     const o = m.uniforms.uOpacity;
-    if (o) o.value = fade.current * intensity;
+    if (instant) {
+      if (o) o.value = target;
+      return;
+    }
+    if (fade.current < 1) fade.current = Math.min(1, fade.current + delta / 1.1);
+    if (o) o.value = fade.current * target;
   });
 
   return (
     /* 파티클 껍질(GLOBE_RADIUS)보다 아주 조금 안쪽. 같은 반지름이면 가장자리에서
        헤이즈가 파티클 밖으로 삐져나와 테두리가 두 겹으로 보인다. */
-    <mesh renderOrder={-2} frustumCulled={false}>
+    <mesh ref={meshRef} renderOrder={-2} frustumCulled={false}>
       <planeGeometry args={[GLOBE_RADIUS * 1.97, GLOBE_RADIUS * 1.97]} />
       <primitive ref={matRef} object={material} attach="material" />
     </mesh>
@@ -854,6 +998,11 @@ const BODY_FRAGMENT = /* glsl */ `
   uniform vec3 uLit;
   uniform vec3 uShade;
   uniform float uOpacity;
+  uniform float uFill;
+  uniform float uRim;
+  uniform float uCau;
+  uniform float uPearl;
+  uniform float uEdge;
 
   /* 시안(205:421 / img_01_sphere01) 안쪽은 강철 블루가 아니다.
      좌 피치·라벤더 → 가운데 진주 → 우측에만 하늘.
@@ -902,7 +1051,7 @@ const BODY_FRAGMENT = /* glsl */ `
      * 두께감은 **색**(아래 lit·cau)이 이미 만들고 있다. 알파는 실루엣까지
      * 평평하게 두고 마지막 6% 반경에서만 떨어뜨린다.
      */
-    float fill = smoothstep(1.0, 0.94, r);
+    float fill = smoothstep(1.0, uEdge, r);
 
     /**
      * ③ 굴절 반점.
@@ -921,28 +1070,59 @@ const BODY_FRAGMENT = /* glsl */ `
     float y = p.y * 0.5 + 0.5;
     vec3 left = mix(WARM, LAV, smoothstep(0.10, 0.82, y));
     vec3 tint = mix(left, PEARL, smoothstep(0.20, 0.48, x) * 0.35);
-    tint = mix(tint, COOL, smoothstep(0.30, 0.92, x) * 0.82);
+    tint = mix(tint, COOL, smoothstep(0.30, 0.92, x) * 0.38);
 
     /* 색은 tint, 조명은 명암만. 대비를 세게 주면 속이 돌처럼 무거워진다. */
     vec3 shade = mix(tint, uShade, 0.10);
     vec3 highlight = mix(mix(tint, PEARL, 0.12), uLit, 0.05);
     vec3 col = mix(shade, highlight, pow(lit, 1.7));
-    col = mix(col, PEARL, pow(thick, 2.2) * 0.06);
-    col += cau * 0.03;
-    col += rim * 0.05;
+    col = mix(col, PEARL, pow(thick, 2.0) * uPearl);
+    col += cau * uCau;
+
+    /**
+     * 젤리 심장 — 수정요청(2차) 레퍼런스 픽셀 실측:
+     *   중심 (167,205,246) / 중우측 (136,182,225) — **채도 있는 하늘색 발광**.
+     *   젤리로 읽히는 건 성에 껍질이 아니라 이 파란 심장이다. 우리는 중심이
+     *   (227,233,248) 흰색이라 그냥 뿌연 공이었다.
+     * 내부 평균 휘도도 시안 199 vs 우리 228 — 0.93 배로 가라앉힌다.
+     */
+    vec3 HEART = vec3(0.47, 0.68, 0.92);
+    vec2 hc = p - vec2(0.10, 0.0);
+    float heart = exp(-dot(hc, hc) / 0.15);
+    col = mix(col, HEART, heart * 0.85);
+    /* 좌하단 분홍 기운 — 시안 (216,204,216) */
+    vec2 pc = p - vec2(-0.52, -0.45);
+    col = mix(col, vec3(0.88, 0.80, 0.86), exp(-dot(pc, pc) / 0.18) * 0.35);
+    col *= 0.96;
+    col += rim * uRim;
     /* 좌상단 핫스팟 — 대륙이 흰 덩어리로 뭉개지지 않게 */
-    float hot = smoothstep(0.52, 0.0, x) * smoothstep(0.36, 0.95, y);
+    float hot = smoothstep(0.52, 0.0, x) * smoothstep(0.36, 0.82, y);
+    /* 윗호는 빼 둔다. y 0.95 까지 곱하면 머리 꼭대기가 배경으로 꺼져 빵구로 읽힌다. */
     col *= 1.0 - hot * 0.28;
 
-    /* 0.98은 볼링공. 0.8이면 밀도는 남기고 마퀴는 흐려진다. */
-    float a = clamp(fill * 0.80 + rim * 0.04, 0.0, 1.0) * uOpacity;
+    /**
+     * 수정요청(2차): "뒤에 글자가 아예 안 보이게끔 젤리공 같은 느낌".
+     * 0.80 은 마퀴가 20% 로 비쳐 고대비 글자가 그대로 읽혔다. 0.95 로 막되,
+     * 젤리 인상은 알파가 아니라 내부 산란(아래 PEARL·cau 상향)이 만든다 —
+     * 0.98 이 볼링공으로 보였던 건 산란 없이 알파만 높였기 때문이다.
+     */
+    float a = clamp(fill * uFill + rim * 0.015, 0.0, 1.0) * uOpacity;
     gl_FragColor = vec4(col * a, a);
   }
 `;
 
-function GlobeBodyMaterial({ intensity, instant }: { intensity: number; instant: boolean }) {
+function GlobeBodyMaterial({
+  intensity,
+  instant,
+  live,
+}: {
+  intensity: number;
+  instant: boolean;
+  live: boolean;
+}) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const fade = useRef(instant ? 1 : 0);
+  const d = GLOBE_TUNE_DEFAULTS;
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -954,6 +1134,11 @@ function GlobeBodyMaterial({ intensity, instant }: { intensity: number; instant:
           uLit: { value: new THREE.Color("#ebe0e8") },
           uShade: { value: new THREE.Color("#c8b8c2") },
           uOpacity: { value: instant ? intensity : 0 },
+          uFill: { value: d.bodyFill },
+          uRim: { value: d.bodyRim },
+          uCau: { value: d.bodyCau },
+          uPearl: { value: d.bodyPearl },
+          uEdge: { value: d.bodyEdge },
         },
         transparent: true,
         depthTest: false,
@@ -963,17 +1148,35 @@ function GlobeBodyMaterial({ intensity, instant }: { intensity: number; instant:
         premultipliedAlpha: true,
         toneMapped: false,
       }),
-    [intensity, instant],
+    [intensity, instant, d.bodyFill, d.bodyRim, d.bodyCau, d.bodyPearl, d.bodyEdge],
   );
 
   useEffect(() => () => material.dispose(), [material]);
 
   useFrame((_state, delta) => {
     const m = matRef.current;
-    if (!m || instant) return;
-    if (fade.current < 1) fade.current = Math.min(1, fade.current + delta / 1.1);
+    if (!m) return;
+    const t = live ? getGlobeTune() : null;
+    if (t) {
+      const uFill = m.uniforms.uFill;
+      const uRim = m.uniforms.uRim;
+      const uCau = m.uniforms.uCau;
+      const uPearl = m.uniforms.uPearl;
+      const uEdge = m.uniforms.uEdge;
+      if (uFill) uFill.value = t.bodyFill;
+      if (uRim) uRim.value = t.bodyRim;
+      if (uCau) uCau.value = t.bodyCau;
+      if (uPearl) uPearl.value = t.bodyPearl;
+      if (uEdge) uEdge.value = t.bodyEdge;
+    }
+    const target = t ? t.cover : intensity;
     const o = m.uniforms.uOpacity;
-    if (o) o.value = fade.current * intensity;
+    if (instant) {
+      if (o) o.value = target;
+      return;
+    }
+    if (fade.current < 1) fade.current = Math.min(1, fade.current + delta / 1.1);
+    if (o) o.value = fade.current * target;
   });
 
   return <primitive ref={matRef} object={material} attach="material" />;
