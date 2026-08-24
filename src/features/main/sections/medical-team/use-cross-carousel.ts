@@ -114,6 +114,8 @@ export interface CrossCarouselResult {
 export function useCrossCarousel(count: number): CrossCarouselResult {
   const [activeIndex, setActiveIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  /** 화면 밖에서는 롤링하지 않는다. 히어로를 지나는 동안 2번으로 넘어가는 걸 막는다. */
+  const [inView, setInView] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ pointerId: -1, startX: 0, dx: 0, moved: false, raf: 0 });
 
@@ -206,8 +208,27 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
     };
   }, []);
 
+  /**
+   * 롤링은 **스테이지가 화면에 들어온 뒤**에만 시작한다.
+   * 마운트와 동시에 interval 을 켜면 히어로 pin(200vh) 을 지나오는 동안
+   * 이미 한 칸 이상 넘어, 도착했을 때 2번 카드가 켜져 있다.
+   */
   useEffect(() => {
-    if (count < 2 || paused || prefersReducedMotionSync()) return;
+    const el = stageRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(Boolean(entry?.isIntersecting)),
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (count < 2 || paused || !inView || prefersReducedMotionSync()) return;
 
     const tick = () => {
       if (document.hidden || drag.current.pointerId !== -1) return;
@@ -215,7 +236,7 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
     };
     const id = window.setInterval(tick, AUTO_MS);
     return () => window.clearInterval(id);
-  }, [count, paused]);
+  }, [count, paused, inView]);
 
   return { activeIndex, select, step, pause, resume, stageRef, dragProps };
 }
