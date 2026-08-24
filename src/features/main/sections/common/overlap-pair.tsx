@@ -51,7 +51,9 @@ export function OverlapPair({ children }: { children: ReactNode }) {
           return;
         }
 
-        const [stay, cover] = kids;
+        const stay = kids[0];
+        const cover = kids[1];
+        if (!stay || !cover) return;
         if (stay === boundStay && cover === boundCover && st) return;
 
         st?.kill(true);
