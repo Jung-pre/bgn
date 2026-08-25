@@ -89,8 +89,8 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   groupScale: 1,
   posX: 0,
   posY: 0,
-  groupY: 0.04,
-  groupRot: -0.04,
+  groupY: 0,
+  groupRot: 0,
 
   r0: {
     amp: 0.2,

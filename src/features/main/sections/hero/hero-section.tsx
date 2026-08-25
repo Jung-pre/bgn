@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
@@ -81,34 +81,6 @@ const LINE_SPRITES: readonly TowerSprite[] = TOWER_LINES.flatMap((s) =>
   Array.from({ length: s.repeat ?? 1 }, () => s as TowerSprite),
 );
 
-/**
- * 띠별 스크롤 패럴랙스 (`[data-line]` 인덱스 순).
- *
- * 그룹 전체(`pxLinesRef`)가 이미 한 덩어리로 흐른다. 여기 값은 그 위에 얹는
- * **띠마다 다른 여벌**이다. 이게 없으면 넷이 판때기처럼 같은 속도로 미끄러져서
- * 시안의 "실크가 서로 스쳐 지나가는" 인상이 안 난다.
- *
- * ⚠️ 단위는 **스프라이트 자기 박스 대비 %** 다. 띠 폭이 스테이지의 1.2~1.9배라
- *    스테이지 % 로 읽으면 실제 이동량이 두 배 가까이 커진다.
- *
- *   0 line-3  가장 크고 멀다              → 느리게
- *   1 line-1  채도 높은 리본              → 반대 방향
- *   2 line-2  파스텔 리본 (2겹 중 1)
- *   3 line-2  파스텔 리본 (2겹 중 2)      → 같은 그림이라 더 벌려 겹침을 푼다
- *   4 line-9  점묘 웨이브, 가장 가깝다    → 가장 빠르게, 반대 방향
- *
- * ⚠️ 2026-08: 띠 전체가 흐르는 방향을 **오른쪽으로 뒤집었다**(그룹 X 부호 포함).
- *    부호를 되돌릴 땐 아래 `shift(pxLinesRef...)` 의 X 도 같이 뒤집어야 한다 —
- *    둘이 어긋나면 띠끼리 서로를 상쇄해 움직임이 거의 안 보인다.
- */
-const LINE_SCROLL = [
-  { x: -1.2, y: -0.8, r: -0.25 },
-  { x: 1.8, y: 1.3, r: 0.4 },
-  { x: -1.8, y: -1.5, r: -0.35 },
-  { x: -2.6, y: -2.1, r: -0.5 },
-  { x: 2.8, y: 1.9, r: 0.55 },
-] as const;
-
 export interface HeroSectionProps {
   messages: HeroSectionMessages;
 }
@@ -154,12 +126,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const pxLinesRef = useRef<HTMLDivElement>(null);
   const sheenRef = useRef<HTMLDivElement>(null);
   const stageClipRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * 띠별 스크롤 오프셋을 쓸 DOM 노드 캐시.
-   * `onProgress` 는 매 프레임 돌기 때문에 거기서 `querySelectorAll` 을 하면 안 된다.
-   */
-  const lineNodesRef = useRef<HTMLElement[] | null>(null);
 
   /** `prefersReducedMotionSync` 는 SSR 에서 못 부르므로 첫 프레임에 한 번만 캐시한다 */
   const reducedRef = useRef<boolean | null>(null);
@@ -249,19 +215,14 @@ export function HeroSection({ messages }: HeroSectionProps) {
            여기서 키우면 픽셀이 늘어나 흐려진다. */
         if (host) host.style.transform = "scale(1)";
         /**
-         * 수정요청(26.08.25) — 구체 → **은하수** → 라인 → 타워.
+         * 수정요청(26.08.25) — 구체 확대 → 축소 → 타워·라인.
          *
-         * 예전 값(dump 0.58, rise 0.74)은 구체가 최대로 커진 직후 바로 지워서,
-         * 파티클이 원반으로 펴지는 장면이 화면에 **한 번도 안 남았다**
-         * (진행도 0.6 근처가 흰 화면 한 장이었다).
-         *
-         * 이제 은하수(scene-sphere 의 CUE.galaxy = 0.40~0.72)가 다 펴지고
-         * 라인이 올라온 **뒤에야** 파티클을 걷는다. 0.88 부터 0.99 까지 —
-         * 은하수를 보여주는 구간이 실제 스크롤로 충분히 길어야 한다는 요청 때문에
-         * 핀 길이도 200vh → 300vh 로 늘렸다.
+         * 파티클이 은하수 밴드로 모이는 모프는 빼 둔다. 확대·축소는
+         * scene-sphere 그룹 스케일이 맡고, 축소가 거의 끝난 뒤(gxCrossStart)
+         * 캔버스를 걷고 2번 섹션 실크 라인이 받는다.
          */
         /**
-         * ## 순서: **2번 섹션 배경 먼저 → 그 위에 은하수 → 라인**
+         * ## 순서: **2번 섹션 배경 먼저 → 구체 축소 → 라인**
          *
          * 수정요청(26.08.25-2): "검은 배경 같은 거 쓰지 마. 2번 섹션 bg 가 먼저
          * 나오고 은하수가 그 위에 모이고, 그다음에 라인으로 바뀌게."
@@ -276,7 +237,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
          * 그래서 레이어를 셋으로 쪼개 각자 다른 곡선을 준다:
          *   · `.sphereBg`  (파스텔 하늘) — 먼저 빠진다
          *   · `.towerLayer` (2번 섹션 배경) — 그 자리를 먼저 채운다
-         *   · `.canvasHost` (파티클)      — 맨 마지막에 빠진다
+         *   · `.canvasHost` (파티클)      — 축소 뒤에 빠진다
          */
         const bgIn = clamp01((t - 0.22) / 0.22);
         const bgEase = bgIn * bgIn * (3 - 2 * bgIn);
@@ -286,7 +247,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
         if (sbg) sbg.style.opacity = String(1 - bgEase);
         if (tower) {
           tower.style.opacity = String(bgEase);
-          /* 크게 들어와 자리 잡는 인상은 유지하되, 은하수와 겹치는 동안은
+          /* 크게 들어와 자리 잡는 인상은 유지하되, 구체 축소와 겹치는 동안은
              거의 제자리여야 배경이 흔들리지 않는다 */
           tower.style.transform = `scale(${1.16 - bgEase * 0.16})`;
         }
@@ -295,7 +256,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
          * ⚠️ 파티클을 타워 **위**로 올린다.
          *
          * 두 레이어 다 `--z-canvas-bg: 0` 이라 DOM 순서상 타워가 위에 그려진다.
-         * 그대로 두면 배경을 먼저 깐 순간 은하수가 뒤로 숨는다.
+         * 그대로 두면 배경을 먼저 깐 순간 파티클이 뒤로 숨는다.
          * `.sphereLayer` 는 will-change 로 자체 스태킹 컨텍스트라 자식 z-index 로는
          * 못 빠져나온다 — **레이어 자체**를 올려야 한다.
          * (마퀴도 같이 올라오지만 이 시점엔 이미 투명하다.)
@@ -307,14 +268,10 @@ export function HeroSection({ messages }: HeroSectionProps) {
         }
 
         /**
-         * ## 은하수 ↔ 라인 **크로스페이드**
+         * ## 축소된 구체 → 라인 **크로스페이드**
          *
-         * 수정요청: "라인은 처음에는 안 나와. 배경 나오고 → 은하수 자리 잡고 →
-         * 은하수 fade out 되면서 라인이 fade in."
-         *
-         * 앞 버전은 타워 레이어를 통째로 띄워서 실크 라인이 **배경과 같이** 들어왔다.
-         * 그러면 은하수가 자리 잡기도 전에 라인이 이미 보여서 "파티클이 라인이 된다"는
-         * 인과가 사라진다. 라인만 따로 잡아 은하수가 빠지는 곡선의 **거울상**으로 넣는다.
+         * 파티클 은하수는 없다. 축소가 끝나기 전에 캔버스를 걷고
+         * 2번 섹션 실크 라인이 제자리 페이드인으로 받는다.
          */
         const { gxCrossStart, gxCrossEnd } = getGlobeTune();
         const cross = clamp01(
@@ -345,26 +302,11 @@ export function HeroSection({ messages }: HeroSectionProps) {
        * 뒤판은 한 장(가장 멀다), 광선만 더 빨리 흘린다.
        */
       /**
-       * 물결(라인)은 **은하수가 다 펴진 직후**에 올라온다.
-       * 요청: "파티클들만 은하수를 먼저 보여주고 라인들이 나와야 해."
-       * CUE.galaxy 가 t=0.72 에 끝나므로 그 지점을 시작으로 잡는다.
+       * 라인은 제자리 페이드인만. 스크롤에 따라 밀리거나 돌지 않는다.
        */
-      const ribbonIn = fadeStart + span * 0.72;
-      const u = reducedRef.current ? 0 : clamp01((p - ribbonIn) / (1 - ribbonIn));
+      const u = reducedRef.current ? 0 : clamp01((p - fadeStart) / span);
       shift(pxBackdropRef.current, 0.6 * u, -1.1 * u);
-      /* 셰이더 판은 그룹 이동까지 캔버스 안에서 처리한다 — 여기서 또 밀면 두 배가 된다 */
-      ribbonProgressRef.current = u;
-      shift(pxLinesRef.current, 4.5 * u, 1.0 * u);
-
-      /* 띠마다 여벌 오프셋 — 그룹 하나만 흘리면 넷이 한 덩어리로 미끄러진다.
-         원본과 광택이 같은 `data-line` 을 쓰므로 둘은 언제나 같이 움직인다. */
-      const lineNodes = lineNodesRef.current;
-      if (lineNodes) {
-        for (const el of lineNodes) {
-          const k = LINE_SCROLL[Number(el.dataset.line) % LINE_SCROLL.length];
-          if (k) shiftRotate(el, k.x * u, k.y * u, k.r * u);
-        }
-      }
+      ribbonProgressRef.current = 0;
     },
     /**
      * ⚠️ 여기에 `isMobile` 을 넣으면 안 된다.
@@ -379,19 +321,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
      */
     dependencies: [],
   });
-
-  /**
-   * 띠 노드 수집 — 타워 레이어가 마운트된 뒤 한 번만.
-   *
-   * `[data-line]` 은 원본 띠와 광택 띠 양쪽에 같은 인덱스로 붙어 있어서 한 번에
-   * 모으면 둘이 자동으로 같은 오프셋을 받는다.
-   */
-  useEffect(() => {
-    const root = stageClipRef.current;
-    lineNodesRef.current = root
-      ? Array.from(root.querySelectorAll<HTMLElement>("[data-line]"))
-      : null;
-  }, [towerMounted]);
 
   /** 진입 인트로 — ScrollTrigger 없이 즉시. 로딩 화면을 두지 않는다. */
   useGSAP(
@@ -446,12 +375,12 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const drifts = gsap.utils.toArray<HTMLElement>("[data-drift]");
       /* 띠마다 다른 진폭·주기. 소수점을 어긋뜨려 최소공배수를 길게 만든다. */
       const PLAN = [
-        { x: 1.1, y: -0.9, r: 0.35, s: 1.012, d: 17.3 },
-        { x: -1.4, y: 0.7, r: -0.28, s: 1.016, d: 23.1 },
-        { x: 0.9, y: 1.2, r: 0.22, s: 1.01, d: 19.7 },
-        { x: -0.8, y: -1.1, r: -0.34, s: 1.014, d: 26.5 },
-        { x: 1.3, y: 0.6, r: 0.3, s: 1.011, d: 21.2 },
-        { x: -1.0, y: -0.7, r: -0.25, s: 1.013, d: 29.4 },
+        { x: 1.1, y: -0.9, r: 0, s: 1.012, d: 17.3 },
+        { x: -1.4, y: 0.7, r: 0, s: 1.016, d: 23.1 },
+        { x: 0.9, y: 1.2, r: 0, s: 1.01, d: 19.7 },
+        { x: -0.8, y: -1.1, r: 0, s: 1.014, d: 26.5 },
+        { x: 1.3, y: 0.6, r: 0, s: 1.011, d: 21.2 },
+        { x: -1.0, y: -0.7, r: 0, s: 1.013, d: 29.4 },
       ] as const;
 
       for (const el of drifts) {
@@ -766,17 +695,6 @@ const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 /** 스테이지 대비 % 로 평행이동. 매 프레임 호출되므로 문자열 조립만 한다. */
 function shift(el: HTMLElement | null, x: number, y: number) {
   if (el) el.style.transform = `translate3d(${x}%, ${y}%, 0)`;
-}
-
-/**
- * 평행이동 + 미세 회전. 띠 전용이다.
- *
- * 회전이 없으면 띠가 "미끄러지는 판"으로 보인다. 1도 미만이라 눈으로는
- * 각도가 아니라 **휘어짐**으로 읽힌다. 요소 중심 기준이라 시안 배치와
- * 회전 중심이 같다.
- */
-function shiftRotate(el: HTMLElement | null, x: number, y: number, r: number) {
-  if (el) el.style.transform = `translate3d(${x}%, ${y}%, 0) rotate(${r}deg)`;
 }
 
 /** 시안 px → 스테이지 대비 %. 스테이지가 1920×920 비율이라 X/Y 가 같은 배율로 줄어든다. */

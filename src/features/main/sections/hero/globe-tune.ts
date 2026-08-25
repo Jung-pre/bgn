@@ -71,11 +71,10 @@ export type GlobeTune = {
   fadeStart: number;
   fadeEnd: number;
 
-  /* --- 은하수 (구체 → 라인 전환) ------------------------------------------
-   * 좌표계: 구체 반경(1.69) 배수. 각도는 도(°).
-   * 기울기는 **고정**이다 — 전환 중에 돌지 않는다.
+  /* --- 축소 배율·라인 페이드 ----------------------------------------------
+   * 파티클 은하수(구체→밴드)는 쓰지 않는다. gxShrink 만 확대 후 축소량이고,
+   * gxCross* 는 축소된 구체가 빠진 뒤 2번 섹션 실크 라인이 들어오는 구간이다.
    */
-  /** 화면상 기울기. +30 = 8시→2시(좌하→우상), -20 = 10시→4시(2번 섹션 라인) */
   gxTiltDeg: number;
   /** 깊이 회전. 0 이면 완전한 평면이라 벽에 붙은 그림이 된다 */
   gxYawDeg: number;
@@ -156,11 +155,13 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
   gxAmp: 0.62,
   gxGap: 0.14,
   gxBands: 3,
-  gxShrink: 3.8,
+  /** 끝까지 되돌리지 않는다. 4.45 → 약 2.4 에서 멈춘 뒤 페이드. */
+  gxShrink: 2.05,
   gxStart: 0.29,
   gxEnd: 0.64,
-  gxCrossStart: 0.29,
-  gxCrossEnd: 0.92,
+  /** 타워가 자리 잡은 직후 — 더 줄어들기 전에 파티클을 걷는다 */
+  gxCrossStart: 0.42,
+  gxCrossEnd: 0.58,
 };
 
 let current: GlobeTune = { ...GLOBE_TUNE_DEFAULTS };

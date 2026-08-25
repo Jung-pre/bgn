@@ -303,7 +303,7 @@ export interface RibbonSceneProps {
   active?: boolean;
 }
 
-export function RibbonScene({ progressRef, active = true }: RibbonSceneProps) {
+export function RibbonScene({ active = true }: RibbonSceneProps) {
   return (
     <CanvasShell
       active={active}
@@ -320,7 +320,7 @@ export function RibbonScene({ progressRef, active = true }: RibbonSceneProps) {
       }}
     >
       <RibbonCamera />
-      <Ribbons progressRef={progressRef} />
+      <Ribbons />
     </CanvasShell>
   );
 }
@@ -352,7 +352,7 @@ function RibbonCamera() {
   return null;
 }
 
-function Ribbons({ progressRef }: { progressRef: RefObject<number> }) {
+function Ribbons() {
   const groupRef = useRef<THREE.Group>(null);
 
   const items = useMemo(() => {
@@ -422,13 +422,12 @@ function Ribbons({ progressRef }: { progressRef: RefObject<number> }) {
   useFrame((state) => {
     const tune = getRibbonTune();
     const t = state.clock.elapsedTime * tune.timeScale;
-    const u = progressRef.current ?? 0;
     const group = groupRef.current;
     if (group) {
       /* 등장 스케일은 타워 래퍼가 맡는다. 여기까지 줄이면 전환이 끝난 뒤
          한 번 더 줄어 띠가 틱한다. */
-      group.position.set(tune.posX, tune.posY + tune.groupY * u, 0);
-      group.rotation.z = tune.groupRot * u;
+      group.position.set(tune.posX, tune.posY, 0);
+      group.rotation.z = 0;
       group.scale.setScalar(tune.groupScale);
     }
     for (let i = 0; i < items.length; i += 1) {
