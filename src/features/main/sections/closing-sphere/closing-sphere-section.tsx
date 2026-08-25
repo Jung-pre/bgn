@@ -70,7 +70,8 @@ export function ClosingSphereSection() {
             · intensity  — 파티클 밝기를 셰이더 단계에서 낮춘다(CSS opacity 는 배경이 비쳐 탁해진다)
             · haze       — 반대로 껍질 산란광은 거의 그대로 둔다
             · showCore   — 한반도 파란 코어는 시안에 없다. 브랜드 포커스를 두 번 반복하면 히어로가 희석된다
-            · interactive — 스쳐 지나가는 전환 씬이라 커서 조작 어포던스를 주지 않는다
+            · interactive — 히어로 튜닝 스토어는 읽지 않는다
+            · pointerFollow — 히어로와 같은 커서 추종·반발만 켠다
 
             ⚠️ intensity 하나만 내리면 안 된다. 시안 프레임을 스캔해 배경 대비 편차를
             재보면 안쪽이 +10~+20 으로 **고르게 차 있고** 테두리는 +24 밖에 안 된다.
@@ -84,6 +85,7 @@ export function ClosingSphereSection() {
           haze={0.9}
           showCore={false}
           interactive={false}
+          pointerFollow
         />
       </div>
     </section>

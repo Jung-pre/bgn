@@ -133,12 +133,12 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
   landPush: 0.85,
 
   spinRate: 0,
-  introYaw: 0.12,
+  introYaw: 0,
   scrollYaw: 0.35,
   pointerYaw: 0.3,
   pointerPitch: 0.16,
-  pitchX: 0.55,
-  yawTrimDeg: -8,
+  pitchX: 0.655,
+  yawTrimDeg: 0,
 
   pushRadius: 0.5,
   pushMax: 0.06,

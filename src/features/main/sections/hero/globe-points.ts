@@ -74,6 +74,85 @@ function isLand(x: number, y: number, z: number): boolean {
 }
 
 /**
+ * 한반도 해안선 (경도, 위도). 시계 방향.
+ *
+ * 세계 마스크는 한국을 몇 픽셀짜리 네모로 뭉갠다. 그 위에 해안선 안 점만
+ * 소량 더 심어 밀도만 살짝 올린다. 색·레이어는 바꾸지 않는다.
+ */
+const KOREA_MAIN: readonly [number, number][] = [
+  [124.4, 40.05],
+  [125.35, 40.55],
+  [126.15, 41.05],
+  [126.95, 41.42],
+  [127.7, 41.7],
+  [128.25, 41.98],
+  [128.85, 42.18],
+  [129.55, 42.38],
+  [130.35, 42.28],
+  [130.15, 41.65],
+  [129.7, 40.85],
+  [129.35, 40.15],
+  [128.95, 39.55],
+  [127.55, 39.18],
+  [127.85, 38.72],
+  [128.45, 38.25],
+  [128.85, 37.7],
+  [129.15, 37.15],
+  [129.4, 36.45],
+  [129.42, 35.85],
+  [129.22, 35.35],
+  [129.04, 35.08],
+  [128.55, 34.88],
+  [127.95, 34.72],
+  [127.35, 34.55],
+  [126.85, 34.35],
+  [126.42, 34.27],
+  [126.18, 34.55],
+  [126.28, 34.95],
+  [126.48, 35.55],
+  [126.58, 36.05],
+  [126.32, 36.55],
+  [126.22, 36.95],
+  [126.52, 37.38],
+  [126.22, 37.72],
+  [125.75, 37.95],
+  [125.35, 38.35],
+  [125.12, 38.85],
+  [124.72, 39.35],
+  [124.42, 39.75],
+];
+
+const KOREA_JEJU: readonly [number, number][] = [
+  [126.16, 33.32],
+  [126.3, 33.16],
+  [126.55, 33.1],
+  [126.82, 33.22],
+  [126.96, 33.48],
+  [126.78, 33.56],
+  [126.48, 33.5],
+  [126.26, 33.4],
+];
+
+function pointInRing(lon: number, lat: number, ring: readonly [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i];
+    const b = ring[j];
+    if (!a || !b) continue;
+    const [xi, yi] = a;
+    const [xj, yj] = b;
+    if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function isKoreaLonLat(lon: number, lat: number): boolean {
+  return pointInRing(lon, lat, KOREA_MAIN) || pointInRing(lon, lat, KOREA_JEJU);
+}
+
+/**
  * 구 표면 균일 분포 1점.
  *
  * `acos(2v - 1)` 을 쓰는 이유: 위도를 그냥 균등 난수로 뽑으면 극에 몰린다.
@@ -122,6 +201,43 @@ export function makeLandPoints(count: number, seed: number): PointCloud {
     positions[written * 3] = dir[0] * r;
     positions[written * 3 + 1] = dir[1] * r;
     positions[written * 3 + 2] = dir[2] * r;
+    scales[written] = 0.55 + rand() * 0.45;
+    written += 1;
+  }
+
+  const worldPos = positions.subarray(0, written * 3);
+  const worldScale = scales.subarray(0, written);
+  /* 세계 마스크 한국(~370점)의 약 1.2배만 더한다. 2.8%는 가운데가 타버렸다. */
+  const korea = makeKoreaPoints(Math.max(80, Math.round(count * 0.0035)), seed ^ 0x51ed);
+  const mergedPos = new Float32Array(worldPos.length + korea.positions.length);
+  const mergedScale = new Float32Array(worldScale.length + korea.scales.length);
+  mergedPos.set(worldPos);
+  mergedPos.set(korea.positions, worldPos.length);
+  mergedScale.set(worldScale);
+  mergedScale.set(korea.scales, worldScale.length);
+  return { positions: mergedPos, scales: mergedScale };
+}
+
+/** 해안선 안 흰 가루. 육지와 같은 크기·밝기. */
+function makeKoreaPoints(count: number, seed: number): PointCloud {
+  const rand = mulberry32(seed);
+  const positions = new Float32Array(count * 3);
+  const scales = new Float32Array(count);
+
+  let written = 0;
+  let tries = 0;
+  const maxTries = count * 80;
+
+  while (written < count && tries < maxTries) {
+    tries += 1;
+    const lon = 124.2 + rand() * 6.5;
+    const lat = 33.05 + rand() * 9.6;
+    if (!isKoreaLonLat(lon, lat)) continue;
+    const [x, y, z] = lonLatToVector(lon, lat);
+    const r = GLOBE_RADIUS * (1 + (rand() - 0.35) * 0.018);
+    positions[written * 3] = x * r;
+    positions[written * 3 + 1] = y * r;
+    positions[written * 3 + 2] = z * r;
     scales[written] = 0.55 + rand() * 0.45;
     written += 1;
   }

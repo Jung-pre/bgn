@@ -16,7 +16,7 @@ import {
   makeShellPoints,
   type PointCloud,
 } from "./globe-points";
-import { GLOBE_TUNE_DEFAULTS, getGlobeTune } from "./globe-tune";
+import { GLOBE_TUNE_DEFAULTS, getGlobeTune, resetGlobeTune } from "./globe-tune";
 
 /**
  * 히어로 — 지도 구체(파티클 지구).
@@ -76,24 +76,24 @@ const COUNTS = {
   mobile: { land: 26000, shell: 16000, halo: 4500 },
 } as const;
 
-/** 지축 기울기 23.4°(rad). 정확히 기울여야 "지구"로 읽힌다. */
-const AXIAL_TILT = 0.409;
+/**
+ * 지축 Z 트위스트.
+ *
+ * 23.4°(0.409) 를 걸면 서울을 정면에 맞춰도 한반도+만주 덩어리가
+ * 화면 왼쪽 위로 돌아간다. 히어로 시작은 "한반도가 화면 중앙"이 우선이라
+ * 트위스트를 끈다. 위도만큼만 숙이면(아래 PITCH) 북극이 위, 서울이 정면이다.
+ */
+const AXIAL_TILT = 0;
 
 /**
- * 수정요청(2차) "한국쪽 지도가 시작으로 보이게" — 정면 구도 보정 두 개.
+ * 수정요청 "한반도가 화면 중앙에 오게 시작".
  *
- * Euler 'XYZ'(Rx·Ry·Rz)라 지축 기울기(Rz)가 **먼저** 걸린다. 그 결과
- * FOCUS_ROTATION_Y 만으로는 한국이 화면 (0.18, 0.81) — 꼭대기 가장자리로
- * 밀려나고 정면 중앙은 호주가 차지했다(마스크를 그대로 투영해 확인).
- *
- *   · PITCH_X 0.55 : 위도 37.5°+기울기만큼 위로 밀린 한국을 화면 중앙대로 내린다
- *   · YAW_TRIM -8° : 내린 뒤 남는 우측 치우침(x 0.18)을 0.10 으로
- *
- * 이 값에서 한국은 화면 (0.10, 0.39), z 0.92 — 정면 상단 중앙에 또렷이 온다.
- * (검증 스크립트: 랜드마스크를 같은 회전으로 정사영해 픽셀로 확인했다)
+ * 서울(127E, 37.5N)이 카메라 축(월드 0,0,+Z)에 오려면
+ * 경도 보정(FOCUS_ROTATION_Y) + 위도만큼 X 회전이면 된다.
+ * yaw 트림은 지축 트위스트가 있을 때만 필요해서 0.
  */
-const FOCUS_PITCH_X = 0.55;
-const FOCUS_YAW_TRIM = -8 * (Math.PI / 180);
+const FOCUS_PITCH_X = 0.655;
+const FOCUS_YAW_TRIM = 0;
 
 /* --- 커서 반발 --------------------------------------------------------------
    Figma 주석: "마우스 포인터에 맞춰 빛 요소가 움직이도록"
@@ -147,10 +147,14 @@ export interface SphereSceneProps {
    */
   showCore?: boolean;
   /**
-   * 포인터 추종 회전 + 커서 반발.
-   * 클로징은 스쳐 지나가는 전환 씬이라 조작 어포던스를 주지 않는다.
+   * 히어로 라이브 튜닝 스토어. 클로징·푸터는 끄고 세기·크기는 prop 으로만 받는다.
    */
   interactive?: boolean;
+  /**
+   * 포인터 추종 회전 + 커서 반발.
+   * 기본은 `interactive` 을 따른다. 클로징은 튜닝은 끄고 호버만 켠다.
+   */
+  pointerFollow?: boolean;
   /**
    * 비인터랙티브(푸터·클로징) 구체 크기 배수.
    * 히어로 `size` 0.86 과 섞이지 않게 이쪽만 따로 둔다.
@@ -165,9 +169,11 @@ export function SphereScene({
   haze = intensity,
   showCore = true,
   interactive = true,
+  pointerFollow,
   fitSize = 1,
 }: SphereSceneProps) {
   const reduced = usePrefersReducedMotion();
+  const follow = pointerFollow ?? interactive;
 
   return (
     <CanvasShell
@@ -186,6 +192,7 @@ export function SphereScene({
         haze={haze}
         showCore={showCore}
         interactive={interactive}
+        pointerFollow={follow}
         fitSize={fitSize}
       />
     </CanvasShell>
@@ -199,6 +206,7 @@ function Globe({
   haze,
   showCore,
   interactive,
+  pointerFollow,
   fitSize,
 }: {
   progressRef?: RefObject<number>;
@@ -207,6 +215,7 @@ function Globe({
   haze: number;
   showCore: boolean;
   interactive: boolean;
+  pointerFollow: boolean;
   fitSize: number;
 }) {
   const isMobile = useIsMobileLayout();
@@ -304,6 +313,11 @@ function Globe({
     if (reduced) invalidate();
   }, [reduced, invalidate]);
 
+  /* HMR 이 모듈 스토어를 살려 두면 예전 pitch/yaw 가 남는다. 히어로 진입마다 기본값으로. */
+  useEffect(() => {
+    if (interactive) resetGlobeTune();
+  }, [interactive]);
+
   useFrame((_state, delta) => {
     const g = groupRef.current;
     if (!g) return;
@@ -354,11 +368,11 @@ function Globe({
     }
 
     // 뷰포트 좌표 → NDC. rect 읽기는 프레임당 한 번뿐이다.
-    // 비인터랙티브(클로징)면 rect 읽기 자체를 건너뛴다 — 어차피 안 쓴다.
+    // 호버가 꺼진 클로징·푸터는 rect 읽기 자체를 건너뛴다.
     let nx = 0;
     let ny = 0;
     let inside = false;
-    if (interactive) {
+    if (pointerFollow) {
       const rect = gl.domElement.getBoundingClientRect();
       if (client.current.has && rect.width > 0 && rect.height > 0) {
         nx = ((client.current.x - rect.left) / rect.width) * 2 - 1;
@@ -389,25 +403,24 @@ function Globe({
     // 정면 경도(FOCUS_ROTATION_Y)를 기준으로 삼고, 인트로는 그 앞에서 살짝 돌다 멈춘다.
     // 클로징은 포인터가 없어서, 스크롤·느린 자전이 없으면 인트로 1.8초 뒤 완전히 멈춘다.
     //
-    // 수정요청(2차): "한국쪽 지도가 시작으로 보이게".
-    //   · 진입 오프셋 0.55(≈31.5°)는 한국이 1.8초 뒤에야 정면에 오는 값이라 0.12 로.
-    //     첫 프레임에도 한반도가 구체 중앙 ±7° 안에 있고, "살짝 돌며 등장"은 남는다.
-    //   · scroll 0.9 도 같은 이유로 0.35 로 — 스크롤을 조금만 내려도 한국이 옆으로
-    //     달아나던 것을, 전환 끝(진행도 1)에 20° 만 돌게 줄인다.
+    // 한반도가 첫 프레임부터 정면 중앙. introYaw 기본 0.
+    // scrollYaw 0.35 는 전환 끝에 한국이 약 20° 만 옆으로 가게 줄인 값.
     const idle = interactive
       ? _state.clock.elapsedTime * (tune?.spinRate ?? 0)
       : _state.clock.elapsedTime * 0.07;
     const yawKeep = interactive ? 1 - zoomTNow * 0.85 : 1;
+    /* 진입이 끝나기 전에는 포인터로 각도를 밀지 않는다 — 첫 화면이 한반도 정면. */
+    const pointerAmt = introEase;
     g.rotation.y =
       FOCUS_ROTATION_Y +
       yawTrim +
-      (1 - introEase) * (tune?.introYaw ?? 0.12) +
+      (1 - introEase) * (tune ? tune.introYaw : 0.12) +
       scrollNow * (tune?.scrollYaw ?? 0.35) * yawKeep +
-      eased.current.x * (tune?.pointerYaw ?? 0.3) +
+      eased.current.x * (tune?.pointerYaw ?? 0.3) * pointerAmt +
       idle;
     // 지축 기울기를 고정으로 주고 그 위에 포인터 반응을 얹는다
     g.rotation.z = AXIAL_TILT;
-    g.rotation.x = pitchX + eased.current.y * (tune?.pointerPitch ?? 0.16);
+    g.rotation.x = pitchX + eased.current.y * (tune?.pointerPitch ?? 0.16) * pointerAmt;
 
     if (showCore) updateCore(coreRef.current, g, camera, introEase);
   });
@@ -458,7 +471,7 @@ function Globe({
           instant={reduced}
           tint={1.0}
           pointerRef={push}
-          pushScale={interactive ? 1.2 : 0}
+          pushScale={pointerFollow ? 1.2 : 0}
           live={interactive}
         />
         <PointLayer
@@ -470,7 +483,7 @@ function Globe({
           instant={reduced}
           tint={1.0}
           pointerRef={push}
-          pushScale={interactive ? 1 : 0}
+          pushScale={pointerFollow ? 1 : 0}
           live={interactive}
         />
         <PointLayer
@@ -482,7 +495,7 @@ function Globe({
           instant={reduced}
           tint={1.0}
           pointerRef={push}
-          pushScale={interactive ? 0.85 : 0}
+          pushScale={pointerFollow ? 0.85 : 0}
           live={interactive}
         />
 
