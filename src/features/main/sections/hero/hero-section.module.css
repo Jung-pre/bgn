@@ -215,7 +215,17 @@
 .stageClip {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  /* 리본·광선이 프레임 밖으로 이어진다. 자르기는 `.towerLayer` 가 맡는다. */
+  overflow: visible;
+}
+
+/* 셰이더 리본 캔버스. 뷰포트와 같으면 카메라 가장자리 + 타워 scale(1.16)
+   클립이 왼쪽에 하늘 띠를 남긴다. 좌우를 넘기고 부모 overflow 가 자른다. */
+.ribbonClip {
+  position: absolute;
+  inset: 0 -18% 0 -18%;
+  overflow: visible;
+  pointer-events: none;
 }
 
 .sprite {
@@ -249,25 +259,25 @@
   pointer-events: none;
 }
 
-/* 파티클 텍스처 — 8:2880. 1920×1080 박스에 넣는다.
+/* 파티클 텍스처 — 8:2880. 레이어 전체를 덮고 좌우로 넘긴다.
    opacity/soft-light 는 위 `.px` 래퍼(= 스태킹 컨텍스트)에 걸린다. */
 .particlesBox {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 117.3913%; /* 1080 / 920 */
+  left: -14%;
+  top: -10%;
+  width: 128%;
+  height: 128%;
   overflow: hidden;
 }
 
 .particlesImg {
   position: absolute;
-  left: 0;
-  top: 0.02%;
+  inset: 0;
   width: 100%;
-  height: 112.02%; /* Figma 실측 */
+  height: 100%;
   max-width: none;
-  object-fit: fill;
+  object-fit: cover;
+  object-position: center;
 }
 
 /* 하단 구름 띠 — 8:2904. 시안도 덩어리 단위로 soft-light 다.

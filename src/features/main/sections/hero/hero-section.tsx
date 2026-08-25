@@ -112,6 +112,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const towerLayerRef = useRef<HTMLDivElement>(null);
   const copySphereRef = useRef<HTMLDivElement>(null);
   const copyTowerRef = useRef<HTMLDivElement>(null);
+  const scrollHintRef = useRef<HTMLDivElement>(null);
   /**
    * 마퀴는 **구체 씬에만** 있다. 시안 타워 프레임(8:733)에는 마퀴가 없다.
    * 계속 떠 있으면 타워 카피와 겹쳐서 시안보다 훨씬 시끄럽다.
@@ -122,7 +123,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
    * 타워 씬 패럴랙스 래퍼들. 매 프레임 transform 만 쓰므로 전부 ref 다.
    * 뒤판은 한 장이라 깊이감은 띠(가장 가깝다)와만 나눈다.
    */
-  const pxBackdropRef = useRef<HTMLDivElement>(null);
   const pxLinesRef = useRef<HTMLDivElement>(null);
   const sheenRef = useRef<HTMLDivElement>(null);
   const stageClipRef = useRef<HTMLDivElement>(null);
@@ -247,9 +247,9 @@ export function HeroSection({ messages }: HeroSectionProps) {
         if (sbg) sbg.style.opacity = String(1 - bgEase);
         if (tower) {
           tower.style.opacity = String(bgEase);
-          /* 크게 들어와 자리 잡는 인상은 유지하되, 구체 축소와 겹치는 동안은
-             거의 제자리여야 배경이 흔들리지 않는다 */
-          tower.style.transform = `scale(${1.16 - bgEase * 0.16})`;
+          /* 스케일하면 `.px` 뒤판이 뷰포트보다 작아져 왼쪽·아래가 빈다.
+             등장은 opacity 만으로 한다. */
+          tower.style.transform = "none";
         }
 
         /**
@@ -285,11 +285,15 @@ export function HeroSection({ messages }: HeroSectionProps) {
       }
       const cs = copySphereRef.current;
       const ct = copyTowerRef.current;
-      if (cs) cs.style.opacity = String(1 - clamp01(t * 2.4));
+      const scene1Out = 1 - clamp01(t * 2.4);
+      if (cs) cs.style.opacity = String(scene1Out);
       if (ct) ct.style.opacity = String(clamp01((t - 0.86) * 6));
       // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)
       const mq = marqueeRef.current;
-      if (mq) mq.style.opacity = String(1 - clamp01(t * 2.4));
+      if (mq) mq.style.opacity = String(scene1Out);
+      /* Scroll 힌트는 시안 1번 프레임에만 있다. 2번(타워)에 남으면 안 된다. */
+      const hint = scrollHintRef.current;
+      if (hint) hint.style.opacity = String(scene1Out);
 
       // 타워 에셋을 미리 마운트해 크로스페이드 때 디코딩이 안 걸리게 한다
       if (!towerMountedRef.current && p > 0.12) {
@@ -297,15 +301,8 @@ export function HeroSection({ messages }: HeroSectionProps) {
         setTowerMounted(true);
       }
 
-      /**
-       * 패럴랙스 — 타워가 등장한 뒤 구간을 다시 0~1 로 편다.
-       * 뒤판은 한 장(가장 멀다), 광선만 더 빨리 흘린다.
-       */
-      /**
-       * 라인은 제자리 페이드인만. 스크롤에 따라 밀리거나 돌지 않는다.
-       */
-      const u = reducedRef.current ? 0 : clamp01((p - fadeStart) / span);
-      shift(pxBackdropRef.current, 0.6 * u, -1.1 * u);
+      /* 라인은 제자리 페이드인만. 뒤판도 패럴랙스로 밀지 않는다 —
+         translate 하면 `.px` 가 화면보다 작아져 가장자리가 빈다. */
       ribbonProgressRef.current = 0;
     },
     /**
@@ -469,7 +466,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
           <div className={styles.towerSky} />
           {HERO_ASSETS_READY && towerMounted ? (
             <>
-              <div ref={pxBackdropRef} className={styles.px}>
+              <div className={styles.px}>
                 <picture>
                   <source
                     media="(max-width: 768px)"
@@ -486,23 +483,22 @@ export function HeroSection({ messages }: HeroSectionProps) {
                 </picture>
               </div>
 
-              <div className={styles.towerStage}>
-                {/* 파티클 텍스처 — 8:2880. soft-light 50% 로 하늘 전체에 결을 깐다.
-                    블렌드는 반드시 .px(스태킹 컨텍스트) 자신에 건다 — 자식에 걸면
-                    투명한 자기 그룹 안에서만 섞여 통째로 죽는다. */}
-                <div className={clsx(styles.px, styles.softLight, styles.particlesPx)}>
-                  <div className={styles.particlesBox}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      className={styles.particlesImg}
-                      src={HERO_ASSETS.particles}
-                      alt=""
-                      decoding="async"
-                      loading="lazy"
-                    />
-                  </div>
+              {/* 파티클 — 1920×920 스테이지 cover 안에 두면 16:9 에서 왼쪽
+                  ~140px 가 잘려 점묘·글로우가 세로로 끊긴다. 레이어 전체를 덮는다. */}
+              <div className={clsx(styles.px, styles.softLight, styles.particlesPx)}>
+                <div className={styles.particlesBox}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className={styles.particlesImg}
+                    src={HERO_ASSETS.particles}
+                    alt=""
+                    decoding="async"
+                    loading="lazy"
+                  />
                 </div>
+              </div>
 
+              <div className={styles.towerStage}>
                 {/* 워터마크 SVG·구름·타워 스프라이트는 쓰지 않는다.
                     뒤판(`img_01_bg02`) 한 장에 이미 들어 있다. */}
 
@@ -550,7 +546,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
            * 위치는 타워 블록 **뒤**다 — 형제 순서가 곧 z 순서라 띠가 타워 위에 온다.
            */}
           {glRibbons ? (
-            <div ref={glLinesRef} className={styles.stageClip}>
+            <div ref={glLinesRef} className={styles.ribbonClip}>
               <RibbonScene progressRef={ribbonProgressRef} active={sceneActive} />
             </div>
           ) : null}
@@ -592,7 +588,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
         </div>
 
         {/* 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 + 40 흰 채움 */}
-        <div className={styles.scrollHint} data-hero-fade>
+        <div ref={scrollHintRef} className={styles.scrollHint} data-hero-fade>
           <span className={styles.scrollBar} aria-hidden>
             <span className={styles.scrollBarFill} />
           </span>
@@ -692,11 +688,6 @@ function SplitBrandTitle({
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** 스테이지 대비 % 로 평행이동. 매 프레임 호출되므로 문자열 조립만 한다. */
-function shift(el: HTMLElement | null, x: number, y: number) {
-  if (el) el.style.transform = `translate3d(${x}%, ${y}%, 0)`;
-}
-
 /** 시안 px → 스테이지 대비 %. 스테이지가 1920×920 비율이라 X/Y 가 같은 배율로 줄어든다. */
 const pct = (value: number, base: number) => `${((value / base) * 100).toFixed(4)}%`;
 
@@ -716,10 +707,11 @@ function TowerSpriteImg({ sprite, drift }: { sprite: TowerSprite; drift?: number
     .filter(Boolean)
     .join(" ");
 
+  const bleed = drift === undefined ? 0 : 400;
   const box = {
-    left: pct(sprite.x, TOWER_STAGE.width),
+    left: pct(sprite.x - bleed, TOWER_STAGE.width),
     top: pct(sprite.y, TOWER_STAGE.height),
-    width: pct(sprite.w, TOWER_STAGE.width),
+    width: pct(sprite.w + bleed * 2, TOWER_STAGE.width),
     height: pct(sprite.h, TOWER_STAGE.height),
   };
 

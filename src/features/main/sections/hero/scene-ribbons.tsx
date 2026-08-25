@@ -23,22 +23,33 @@ const SEG_Y = 28;
 
 const srgb = (hex: string) => new THREE.Color().setStyle(hex, THREE.LinearSRGBColorSpace);
 
+/** Figma `물결 라인` (213:10873) 스톱. 크림 / 핑크 / 블루 */
 const WHITE = srgb("#ffffff");
-const ROSE = srgb("#eba0b8");
-const LAV = srgb("#a394d0");
-const BLUE = srgb("#7eb6ef");
-const GOLD = srgb("#f3d0b0");
-/** 2번 시안 컷 샘플 */
-const CYAN = srgb("#ccdcf0");
-const DEEP = srgb("#6aa2c9");
-/** 3번 시안 컷 샘플 */
-const PEACH = srgb("#f0e7de");
-const PINK3 = srgb("#eccfda");
-const MID3 = srgb("#94a3cd");
-const END3 = srgb("#8ba9d0");
+const WAVE_CREAM = srgb("#ffe8cd");
+const WAVE_PINK = srgb("#f6beea");
+const WAVE_BLUE = srgb("#88bffb");
+
+/**
+ * 위→아래 5막. 가운데 스톱 위치는 Figma linear-gradient % 그대로.
+ * 0 213:10874  크림 → 핑크 47.3% → 블루
+ * 1 213:10878  핑크 → 블루 49.5% → 크림
+ * 2 213:10875  블루 → 핑크 71.6% → 크림
+ * 3 213:10876  블루 → 크림 31.7% → 핑크
+ * 4 213:10877  크림 → 블루 71.4% → 핑크
+ */
+const WAVE_STOPS = [
+  { a: WAVE_CREAM, b: WAVE_PINK, c: WAVE_BLUE, mid: 0.473 },
+  { a: WAVE_PINK, b: WAVE_BLUE, c: WAVE_CREAM, mid: 0.495 },
+  { a: WAVE_BLUE, b: WAVE_PINK, c: WAVE_CREAM, mid: 0.716 },
+  { a: WAVE_BLUE, b: WAVE_CREAM, c: WAVE_PINK, mid: 0.317 },
+  { a: WAVE_CREAM, b: WAVE_BLUE, c: WAVE_PINK, mid: 0.714 },
+] as const;
 
 const PX = 1 / 460;
 const DEG = Math.PI / 180;
+/** 시안 박스가 뷰포트 왼쪽보다 안쪽에서 끝나 기울이면 더 짧아진다.
+ *  양쪽을 프레임 밖으로 밀어 세로 이음매가 안 생기게 한다. */
+const EDGE_BLEED = 900;
 
 type RibbonConf = {
   slot: number;
@@ -49,13 +60,10 @@ type RibbonConf = {
   phase: number;
   speed: number;
   bodyAlpha: number;
-  blue: number;
-  rose: number;
-  gold: number;
   streak: number;
   copies: number;
-  /** 0 흰·파랑 / 1 띠2 램프 / 2 띠3 워시 위치 */
-  wash: 0 | 1 | 2;
+  /** WAVE_STOPS 시작 인덱스. copies>1 이면 복사본마다 +1 */
+  wave: number;
 };
 
 const CONFS: readonly RibbonConf[] = [
@@ -68,12 +76,9 @@ const CONFS: readonly RibbonConf[] = [
     phase: 0.0,
     speed: 0.55,
     bodyAlpha: 0.62,
-    blue: 0.95,
-    rose: 0,
-    gold: 0,
     streak: 0.2,
     copies: 1,
-    wash: 0,
+    wave: 0,
   },
   {
     slot: 1,
@@ -84,12 +89,9 @@ const CONFS: readonly RibbonConf[] = [
     phase: 2.1,
     speed: 0.62,
     bodyAlpha: 0.66,
-    blue: 0.88,
-    rose: 1.05,
-    gold: 0.55,
     streak: 0.42,
     copies: 1,
-    wash: 1,
+    wave: 1,
   },
   {
     slot: 2,
@@ -100,12 +102,9 @@ const CONFS: readonly RibbonConf[] = [
     phase: 4.4,
     speed: 0.5,
     bodyAlpha: 0.58,
-    blue: 0.78,
-    rose: 0.82,
-    gold: 0.62,
     streak: 0.55,
     copies: 2,
-    wash: 2,
+    wave: 2,
   },
   {
     slot: 3,
@@ -116,12 +115,9 @@ const CONFS: readonly RibbonConf[] = [
     phase: 1.3,
     speed: 0.45,
     bodyAlpha: 0.42,
-    blue: 0.92,
-    rose: 0,
-    gold: 0,
     streak: 0.22,
     copies: 1,
-    wash: 0,
+    wave: 4,
   },
 ];
 
@@ -151,8 +147,10 @@ const COMMON_GLSL = /* glsl */ `
   }
 
   float taperAt(float u) {
-    float leaf = 0.22 + 0.78 * pow(sin(3.14159265 * clamp(u, 0.0, 1.0)), 0.6);
-    float breathe = 0.82 + 0.18 * sin(2.6 * u * uLen * 0.55 + uPhase * 2.1 + uTime * 0.12);
+    /* 끝으로 갈수록 가늘어지면 화면 왼쪽에서 띠가 끊긴다.
+       시안 리본은 프레임 밖으로 이어지므로 두께는 거의 유지한다. */
+    float leaf = 0.9 + 0.1 * pow(sin(3.14159265 * clamp(u, 0.0, 1.0)), 0.8);
+    float breathe = 0.94 + 0.06 * sin(2.6 * u * uLen * 0.55 + uPhase * 2.1 + uTime * 0.12);
     return leaf * breathe;
   }
 `;
@@ -161,6 +159,7 @@ const MEMBRANE_VERT_BODY = /* glsl */ `
   varying vec2 vUv;
   varying float vTwist;
   varying float vRoll;
+  varying float vAcross;
 
   void main() {
     vUv = uv;
@@ -172,6 +171,9 @@ const MEMBRANE_VERT_BODY = /* glsl */ `
     vRoll = sin(tw);
     vec3 p = vec3(a, spineY(a, t) + yy * cos(tw), yy * sin(tw) * 0.9);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    /* 그라디언트는 메시 UV가 아니라 **화면 가로**. 띠가 길어서 UV 한 구간만
+       보이면 단색으로 읽힌다. Figma 물결 라인 바가 박스 전체를 가로지르는 것과 같다. */
+    vAcross = gl_Position.w > 0.0 ? gl_Position.x / gl_Position.w * 0.5 + 0.5 : 0.5;
   }
 `;
 
@@ -183,28 +185,18 @@ const MEMBRANE_FRAG = /* glsl */ `
   uniform float uTime;
   uniform float uPhase;
   uniform float uBodyAlpha;
-  uniform float uRose;
-  uniform float uGold;
-  uniform float uBlue;
-  uniform float uIrid;
   uniform float uGrain;
   uniform float uSeed;
   uniform float uStreak;
-  uniform float uWash;
   uniform vec3 uWhite;
-  uniform vec3 uRoseC;
-  uniform vec3 uGoldC;
-  uniform vec3 uBlueC;
-  uniform vec3 uLavC;
-  uniform vec3 uCyanC;
-  uniform vec3 uDeepC;
-  uniform vec3 uPeachC;
-  uniform vec3 uPink3C;
-  uniform vec3 uMid3C;
-  uniform vec3 uEnd3C;
+  uniform vec3 uStopA;
+  uniform vec3 uStopB;
+  uniform vec3 uStopC;
+  uniform float uMid;
   varying vec2 vUv;
   varying float vTwist;
   varying float vRoll;
+  varying float vAcross;
 
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -234,53 +226,21 @@ const MEMBRANE_FRAG = /* glsl */ `
     return 130.0 * dot(m, g);
   }
 
-  float alongBand(float p, float c, float w) {
-    return 1.0 - smoothstep(w * 0.42, w, abs(p - c));
-  }
-
   void main() {
     float u = vUv.x;
     float v = vUv.y * 2.0 - 1.0;
-    float t = uTime * 0.28 + uPhase;
 
-    /* 연속 실크. 가장자리만 부드럽게 사라지고, 안은 뚫지 않는다 */
     float body = 1.0 - smoothstep(0.62, 1.0, abs(v));
     float fold = pow(abs(vRoll), 1.6);
-    float along = smoothstep(0.0, 0.06, u) * smoothstep(1.0, 0.94, u);
+    /* 끝 페이드는 화면 밖 오버행에서만. 6% 를 쓰면 왼쪽이 하늘로 끊긴다. */
+    float along = smoothstep(0.0, 0.01, u) * smoothstep(1.0, 0.99, u);
 
-    vec2 streak = vec2(u * uStreak + uSeed * 0.06, v * 0.18) + vec2(t * 0.012, 0.0);
-    float lane = snoise(streak);
-    float edge = 0.16 * snoise(vec2(u * (uStreak * 1.7) + uSeed * 0.1, v * 0.65));
-
-    float blueStroke = 0.36 + 0.54 * smoothstep(-0.35, 0.5, lane + edge);
-    vec3 mono = mix(uWhite, uBlueC, clamp(blueStroke * uBlue, 0.0, 0.86));
-
-    /* 길이 방향 p. 브릿지가 되지 않게 U만 아주 약하게 흔든다 */
-    float p = clamp(u + lane * 0.045, 0.0, 1.0);
-    float amt = 0.42 + 0.48 * smoothstep(-0.28, 0.42, lane + edge);
-
-    /* 2번: 시안 0.29 → 분홍 0.50 → 라벤더 0.63 → 진파랑 0.71 */
-    vec3 wash2 = mix(uWhite, uCyanC, smoothstep(0.18, 0.36, p));
-    wash2 = mix(wash2, uRoseC, smoothstep(0.40, 0.54, p));
-    wash2 = mix(wash2, uLavC, smoothstep(0.56, 0.64, p));
-    wash2 = mix(wash2, uDeepC, smoothstep(0.64, 0.74, p));
-    wash2 = mix(wash2, mix(uBlueC, uWhite, 0.28), smoothstep(0.80, 0.96, p));
-    vec3 chroma2 = mix(uWhite, wash2, clamp(amt * max(max(uRose, uGold), uBlue), 0.0, 0.9));
-
-    /* 3번: 샘플 U 0.21 복숭아 / 0.29 분홍 / 0.38 청보라 / 0.63 라벤더 / 0.88 파랑.
-       흰 배경 시안은 옅지만 하늘 위에서는 안 보이므로 채도만 조금 살린다. */
-    vec3 wash3 = mix(uWhite, uCyanC, 0.16);
-    wash3 = mix(wash3, mix(uPeachC, uGoldC, 0.35), 0.82 * alongBand(p, 0.21, 0.18));
-    wash3 = mix(wash3, mix(uPink3C, uRoseC, 0.45), 0.88 * alongBand(p, 0.29, 0.16));
-    wash3 = mix(wash3, uMid3C, 0.86 * alongBand(p, 0.38, 0.18));
-    wash3 = mix(wash3, uLavC, 0.78 * alongBand(p, 0.63, 0.18));
-    wash3 = mix(wash3, uEnd3C, 0.9 * alongBand(p, 0.88, 0.2));
-    vec3 chroma3 = mix(uWhite, wash3, clamp(0.5 + 0.45 * amt, 0.0, 0.94));
-
-    vec3 col = mono;
-    col = mix(col, chroma2, step(0.5, uWash) * (1.0 - step(1.5, uWash)));
-    col = mix(col, chroma3, step(1.5, uWash));
-    col = mix(col, uWhite, 0.08 * fold);
+    /* Figma 물결 라인 스톱 + 실크 펄. 흰을 빼면 채도만 남아 결이 거칠게 읽힌다. */
+    float p = clamp(vAcross, 0.0, 1.0);
+    float mid = clamp(uMid, 0.08, 0.92);
+    vec3 wash = mix(uStopA, uStopB, smoothstep(0.0, mid, p));
+    wash = mix(wash, uStopC, smoothstep(mid, 1.0, p));
+    vec3 col = mix(wash, uWhite, 0.34 + 0.18 * fold);
 
     float fiber = snoise(vec2(u * 120.0, v * 18.0 + uSeed));
     vec2 gUv = gl_FragCoord.xy * 0.85;
@@ -361,7 +321,7 @@ function Ribbons() {
     return CONFS.flatMap((conf, ci) => {
       const sprite = TOWER_LINES[conf.slot];
       if (!sprite) return [];
-      const len = sprite.w * PX;
+      const len = (sprite.w + EDGE_BLEED * 2) * PX;
       const halfW = (sprite.h * PX) / 2;
       const cx = sprite.x + sprite.w / 2;
       const cy = sprite.y + sprite.h / 2;
@@ -370,6 +330,7 @@ function Ribbons() {
 
       return Array.from({ length: conf.copies }, (_, copy) => {
         const phase = conf.phase + copy * 0.38;
+        const wave = WAVE_STOPS[(conf.wave + copy) % WAVE_STOPS.length] ?? WAVE_STOPS[0];
         return {
           key: `rb-${ci}-${copy}`,
           ci,
@@ -391,25 +352,14 @@ function Ribbons() {
             uLen: { value: len },
             uHalfW: { value: halfW },
             uBodyAlpha: { value: conf.bodyAlpha * (copy === 1 ? 0.7 : 1) },
-            uRose: { value: conf.rose },
-            uGold: { value: conf.gold },
-            uBlue: { value: conf.blue },
-            uIrid: { value: 1 },
             uGrain: { value: 1 },
             uSeed: { value: ci * 17.3 + copy * 4.1 },
             uStreak: { value: conf.streak },
-            uWash: { value: conf.wash },
             uWhite: { value: WHITE },
-            uRoseC: { value: ROSE },
-            uGoldC: { value: GOLD },
-            uBlueC: { value: BLUE },
-            uLavC: { value: LAV },
-            uCyanC: { value: CYAN },
-            uDeepC: { value: DEEP },
-            uPeachC: { value: PEACH },
-            uPink3C: { value: PINK3 },
-            uMid3C: { value: MID3 },
-            uEnd3C: { value: END3 },
+            uStopA: { value: wave.a.clone() },
+            uStopB: { value: wave.b.clone() },
+            uStopC: { value: wave.c.clone() },
+            uMid: { value: wave.mid },
           },
         };
       });
@@ -447,9 +397,6 @@ function Ribbons() {
       const phase = layer.phase + item.copyIndex * 0.38;
       const tt = t * layer.speed * tune.speedMul;
       const bodyAlpha = layer.bodyAlpha * tune.bodyAlphaMul * (item.copyIndex === 1 ? 0.7 : 1);
-      const rose = layer.rose * tune.roseMul;
-      const gold = layer.gold * tune.goldMul;
-      const blue = layer.blue * tune.blueMul;
 
       if (!mMat) continue;
       mMat.uniforms.uTime!.value = tt;
@@ -459,10 +406,6 @@ function Ribbons() {
       mMat.uniforms.uTwFreq!.value = layer.twFreq;
       mMat.uniforms.uTwistDir!.value = twistDir;
       mMat.uniforms.uBodyAlpha!.value = bodyAlpha;
-      mMat.uniforms.uRose!.value = rose;
-      mMat.uniforms.uGold!.value = gold;
-      mMat.uniforms.uBlue!.value = blue;
-      mMat.uniforms.uIrid!.value = tune.iridMul;
       mMat.uniforms.uGrain!.value = tune.grainMul;
       mMat.uniforms.uStreak!.value = layer.streak;
     }

@@ -83,7 +83,7 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   goldMul: 1,
   blueMul: 1,
   iridMul: 1,
-  grainMul: 2.04,
+  grainMul: 2.0,
   dotSizeMul: 1,
 
   groupScale: 1,
