@@ -312,16 +312,30 @@ export function RibbonScene({ progressRef, active = true }: RibbonSceneProps) {
       orthographic
       camera={{ manual: true }}
       style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "transparent" }}
-      onCreated={({ gl, scene }) => {
+      onCreated={({ gl, scene, camera, size }) => {
         gl.toneMapping = THREE.NoToneMapping;
         gl.setClearColor(0x000000, 0);
         scene.background = null;
+        fitRibbonCamera(camera as THREE.OrthographicCamera, size.width, size.height);
       }}
     >
       <RibbonCamera />
       <Ribbons progressRef={progressRef} />
     </CanvasShell>
   );
+}
+
+function fitRibbonCamera(camera: THREE.OrthographicCamera, width: number, height: number) {
+  const aspect = width / Math.max(height, 1);
+  camera.left = -aspect;
+  camera.right = aspect;
+  camera.top = 1;
+  camera.bottom = -1;
+  camera.near = 0.1;
+  camera.far = 100;
+  camera.position.set(0, 0, 5);
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
 }
 
 function RibbonCamera() {
@@ -332,17 +346,7 @@ function RibbonCamera() {
   useFrame(() => {
     if (applied.current.w === size.width && applied.current.h === size.height) return;
     applied.current = { w: size.width, h: size.height };
-    const camera = get().camera as THREE.OrthographicCamera;
-    const aspect = size.width / Math.max(size.height, 1);
-    camera.left = -aspect;
-    camera.right = aspect;
-    camera.top = 1;
-    camera.bottom = -1;
-    camera.near = 0.1;
-    camera.far = 100;
-    camera.position.set(0, 0, 5);
-    camera.lookAt(0, 0, 0);
-    camera.updateProjectionMatrix();
+    fitRibbonCamera(get().camera as THREE.OrthographicCamera, size.width, size.height);
   });
 
   return null;
@@ -421,11 +425,11 @@ function Ribbons({ progressRef }: { progressRef: RefObject<number> }) {
     const u = progressRef.current ?? 0;
     const group = groupRef.current;
     if (group) {
-      const arrive = Math.min(1, u / 0.34);
-      const arriveEase = arrive * arrive * (3 - 2 * arrive);
+      /* 등장 스케일은 타워 래퍼가 맡는다. 여기까지 줄이면 전환이 끝난 뒤
+         한 번 더 줄어 띠가 틱한다. */
       group.position.set(tune.posX, tune.posY + tune.groupY * u, 0);
       group.rotation.z = tune.groupRot * u;
-      group.scale.setScalar(tune.groupScale * (1.36 - arriveEase * 0.36));
+      group.scale.setScalar(tune.groupScale);
     }
     for (let i = 0; i < items.length; i += 1) {
       const item = items[i];

@@ -139,6 +139,8 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const sphereLayerRef = useRef<HTMLDivElement>(null);
   const towerLayerRef = useRef<HTMLDivElement>(null);
+  /** 타워·하늘만 확대. 띠는 밖에 둬서 전환이 끝나는 순간 스케일이 틱하지 않게 한다. */
+  const towerRiseRef = useRef<HTMLDivElement>(null);
   const copySphereRef = useRef<HTMLDivElement>(null);
   const copyTowerRef = useRef<HTMLDivElement>(null);
   /**
@@ -215,6 +217,9 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const { sectionRef, pinRef, progressRef } = usePinnedProgress({
     steps: 2,
     scrub: 1,
+    /* 인덱스는 JSX 가 안 쓴다. 기본 매핑은 p=0.5 에서 setState 가 떠서
+       전환 중 히어로가 리렌더되고 띠 위치가 한 프레임 튄다. */
+    mapProgress: () => 0,
     onProgress: (p) => {
       // ⚠️ 매 프레임 호출된다. setState 금지. 스타일만 직접 쓴다.
       if (reducedRef.current === null) reducedRef.current = prefersReducedMotionSync();
@@ -223,6 +228,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const t = clamp01((p - fadeStart) / span);
       const sphere = sphereLayerRef.current;
       const tower = towerLayerRef.current;
+      const riseLayer = towerRiseRef.current;
       const host = canvasHostRef.current;
       const reduced = reducedRef.current === true;
       if (reduced) {
@@ -231,10 +237,8 @@ export function HeroSection({ messages }: HeroSectionProps) {
           sphere.style.transform = "none";
         }
         if (host) host.style.transform = "scale(1)";
-        if (tower) {
-          tower.style.opacity = String(t);
-          tower.style.transform = "scale(1)";
-        }
+        if (tower) tower.style.opacity = String(t);
+        if (riseLayer) riseLayer.style.transform = "scale(1)";
       } else {
         /* 확대는 캔버스 CSS 가 아니라 3D 그룹이 맡는다(scene-sphere).
            여기서 키우면 픽셀이 늘어나 흐려진다. */
@@ -246,13 +250,12 @@ export function HeroSection({ messages }: HeroSectionProps) {
           sphere.style.opacity = String(1 - dumpEase);
           sphere.style.transform = "none";
         }
-        /* 구체가 거의 사라진 뒤에 타워가 조금 큰 채로 들어와 자리 잡는다. */
+        /* 구체가 거의 사라진 뒤에 타워가 조금 큰 채로 들어와 자리 잡는다.
+           스케일은 타워·하늘만. 띠까지 줄이면 전환이 끝나는 순간 한 번 틱한다. */
         const rise = clamp01((t - 0.74) / 0.2);
         const riseEase = rise * rise * (3 - 2 * rise);
-        if (tower) {
-          tower.style.opacity = String(riseEase);
-          tower.style.transform = `scale(${1.38 - riseEase * 0.38})`;
-        }
+        if (tower) tower.style.opacity = String(riseEase);
+        if (riseLayer) riseLayer.style.transform = `scale(${1.38 - riseEase * 0.38})`;
       }
       const cs = copySphereRef.current;
       const ct = copyTowerRef.current;
@@ -461,6 +464,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
             시안에서는 타워/광선이 카피 위에 있지만, 타워가 본문을 덮으면
             가독성이 떨어져서 카피는 그대로 위(z-content)에 둔다. */}
         <div ref={towerLayerRef} className={styles.towerLayer} aria-hidden>
+          <div ref={towerRiseRef} className={styles.towerRise}>
           <div className={styles.towerSky} />
           {HERO_ASSETS_READY && towerMounted ? (
             <>
@@ -580,6 +584,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
               </div>
             </>
           ) : null}
+          </div>
 
           {/**
            * 띠 캔버스 — 타워 에셋과 **따로, 더 일찍** 올린다.

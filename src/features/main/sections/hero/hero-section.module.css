@@ -64,8 +64,16 @@
   position: absolute;
   inset: 0;
   z-index: var(--z-canvas-bg);
-  will-change: opacity, transform;
+  will-change: opacity;
   transform-origin: 50% 48%;
+}
+
+/* 타워 등장 확대. 띠(WebGL)는 이 래퍼 밖에 둬서 스케일 종료 틱을 안 탄다. */
+.towerRise {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 48%;
+  will-change: transform;
 }
 
 .towerLayer {
