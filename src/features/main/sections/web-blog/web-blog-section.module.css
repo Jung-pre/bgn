@@ -34,13 +34,13 @@
 }
 
 /* ③ Figma 2:2571 — 글자 모양으로 뚫린 덮개판.
-   opacity/scale 은 GSAP 이 스크롤에 물려 쓴다. CSS transition 을 걸면 scrub 과 싸운다. */
+   opacity 만 GSAP 이 스크롤에 물려 쓴다. CSS transition 을 걸면 scrub 과 싸운다. */
 .maskStage {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  will-change: transform, opacity;
+  will-change: opacity;
 }
 
 .maskSvg {

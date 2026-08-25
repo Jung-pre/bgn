@@ -134,7 +134,7 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
 
           즉 모바일 기기에서도 데스크톱 분기가 먼저 돌고, 그 ScrollTrigger 가
           **정리되지 않은 채 살아남는다.** 살아 있는 scrub 트리거는 스크롤·refresh 마다
-          덮개에 `autoAlpha: 0 / scale: 1.14`(fromTo 의 from 값)를 다시 써 넣기 때문에,
+          덮개에 `autoAlpha: 0`(fromTo 의 from 값)을 다시 써 넣기 때문에,
           여기서 `gsap.set(clearProps)` 로 지워 봐야 곧바로 되돌아온다.
           (모바일에서 타이틀 덮개가 `visibility: hidden` 으로 굳어 있던 원인)
 
@@ -156,7 +156,7 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
         /* 동작 줄이기: pin·가로이동을 걸지 않고 **직접 가로 스크롤되는 트랙**으로
            둔다. early-return 이 아니라 최종 상태를 확정하는 것이 중요하다 —
            아래 fromTo 의 시작값(autoAlpha 0)이 남으면 덮개가 사라져 버린다. */
-        gsap.set(stage, { autoAlpha: 1, clearProps: "transform" });
+        gsap.set(stage, { autoAlpha: 1 });
         track.style.overflowX = "auto";
         /* ★ 여기서만 data-lenis-prevent 를 단다.
            이 트랙이 "내부 가로 스크롤 영역"이 되는 건 이 분기뿐이다.
@@ -175,10 +175,9 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
       // ── 진입 fade in — pin 이 시작되기 전 구간에서 처리한다 ────────────
       const fadeIn = gsap.fromTo(
         stage,
-        { autoAlpha: 0, scale: 1.14 },
+        { autoAlpha: 0 },
         {
           autoAlpha: 1,
-          scale: 1,
           ease: "none",
           scrollTrigger: {
             trigger: section,
@@ -208,7 +207,9 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
       /* 주석 원문이 "fade in-**out**" 이고, 시안 2:2457 이후 프레임에는 이 글자가
          전혀 남아 있지 않다. 예전 구현처럼 0.4 로 남겨 두면 가로 트랙 위에
          시안에 없는 덮개가 계속 깔린다 → 완전히 걷어낸다. */
-      tl.to(stage, { autoAlpha: 0, scale: 0.9, ease: "none", duration: INTRO_RATIO }, 0)
+      /* 주석은 fade in-out 만이다. scale 을 넣으면 덮개판이 안쪽으로
+         줄어 영상 가장자리가 드러나는데, 시안에 그 연출은 없다. */
+      tl.to(stage, { autoAlpha: 0, ease: "none", duration: INTRO_RATIO }, 0)
         /* 시안 2:2399 는 **화면 전체가 배경 영상 + 타이틀뿐**이다. 트랙을 x=0 에
            두면 인트로 내내 오른쪽 절반이 흰 카드로 덮여 시안과 달라진다.
            → 트랙은 화면 밖(오른쪽)에서 대기하다가 타이틀이 사라지는 동안 들어온다. */
