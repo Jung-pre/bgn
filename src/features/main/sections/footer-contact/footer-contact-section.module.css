@@ -266,6 +266,8 @@
   width: 37.125rem; /* 594 */
   height: auto;
   mix-blend-mode: normal;
+  /* 타워보다 한 단계 물러난다. 시선이 왼쪽 병원에 먼저 가지 않게. */
+  opacity: 0.46;
   /**
    * 시안은 아래로 갈수록 건물이 **사라진다**. 행 표준편차로 잰 감쇠:
    *   y400 26.3(=100%) / 460 19.8(75%) / 520 13.0(49%) / 580 7.4(28%) / 640 2.6(0%)
@@ -297,19 +299,18 @@
  * 진료시간·사업자정보 위를 덮었다. 좌표는 시안대로 두고 세기만 낮추는 쪽이
  * 판독성·유사도 둘 다 낫다.
  */
-.wireCity {
+.wireCityClip {
+  position: absolute;
   left: 46.75rem; /* 748 */
   top: 0.625rem; /* 10 */
   width: 95.375rem; /* 1526 */
-  height: auto;
+  pointer-events: none;
   /**
    * 0.3 은 **너무 흐렸다.** 시안 타워 구역(x1560~1900) 행 표준편차가 35 인데
    * 0.3 에서 우리는 19 였다 — 절반 세기다. 예전에 0.3 으로 맞았던 건
    * 하단 페이드가 없어서 아래쪽이 과하게 밝았고, 그걸 전체 불투명도로
    * 상쇄하고 있었기 때문이다. 페이드를 넣은 뒤 다시 맞춘 값이 0.9 다.
    */
-  opacity: 0.9;
-  mix-blend-mode: normal;
   /* ① 가로 — 시안에서 도심은 오른쪽 끝에만 남고 가운데로 갈수록 사라진다.
         원본은 가운데가 석촌호수라 그대로 두면 하단에 물결 띠가 가로로 남는다.
      ② 세로 — 시안은 y520 부터 흐려져 y645 에 완전히 사라진다(표준편차
@@ -326,11 +327,90 @@
   -webkit-mask-composite: source-in;
 }
 
+.wireCityClip .wireCity {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  height: auto;
+  opacity: 1;
+  mix-blend-mode: normal;
+}
+
+/**
+ * 롯데타워 **선화 위**만 하이라이트. 공중에 떠 있던 + 점은 뺀다.
+ * 마스크는 wire-3 밝기 × 타워 기둥(박스 폭 58.5~66.3%).
+ */
+.towerSheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(255, 255, 255, 0.32) 18%,
+    rgba(255, 255, 255, 0.06) 40%,
+    rgba(255, 255, 255, 0.22) 54%,
+    transparent 82%
+  );
+  background-size: 100% 240%;
+  background-position: 50% 0%;
+  animation: towerGlint 8s cubic-bezier(0.45, 0.05, 0.2, 1) infinite;
+  mix-blend-mode: plus-lighter;
+  -webkit-mask-image:
+    url("/main/img_12_wire03.webp"),
+    linear-gradient(to right, transparent 56%, #000 59%, #000 67%, transparent 71%);
+  mask-image:
+    url("/main/img_12_wire03.webp"),
+    linear-gradient(to right, transparent 56%, #000 59%, #000 67%, transparent 71%);
+  -webkit-mask-size: 100% auto, 100% 100%;
+  mask-size: 100% auto, 100% 100%;
+  -webkit-mask-position: 0 0, 0 0;
+  mask-position: 0 0, 0 0;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+
+@keyframes towerGlint {
+  0% {
+    background-position: 50% -18%;
+    opacity: 0.16;
+  }
+  22% {
+    background-position: 50% 18%;
+    opacity: 0.48;
+  }
+  48% {
+    background-position: 50% 62%;
+    opacity: 0.28;
+  }
+  64% {
+    background-position: 50% 108%;
+    opacity: 0.1;
+  }
+  100% {
+    background-position: 50% 108%;
+    opacity: 0.1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .towerSheen {
+    animation: none;
+    opacity: 0.32;
+    background-position: 50% 24%;
+  }
+}
+
 .ringLarge {
   width: 28.5rem; /* 456 — 건물(594)보다 한 둘레 작은 호 */
   height: 28.5rem;
   left: -7.25rem;
   top: 16.5rem;
+  /* 왼쪽 건물 쪽 호는 타워보다 약하게. */
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .ringMid {
@@ -605,28 +685,23 @@
 }
 
 .logo {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
   margin: 0;
-  font-size: 1.75rem; /* 로고 높이 30 에 맞춘 광학 크기 */
-  font-weight: var(--weight-bold);
-  line-height: 1;
-  color: var(--color-white);
-  white-space: nowrap;
+  line-height: 0;
 }
 
-.logoMark {
-  font-family: var(--font-display-stack);
-  font-weight: var(--weight-regular);
-  font-size: 1.875rem;
-  letter-spacing: var(--tracking-eng);
+.logoImage {
+  display: block;
+  width: 199px;
+  height: 30px;
+  object-fit: contain;
 }
 
 .copyright {
   margin: 0;
-  font-size: var(--fs-13);
-  line-height: var(--leading-tight);
+  /* Figma pc/caption/caption 1 — 13 / 400 / 1.25 / -3% / gray-300 */
+  font: var(--t-caption-1);
+  font-style: normal;
+  letter-spacing: var(--tracking-default);
   color: var(--gray-300);
 }
 
@@ -660,7 +735,7 @@
     width: 30.94vw;
   }
 
-  .wireCity {
+  .wireCityClip {
     left: 38.96vw;
     top: 1.26%;
     width: 79.5vw;
@@ -740,12 +815,13 @@
     top: 19.6875rem; /* 315 */
     bottom: auto;
     width: 40vw;
-    opacity: 0.85;
+    /* 모바일 시안은 병원이 주인공이라 PC 의 후퇴 opacity 를 되돌린다. */
+    opacity: 0.92;
     -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
     mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
   }
 
-  .wireCity {
+  .wireCityClip {
     /* 타워 잉크가 x 316~342 (폭 26) 에 오게: 26 / 0.0786 = 331 = 88vw,
        왼쪽 = 316 − 0.585×331 = 122.5 = 32.7vw. 첨탑 y 275 → top = 257. */
     left: 28.8vw;
@@ -753,7 +829,7 @@
     top: 15.25rem; /* 244 */
     bottom: auto;
     width: 95vw;
-    opacity: 0.75;
+    opacity: 0.42;
     /* ① 가로 — 시안은 타워 **왼쪽에 아무것도 없다**(x310 표준편차 0.7, x315 2.2).
           타워는 박스 폭의 58.5% 지점에서 시작하므로 그 앞을 잘라낸다.
           안 자르면 저층 도심이 '부산' 지점 버튼 위로 올라온다.

@@ -216,6 +216,15 @@ function Globe({
   const bodyGroupRef = useRef<THREE.Group>(null);
   const bodyMeshRef = useRef<THREE.Mesh>(null);
   const coreRef = useRef<THREE.Mesh>(null);
+  /**
+   * 은하수 진행도 / 원형 평판 잔량.
+   *
+   * 이 `useFrame` 에서 계산해 자식(PointLayer·GlobeBodyMaterial)이 읽는다.
+   * R3F 는 등록 순서대로 프레임 콜백을 돌리고 부모가 먼저 렌더되므로
+   * 부모 → 자식 순서가 보장된다(한 프레임 지연 없음).
+   */
+  const galaxyRef = useRef(0);
+  const bodyCoverRef = useRef(1);
   const eased = useRef({ x: 0, y: 0 });
   /** 진입 회전 진행도 — "지구형태가 약간 돌면서 등장" */
   const intro = useRef(reduced ? 1 : 0);
@@ -315,9 +324,37 @@ function Globe({
           Math.max(0, (scrollNow - fadeStartNow) / Math.max(0.02, fadeEndNow - fadeStartNow)),
         )
       : 0;
-    /* 히어로만: 장면 2로 넘기기 전에 구체가 화면을 채운다. 클로징·푸터는 키우지 않는다. */
-    const zoomNow = zoomTNow * 0.78 + zoomTNow * zoomTNow * 0.22;
-    const grow = interactive && !reduced ? 1 + zoomNow * 3.45 : 1;
+    /**
+     * 히어로만: 확대 → (은하수) → 축소.
+     *
+     * 예전엔 `grow` 가 끝까지 단조 증가라 구체가 화면 밖으로 계속 커지다가
+     * 통째로 페이드아웃했다(진행도 0.6 근처가 **흰 화면 한 장**이었다).
+     * 이제 `zoomIn` 으로 화면을 채운 뒤 `zoomOut` 으로 되돌아오며,
+     * 그 되돌아오는 구간에서 파티클이 은하수로 펴진다 — 사용자가 말한
+     * "다시 축소되어 2번 섹션이 나올 때"가 이 구간이다.
+     */
+    const zin = smoothRange(zoomTNow, CUE.zoomIn[0], CUE.zoomIn[1]);
+    const zout = smoothRange(zoomTNow, CUE.zoomOut[0], CUE.zoomOut[1]);
+    /* 곡선은 기존과 같은 모양(0.78 선형 + 0.22 제곱)을 유지한다 */
+    const zoomNow = zin * 0.78 + zin * zin * 0.22;
+    /**
+     * 최대 4.45 → 은하수가 다 펴지는 지점에서 **0.6**.
+     *
+     * 원반은 `spread` 로 반경이 1.9배까지 벌어진다. 배율을 1 근처로만 되돌리면
+     * 실효 반경이 구체의 2.4배가 되어 띠가 화면 밖으로 넘친다(실제로 그랬다).
+     * 0.6 이면 실효 1.1 배 — 원반 전체가 여백을 두고 화면에 들어온다.
+     */
+    const grow =
+      interactive && !reduced
+        ? 1 + zoomNow * 3.45 - zout * (tune?.gxShrink ?? GLOBE_TUNE_DEFAULTS.gxShrink)
+        : 1;
+    const galaxyNow =
+      interactive && !reduced
+        ? smoothRange(zoomTNow, tune?.gxStart ?? CUE.galaxy[0], tune?.gxEnd ?? CUE.galaxy[1])
+        : 0;
+    galaxyRef.current = galaxyNow;
+    /* 원형 평판은 은하수가 펴지기 전에 사라진다 */
+    bodyCoverRef.current = 1 - smoothRange(zoomTNow, CUE.bodyOut[0], CUE.bodyOut[1]);
     g.scale.setScalar(fitted * grow);
     bodyGroupRef.current?.scale.setScalar(fitted * grow);
     if (bodyMeshRef.current) bodyMeshRef.current.visible = tune ? tune.showBody : true;
@@ -375,16 +412,26 @@ function Globe({
       ? _state.clock.elapsedTime * (tune?.spinRate ?? 0)
       : _state.clock.elapsedTime * 0.07;
     const yawKeep = interactive ? 1 - zoomTNow * 0.85 : 1;
+    /**
+     * 은하수는 **화면 수평**으로 흘러야 한다(수정요청: "방향이 너무 잘못된 거 같아").
+     *
+     * 밴드는 로컬 XY 평면에 만든다. 그런데 이 그룹은 pitch 0.55 + 지축 기울기로
+     * 기울어 있어서 그대로 두면 띠가 사선으로 눕고 원근으로 찌그러진다.
+     * 그래서 `uGalaxy` 가 차오르는 만큼 회전을 0 으로 수렴시킨다 —
+     * 구체일 때의 기울기는 그대로 두고, 펴지는 동안 반듯해진다.
+     */
+    const upright = 1 - galaxyNow;
     g.rotation.y =
-      FOCUS_ROTATION_Y +
-      yawTrim +
-      (1 - introEase) * (tune?.introYaw ?? 0.12) +
-      scrollNow * (tune?.scrollYaw ?? 0.35) * yawKeep +
-      eased.current.x * (tune?.pointerYaw ?? 0.3) +
-      idle;
+      (FOCUS_ROTATION_Y +
+        yawTrim +
+        (1 - introEase) * (tune?.introYaw ?? 0.12) +
+        scrollNow * (tune?.scrollYaw ?? 0.35) * yawKeep +
+        eased.current.x * (tune?.pointerYaw ?? 0.3) +
+        idle) *
+      upright;
     // 지축 기울기를 고정으로 주고 그 위에 포인터 반응을 얹는다
-    g.rotation.z = AXIAL_TILT;
-    g.rotation.x = pitchX + eased.current.y * (tune?.pointerPitch ?? 0.16);
+    g.rotation.z = AXIAL_TILT * upright;
+    g.rotation.x = (pitchX + eased.current.y * (tune?.pointerPitch ?? 0.16)) * upright;
 
     if (showCore) updateCore(coreRef.current, g, camera, introEase);
   });
@@ -408,7 +455,12 @@ function Globe({
          */}
         <mesh ref={bodyMeshRef} renderOrder={-3} frustumCulled={false}>
           <planeGeometry args={[GLOBE_RADIUS * 1.97, GLOBE_RADIUS * 1.97]} />
-          <GlobeBodyMaterial intensity={intensity} instant={reduced} live={interactive} />
+          <GlobeBodyMaterial
+            intensity={intensity}
+            instant={reduced}
+            live={interactive}
+            coverRef={bodyCoverRef}
+          />
         </mesh>
         <GlobeHaze intensity={haze} instant={reduced} live={interactive} />
       </group>
@@ -432,6 +484,7 @@ function Globe({
           pointerRef={push}
           pushScale={interactive ? 1.2 : 0}
           live={interactive}
+          galaxyRef={galaxyRef}
         />
         <PointLayer
           cloud={shell}
@@ -444,6 +497,7 @@ function Globe({
           pointerRef={push}
           pushScale={interactive ? 1 : 0}
           live={interactive}
+          galaxyRef={galaxyRef}
         />
         <PointLayer
           cloud={land}
@@ -456,6 +510,7 @@ function Globe({
           pointerRef={push}
           pushScale={interactive ? 0.85 : 0}
           live={interactive}
+          galaxyRef={galaxyRef}
         />
 
         {/* 수정요청(26.08.24) "지구 주변에 둘러져있는 행성같은 띠는 빼주세요" — 궤도 고리 제거 */}
@@ -533,11 +588,89 @@ const POINT_VERTEX = /* glsl */ `
   uniform float uAspect;      // width / height — 원형 반경을 유지하려면 필요
   uniform float uPush;        // NDC 단위 최대 밀림량. 0 이면 비활성
   uniform float uPushRadius;  // 영향 반경 (aspect 보정된 NDC)
+  uniform float uGalaxy;      // 0 = 구체 / 1 = 은하수 밴드
+  uniform vec4 uGxPose;       // (tilt rad, yaw rad, offX, offY)
+  uniform vec4 uGxShape;      // (length, thick, amp, gap)
+  uniform float uGxBands;
+  uniform float uTime;
   varying float vScale;
   varying vec2 vScreen;
+  varying float vGalaxy;
 
   void main() {
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    /**
+     * ## 구체 → 은하수
+     *
+     * 수정요청: "파티클들을 끌어와서 다시 은하수를 만드는 부분이 더 잘 보이게".
+     *
+     * 구(球)를 **XZ 평면 원반**으로 눌러 나선으로 감는다:
+     *  ① 'pos.y' 를 거의 0 으로 눌러 납작하게 만든다 — 원반의 두께가 된다.
+     *  ② 바깥 입자일수록 더 감기게 각도를 더한다(differential rotation).
+     *     같은 각속도로 돌리면 구체가 통째로 도는 것처럼 보여 "빨려든다"가 안 산다.
+     *  ③ 반경을 벌려('spread') 화면을 가로지르는 띠가 되게 한다.
+     *
+     * ⚠️ 원반의 법선은 로컬 +Y 다. 그룹이 'rotation.x = 0.55'(≈31°)로 기울어 있어
+     *    화면에서는 **31° 로 열린 타원 띠**로 보인다 — 정확히 은하수 실루엣이다.
+     *    여기서 각도를 더 주면 정면 원반이 되어 그냥 "소용돌이 판"이 된다.
+     */
+    vec3 pos = position;
+    if (uGalaxy > 0.0005) {
+      float g = uGalaxy;
+      float R = max(length(pos), 1e-4);
+
+      /**
+       * ## 구체 → 은하수 = 겹치는 라인 밴드
+       *
+       * 모양·자세는 전부 **튜닝 패널**(globe-tune 의 gx* 값)이 정한다.
+       * 기울기는 **고정**이다 — 전환 도중 회전시키지 않는다.
+       *
+       * uGxPose  = (기울기rad, 깊이yaw rad, 오프셋X, 오프셋Y)
+       * uGxShape = (길이, 두께, 진폭, 밴드간격)
+       * uGxBands = 밴드 개수
+       */
+      float h1 = fract(sin(dot(position, vec3(12.9898, 78.2330, 37.7190))) * 43758.5453);
+      float h2 = fract(sin(dot(position, vec3(93.9898, 67.3450, 11.1350))) * 24634.6345);
+      float h3 = fract(sin(dot(position, vec3(45.3320, 19.8740, 88.2190))) * 15731.7431);
+
+      float nb = max(1.0, uGxBands);
+      float band = floor(h1 * nb);
+      float phase = band * 2.1;
+      float amp = uGxShape.z - band * 0.09;
+      /* 밴드끼리 세로로 어긋나게 두어 서로 교차한다 */
+      float baseY = (band - (nb - 1.0) * 0.5) * uGxShape.w;
+
+      /* 밴드를 따라가는 위치 -1..1 — 길이를 키우면 화면 밖까지 나간다 */
+      float ax = h2 * 2.0 - 1.0;
+      float X = ax * uGxShape.x;
+
+      /* 두 하모닉을 겹쳐 리본처럼 완만하게 굽힌다 */
+      float w = sin(ax * 2.0 + phase + uTime * 0.10) * 0.62
+              + sin(ax * 3.7 + phase * 1.7 - uTime * 0.07) * 0.28;
+      /* 밴드 두께 — 가운데가 촘촘하고 위아래로 성글어진다 */
+      float t3 = (h3 - 0.5);
+      float Y = baseY + amp * w + t3 * abs(t3) * uGxShape.y;
+      float Z = (fract(h3 * 7.31) - 0.5) * 0.35;
+
+      /**
+       * 자세 — 두 번 돌린다. 순서가 중요하다:
+       *  1) Y축(깊이) — 한쪽 끝을 카메라에서 멀리 보낸다. 이게 없으면 아무리
+       *     기울여도 벽에 붙은 그림이다. 원근이 먼 쪽을 좁혀야 공간감이 난다.
+       *  2) Z축(화면 기울기) — +30도면 8시→2시, -20도면 10시→4시.
+       * 반대로 하면 기울기가 원근에 먹혀 각도가 눕는다.
+       */
+      vec3 b = vec3(X + uGxPose.z, Y + uGxPose.w, Z);
+      float cy = cos(uGxPose.y);
+      float sy = sin(uGxPose.y);
+      b = vec3(b.x * cy + b.z * sy, b.y, -b.x * sy + b.z * cy);
+      float cz = cos(uGxPose.x);
+      float sz = sin(uGxPose.x);
+      b = vec3(b.x * cz - b.y * sz, b.x * sz + b.y * cz, b.z);
+
+      pos = mix(pos, b * R, g);
+    }
+    vGalaxy = uGalaxy;
+
+    vec4 mv = modelViewMatrix * vec4(pos, 1.0);
     vec4 clip = projectionMatrix * mv;
 
     float grow = 0.0;
@@ -559,7 +692,9 @@ const POINT_VERTEX = /* glsl */ `
     gl_Position = clip;
     // three 의 sizeAttenuation 과 같은 식. uHeight 는 drawingBuffer 높이.
     // 밀려난 입자를 살짝 키워 "쓸려 나간다"는 인상을 준다.
-    gl_PointSize = uSize * (1.0 + grow * 0.5) * (uHeight * 0.5) / max(0.001, -mv.z);
+    /* 은하수 구간에서는 입자를 조금 키운다 — 반경이 벌어지며 밀도가 떨어져
+       그냥 두면 띠가 옅어져 "잘 안 보인다". */
+    gl_PointSize = uSize * (1.0 + grow * 0.5) * (1.0 + uGalaxy * 0.85) * (uHeight * 0.5) / max(0.001, -mv.z);
     vScale = aScale;
 
     /* 파스텔 이리데선스용 화면 좌표. 구체의 **로컬** 좌표가 아니라 NDC 를 쓴다 —
@@ -583,6 +718,7 @@ const POINT_FRAGMENT = /* glsl */ `
   uniform float uTint;
   varying float vScale;
   varying vec2 vScreen;
+  varying float vGalaxy;
 
   /**
    * 시안 2:416 픽셀 실측 팔레트.
@@ -641,11 +777,59 @@ const POINT_FRAGMENT = /* glsl */ `
     /* 좌상단 가산 파티클이 대륙을 흰 덩어리로 만든다 */
     float hot = smoothstep(0.52, 0.0, x) * smoothstep(0.36, 0.82, y);
     /* 윗호는 빼 둔다. y 0.95 까지 곱하면 머리 꼭대기가 배경으로 꺼져 빵구로 읽힌다. */
-    col *= 1.0 - hot * 0.46;
+    /* ⚠️ 은하수 구간에서는 이 억제를 푼다. 구체일 때 대륙이 뭉치는 걸 막는 보정인데
+       원반으로 펴진 뒤에도 걸려 있으면 띠의 왼쪽 절반만 어두워져 반쪽만 보인다. */
+    col *= 1.0 - hot * 0.46 * (1.0 - vGalaxy);
 
-    gl_FragColor = vec4(col, a * vScale * uOpacity);
+    /* 은하수는 배경(밝은 하늘)과 붙어 있어 그대로 두면 묻힌다.
+       가산 블렌딩이라 광량을 올리는 것이 곧 가시성이다. */
+    /* 배경이 어두운 딤이 아니라 **2번 섹션 하늘**이라 그만큼 더 밝아야 산다 */
+    col *= 1.0 + vGalaxy * 0.28;
+    /* 은하수는 1까지 올리지 않는다. 최대 0.8 */
+    float alpha = a * vScale * uOpacity * mix(1.0, 0.8, vGalaxy);
+
+    gl_FragColor = vec4(col, min(alpha, mix(1.0, 0.8, vGalaxy)));
   }
 `;
+
+/**
+ * ## 구체 → 은하수 → 라인 (수정요청 26.08.25)
+ *
+ * 진행도 `t`(= fadeStart~fadeEnd 를 0~1 로 편 값) 기준 큐 시트다.
+ * 세 요청을 그대로 옮겼다:
+ *   ① "확대 모션은 너무 좋아"      → `ZOOM_IN` 구간의 곡선은 손대지 않는다.
+ *   ② "은하수가 더 잘 보이길"      → `GALAXY` 를 넓게 잡고 그 뒤에 **정지 구간**을 둔다.
+ *   ③ "원형 오브젝트는 안 보여도 됨" → `BODY_OUT` 이 은하수보다 **먼저** 끝난다.
+ *
+ * 순서가 핵심이다. 바디(원형 평판)가 남아 있으면 파티클이 그 위에 묻혀
+ * 은하수가 안 읽힌다. 그래서 바디를 먼저 지우고, 그다음 파티클을 편다.
+ */
+const CUE = {
+  /** 확대 — 여기까지 최대 배율. 이 곡선이 "좋다"고 한 그 모션이다. */
+  zoomIn: [0.0, 0.46],
+  /** 원형 평판(바디) 소멸 — 은하수가 펴지기 전에 완전히 사라진다 */
+  bodyOut: [0.26, 0.48],
+  /**
+   * 파티클이 라인으로 모인다.
+   * 시작이 늦으면 최대 확대 상태(배율 4.45)로 파티클이 흩어진 채 머무는
+   * **빈 프레임**이 생긴다. 확대가 끝나자마자 바로 모이기 시작해야 한다.
+   */
+  galaxy: [0.29, 0.64],
+  /**
+   * 다시 축소 — 은하수와 **같이** 진행한다.
+   *
+   * 처음엔 축소를 은하수 뒤(0.5~0.88)에 뒀는데, 원반이 다 펴지는 순간에도
+   * 배율이 4.3 이라 띠가 화면보다 훨씬 커져 "은하수"가 아니라 화면을 덮은
+   * 반짝이는 텍스처로 읽혔다. 펴짐과 축소가 같이 가야 띠 전체가 화면에 들어온다.
+   */
+  zoomOut: [0.34, 0.68],
+} as const;
+
+/** smoothstep(a,b,x) 와 같다 */
+function smoothRange(x: number, a: number, b: number) {
+  const t = Math.min(1, Math.max(0, (x - a) / Math.max(1e-4, b - a)));
+  return t * t * (3 - 2 * t);
+}
 
 const LAYER_SHOW = {
   halo: "showHalo",
@@ -679,6 +863,7 @@ function PointLayer({
   pointerRef,
   pushScale,
   live,
+  galaxyRef,
 }: {
   cloud: PointCloud;
   kind: "halo" | "shell" | "land";
@@ -708,6 +893,8 @@ function PointLayer({
   pushScale: number;
   /** 히어로만 라이브 스토어를 읽는다. */
   live: boolean;
+  /** 0 = 구체 / 1 = 은하수 원반. 부모가 매 프레임 쓴다. */
+  galaxyRef?: RefObject<number>;
 }) {
   const fade = useRef(instant ? 1 : 0);
   const groupRef = useRef<THREE.Group>(null);
@@ -734,6 +921,11 @@ function PointLayer({
           uPush: { value: 0 },
           uPushRadius: { value: PUSH_RADIUS },
           uTint: { value: tint },
+          uGalaxy: { value: 0 },
+          uGxPose: { value: new THREE.Vector4(0.2618, 0.2618, 0.08, -1.2) },
+          uGxShape: { value: new THREE.Vector4(5.4, 1.45, 0.62, 0.14) },
+          uGxBands: { value: 3 },
+          uTime: { value: 0 },
         },
         transparent: true,
         depthWrite: false,
@@ -746,11 +938,30 @@ function PointLayer({
   // 언마운트 시 컴파일된 GPU 프로그램을 직접 놓아준다.
   useEffect(() => () => material.dispose(), [material]);
 
-  useFrame(({ size: viewSize, viewport }, delta) => {
+  useFrame(({ size: viewSize, viewport, clock }, delta) => {
     const m = matRef.current;
     if (!m) return;
     const h = m.uniforms.uHeight;
     if (h) h.value = viewSize.height * viewport.dpr;
+
+    const ug = m.uniforms.uGalaxy;
+    if (ug) ug.value = galaxyRef?.current ?? 0;
+    /* 모양·자세는 패널이 정한다. 히어로가 아니면 기본값 그대로. */
+    const gt = live ? getGlobeTune() : GLOBE_TUNE_DEFAULTS;
+    const upose = m.uniforms.uGxPose;
+    if (upose)
+      (upose.value as THREE.Vector4).set(
+        (gt.gxTiltDeg * Math.PI) / 180,
+        (gt.gxYawDeg * Math.PI) / 180,
+        gt.gxX,
+        gt.gxY,
+      );
+    const ushape = m.uniforms.uGxShape;
+    if (ushape) (ushape.value as THREE.Vector4).set(gt.gxLength, gt.gxThick, gt.gxAmp, gt.gxGap);
+    const ubands = m.uniforms.uGxBands;
+    if (ubands) ubands.value = Math.max(1, Math.round(gt.gxBands));
+    const ut = m.uniforms.uTime;
+    if (ut) ut.value = clock.elapsedTime;
 
     const t = live ? getGlobeTune() : null;
     if (groupRef.current) {
@@ -1115,10 +1326,19 @@ function GlobeBodyMaterial({
   intensity,
   instant,
   live,
+  coverRef,
 }: {
   intensity: number;
   instant: boolean;
   live: boolean;
+  /**
+   * 스크롤로 깎는 잔량 0~1.
+   *
+   * 수정요청: "다시 축소되어 2번 섹션이 나올 때 원형 오브젝트는 안 보여도 된다."
+   * 튜닝 스토어의 `cover` 는 그대로 두고 여기에 곱한다 — 패널로 맞춰 둔
+   * 기본 불투명도를 잃지 않으면서 스크롤로만 걷어낸다.
+   */
+  coverRef?: RefObject<number>;
 }) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const fade = useRef(instant ? 1 : 0);
@@ -1169,7 +1389,7 @@ function GlobeBodyMaterial({
       if (uPearl) uPearl.value = t.bodyPearl;
       if (uEdge) uEdge.value = t.bodyEdge;
     }
-    const target = t ? t.cover : intensity;
+    const target = (t ? t.cover : intensity) * (coverRef?.current ?? 1);
     const o = m.uniforms.uOpacity;
     if (instant) {
       if (o) o.value = target;

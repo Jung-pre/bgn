@@ -366,60 +366,11 @@
   cursor: pointer;
 }
 
-/* 펼친 카드는 화살표 대신 `+` 를 쓴다.
+/* 펼친 카드는 화살표 대신 커스텀 `+` 커서를 쓴다.
    `display:none` 인 이유 — 화살표는 흐름 안 요소(space-between 의 아래쪽)라
    숨기기만 하면 48px 자리가 남아 카피의 pb 64 가 어긋난다. */
 .itemExpanded .arrow {
   display: none;
-}
-
-/* Figma 2:1984 — 96×96, bg rgba(0,114,236,.6) + border primary/500 + blur 3.
-   시안 좌표(1179,571)를 확장 카드 기준으로 환산하면 우 197 / 하 53 이다. */
-.plus {
-  position: absolute;
-  right: 12.3125rem;
-  bottom: 3.3125rem;
-  display: grid;
-  place-items: center;
-  width: 6rem;
-  height: 6rem;
-  z-index: 2;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--primary-500);
-  background: rgba(0, 114, 236, 0.6);
-  backdrop-filter: blur(3px);
-  color: var(--color-white);
-  opacity: 0;
-  transform: scale(0.9);
-  transition:
-    opacity 0.35s ease 0.12s,
-    transform 0.35s ease 0.12s;
-  /* 접힌 동안에는 없는 것처럼. 펼쳐질 때만 아래에서 되살린다. */
-  pointer-events: none;
-}
-
-.plus svg {
-  width: 3rem;
-  height: 3rem;
-}
-
-.itemExpanded .plus {
-  opacity: 1;
-  transform: scale(1);
-  /* 펼친 카드에서 **유일한** 이동 수단이다(카드 본체는 더 이상 링크가 아니다) */
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-.itemExpanded .plus:hover,
-.itemExpanded .plus:focus-visible {
-  background: rgba(0, 114, 236, 0.82);
-  transform: scale(1.06);
-}
-
-.plus:focus-visible {
-  outline: 3px solid var(--color-white);
-  outline-offset: 3px;
 }
 
 /**
@@ -429,7 +380,8 @@
  * 필요해졌다. 라벨 위에 얹지 않고 `inset: 0` 으로 깔면, 텍스트/화살표는 그대로
  * 보이면서 어디를 눌러도 펼쳐진다.
  */
-.selectHit {
+.selectHit,
+.detailHit {
   position: absolute;
   inset: 0;
   z-index: 3;
@@ -440,32 +392,44 @@
   cursor: pointer;
 }
 
-.selectHit:focus-visible {
+.selectHit:focus-visible,
+.detailHit:focus-visible {
   outline: 3px solid var(--color-white);
   outline-offset: -6px;
   border-radius: var(--center-card-radius);
 }
 
 /**
- * 카드 영역 호버 커서 = 시안의 `+` (Figma 2:1984 축소판).
+ * 카드 영역 호버 커서 = 시안의 `+` (Figma 2:1984).
+ * `cursor-plus.png` 는 192(@2x, 화질용). CSS `cursor:` 는 그 픽셀을 1:1 로
+ * 그려서 원사이즈(96)가 안 나오므로, 기본 커서는 숨기고 `.plusCursor` 가 따른다.
  * 폭이 아니라 `pointer: fine` 으로 가드한다 — 터치 노트북에서 커스텀 커서가
  * 손가락 제스처를 가리면 안 된다.
  */
 @media (hover: hover) and (pointer: fine) {
   .item .card,
   .item .card *,
-  .item:not(.itemActive) .card,
-  .item:not(.itemExpanded) .card,
   .selectHit,
-  .plus,
-  .itemExpanded .plus {
-    cursor: url("/main/cursor-plus.svg") 20 20, pointer;
+  .detailHit {
+    cursor: none;
   }
 }
 
-/* 그룹 모드(392)에서는 `+` 가 카피를 덮는다 */
-.itemGrouped .plus {
-  display: none;
+.plusCursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  width: 96px;
+  height: 96px;
+  background: url("/main/cursor-plus.png") center / 96px 96px no-repeat;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform;
+}
+
+.plusCursor[data-on] {
+  opacity: 1;
 }
 
 /* --- `≡` 그룹 토글 (Figma 2:1961) -----------------------------------------
@@ -646,7 +610,7 @@
   }
 
   .expanded,
-  .plus,
+  .detailHit,
   .controls {
     display: none;
   }
@@ -794,8 +758,9 @@
     display: none;
   }
 
-  /* 모바일 시안은 `+` 가 없다 (Figma 주석 "모바일에선 제거") */
-  .plus {
+  /* 모바일 시안은 `+` 커서가 없다 (Figma 주석 "모바일에선 제거").
+     카드 전체 링크도 스와이프와 겹치지 않게 끈다. */
+  .detailHit {
     display: none;
   }
 
@@ -816,7 +781,6 @@
   .media,
   .shortLabel,
   .arrow,
-  .plus,
   .dot,
   .dot::after,
   .navButton,

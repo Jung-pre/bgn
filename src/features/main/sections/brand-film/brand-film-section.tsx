@@ -55,6 +55,16 @@ const VIDEO_SRC = "/main/video_03_film.mp4";
 /** 모바일 노을 필름 (`…노을 버전_mo`, 1440×3200) */
 const VIDEO_SRC_MO = "/main/video_03_film_mo.mp4";
 const POSTER = "/main/img_03_poster02.webp";
+/**
+ * 모바일 전용 포스터.
+ *
+ * PC 포스터는 1280×720(16:9)이라 세로 화면에서 두 가지 문제를 만든다:
+ *  ① 영상이 디코딩되기 전 `<video>` 의 고유비가 포스터 비율로 잡혀
+ *     상자가 375×211 로 접힌다(모바일에서 영상이 "안 나오던" 원인).
+ *  ② 보이더라도 세로 화면에서 좌우가 크게 잘린다.
+ * 그래서 모바일 필름(1440×3200)의 로고가 다 맺힌 6초 프레임을 따로 구웠다.
+ */
+const POSTER_MO = "/main/img_03_poster-mo01.webp";
 
 const PLATE = "/main/img_03_poster01.webp";
 const OVERLAY_SPARK = "/main/img_03_overlay01.webp";
@@ -336,7 +346,7 @@ export function BrandFilmSection() {
             />
             <VideoSlot
               src={VIDEO_SRC_MO}
-              poster={POSTER}
+              poster={POSTER_MO}
               decorative
               className={`${styles.film} ${styles.filmMo}`}
               rootMargin="400px 0px"

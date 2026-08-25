@@ -41,10 +41,6 @@ export const HERO_ASSETS = {
   backdropMo: "/main/img_01_bg02_mo.webp",
   /** 8:2880 — soft-light 50% 로 깔리는 파티클 텍스처 */
   particles: "/main/img_01_particles01.webp",
-  /** 8:2948 — 롯데타워 + 스카이라인 (알파) */
-  tower: "/main/img_01_tower01.webp",
-  /** 8:759 — 타워 뒤에 크게 깔리는 `BGn` 워드마크 워터마크 (흰색 50% + blur 2) */
-  watermark: "/main/img_01_watermark01.svg",
 } as const;
 
 /** 파일이 `public/main/` 에 모두 들어와 있다. */
@@ -139,25 +135,6 @@ export const TOWER_CLOUDS_TOP: readonly TowerSprite[] = [
 
 /** 8:2892 = 8:2881 의 평행이동 복사본 (시안 px) */
 export const TOWER_CLOUD_TOP_OFFSET = { x: -55.31, y: 2 } as const;
-
-/**
- * `BGn` 워터마크 (8:759) — 타워 뒤, 상단 구름과 하단 구름 띠 **사이**에 깔린다.
- *
- * 시안에서는 vector 노드 하나이고 흰색 `fill-opacity 0.5` 에 `feGaussianBlur 2` 가
- * 걸려 있다. SVG 를 그대로 뽑아 `img_01_watermark01.svg` 로 넣었으므로 색·블러는
- * 파일이 갖고 있고 여기서는 좌표만 잡는다.
- *
- * 노드 박스는 374×225 @ (1447, 235) 인데, 블러가 번지는 만큼
- * (`inset -1.78% -1.07%`) 실제 그림은 382×233 @ (1443, 231) 이다. 그 값을 쓴다.
- */
-export const TOWER_WATERMARK: TowerSprite = {
-  node: "8:759",
-  src: "/main/img_01_watermark01.svg",
-  x: 1443,
-  y: 231,
-  w: 382,
-  h: 233,
-};
 
 /**
  * 하단 구름 띠 (8:2904) — 세 덩어리.

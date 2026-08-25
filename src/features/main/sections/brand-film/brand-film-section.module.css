@@ -131,7 +131,15 @@
   background: linear-gradient(0deg, rgb(248, 248, 249) 0%, rgba(248, 248, 249, 0) 100%);
 }
 
-.film {
+/**
+ * ⚠️ `.pinShell` 로 한 단계 감싸서 **specificity 를 올린다.**
+ *
+ * `VideoSlot` 의 `.root` 도 `position: relative; height: 100%` 이고 클래스 하나라
+ * 특정도가 같다. CSS 모듈 번들 순서상 `video-slot.module.css` 가 뒤에 실려
+ * 여기 `position: absolute` 가 **매번 졌다.** 그 결과 슬롯이 흐름 배치로 남아
+ * 부모 높이를 못 채우고 포스터의 고유비(16:9)로 주저앉았다.
+ */
+.pinShell .film {
   position: absolute;
   inset: 0;
 }
@@ -157,28 +165,35 @@
   .section[data-composite="true"] {
     height: 180vh;
   }
-  /**
-   * ⚠️ 100svh 로 두면 **로고타입이 좌우로 잘린다.**
-   *
-   * 포스터는 16:9(1920×1080)인데 375×812 상자에 `cover` 로 채우면 배율이
-   * 812/1080 = 0.752 라 가로로 1444px 이 되고, 화면에는 원본 x710~1209 만 남는다.
-   * 시안 `8:961` 의 `BGN` 로고타입은 x700~1240 이라 좌우가 각각 10px / 31px 잘린다.
-   * 실제 렌더에서도 B 의 왼쪽과 n 의 오른쪽이 화면 밖으로 나가 있었다.
-   *
-   * 68svh(≈552) 면 배율 0.511 → 보이는 구간이 원본 x593~1327 이라 로고가 다 들어온다.
-   * (모바일 시안에는 이 섹션 프레임 자체가 없다 — 의료진 2:3871 다음이 바로
-   *  AI 시스템 2:3928 이다. 그래서 기준으로 삼을 모바일 시안 값이 없다.)
-   */
   .pinShell {
     height: 100svh;
   }
 
   /**
-   * 세로 화면에서는 16:9 판을 **레터박스**로 놓고, 남는 위아래는 같은 포스터를
-   * 크게 흐려 깔아 메운다(단색 #345583 을 그대로 두면 하늘색 판이 뚝 끊긴다).
-   * `filter` 는 의사요소에만 걸리므로 형제 레이어(불티·타이포)에는 영향이 없다.
+   * ⚠️ **모바일에서 영상이 안 나오던 진짜 원인.**
+   *
+   * 위쪽 `.section[data-composite="false"] .pinShell { height: 100% }` 는
+   * 특정도가 (0,3,0) 이라 미디어쿼리 안의 `.pinShell { height: 100svh }` 를 이긴다.
+   * 그런데 PC 와 달리 모바일 섹션은 `aspect-ratio: unset` 이라 **높이가 불확정**이다
+   * → `height: 100%` 가 auto 로 떨어지고, 안쪽 슬롯도 auto → 결국 `<video>` 의
+   * 고유비(= 16:9 포스터)로 접혀 375×211 짜리 띠만 남았다. 나머지 601px 은
+   * 섹션 바닥색 `#345583` 이 그대로 드러난 것이다.
+   *
+   * 그래서 **영상 모드의 모바일 핀셸에 확정 높이**를 다시 준다.
    */
-  .pinShell::before {
+  .section[data-composite="false"] .pinShell {
+    height: 100svh;
+  }
+
+  /**
+   * 합성 연출 전용 레터박스 — 영상 모드에는 걸면 안 된다.
+   *
+   * 예전엔 이 `::before` 가 무조건 붙어서 위 `data-composite="false"` 규칙의
+   * 상단 그라디언트와 서로 덮어썼다(배경은 그라디언트가, filter 는 여기가 이겨
+   * 정체불명의 흐린 띠가 됐다). 모바일 필름은 1440×3200 **세로 컷**이라
+   * 레터박스 자체가 필요 없다.
+   */
+  .section[data-composite="true"] .pinShell::before {
     content: "";
     position: absolute;
     inset: -10%;
@@ -188,20 +203,29 @@
     transform: scale(1.15);
   }
 
-  .layer,
-  .layerAdd,
-  .fireworks {
+  .section[data-composite="true"] .layer,
+  .section[data-composite="true"] .layerAdd,
+  .section[data-composite="true"] .fireworks {
     top: 50%;
     bottom: auto;
-    /**
-     * 높이 상한은 **로고타입이 잘리지 않는 최댓값**이다.
-     * `cover` 라 화면에 보이는 원본 가로 구간 = 뷰포트폭 × 1080 / 높이.
-     * 시안 로고타입이 원본 x700~1240(540) 이므로 여유 20 을 두고 560 이상이 필요:
-     *   뷰포트폭 × 1080 / H ≥ 560  →  H ≤ 뷰포트폭 × 1.93
-     * 375 에서 712px. 100svh(812)를 그대로 쓰면 보이는 구간이 498 이라 좌우가 잘린다.
-     */
     height: min(100svh, 190vw);
     translate: 0 -50%;
+  }
+
+  /**
+   * 앞뒤 섹션 이음매 — PC 와 같은 방식이되 **모바일 실측값**으로 맞춘다.
+   * 위(의료진 바닥)는 좌 238,212,230 → 중앙 214,224,244 → 우 184,212,246 의
+   * 가로 그라디언트라 섹션의 `::before` 지우개가 그대로 받는다.
+   * 아래(AI 시스템 상단)는 PC 의 248,248,249 가 아니라 **226,229,241** 이다.
+   * 세로 화면은 폭 대비 높이가 커서 160px 로는 경계가 티가 나므로 22svh 로 넓힌다.
+   */
+  .section[data-composite="false"] .pinShell::before,
+  .section[data-composite="false"] .pinShell::after {
+    height: 22svh;
+  }
+
+  .section[data-composite="false"] .pinShell::after {
+    background: linear-gradient(0deg, rgb(226, 229, 241) 0%, rgba(226, 229, 241, 0) 100%);
   }
 }
 

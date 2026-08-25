@@ -12,12 +12,8 @@ import type { HeroSectionMessages } from "@/shared/i18n/messages";
 import {
   HERO_ASSETS,
   HERO_ASSETS_READY,
-  TOWER_CLOUD_BANDS,
-  TOWER_CLOUD_TOP_OFFSET,
-  TOWER_CLOUDS_TOP,
   TOWER_LINES,
   TOWER_STAGE,
-  TOWER_WATERMARK,
   type TowerSprite,
 } from "./hero-assets";
 import { getGlobeTune } from "./globe-tune";
@@ -137,10 +133,11 @@ function glRibbonsSnapshot() {
 
 export function HeroSection({ messages }: HeroSectionProps) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
+  const sphereBgRef = useRef<HTMLDivElement>(null);
+  /** 셰이더 리본 래퍼 — 은하수와 크로스페이드하려고 불투명도를 직접 쓴다 */
+  const glLinesRef = useRef<HTMLDivElement>(null);
   const sphereLayerRef = useRef<HTMLDivElement>(null);
   const towerLayerRef = useRef<HTMLDivElement>(null);
-  /** 타워·하늘만 확대. 띠는 밖에 둬서 전환이 끝나는 순간 스케일이 틱하지 않게 한다. */
-  const towerRiseRef = useRef<HTMLDivElement>(null);
   const copySphereRef = useRef<HTMLDivElement>(null);
   const copyTowerRef = useRef<HTMLDivElement>(null);
   /**
@@ -215,11 +212,13 @@ export function HeroSection({ messages }: HeroSectionProps) {
    * `steps: 2` 로 두고 실제 크로스페이드는 progress 로 직접 그린다.
    */
   const { sectionRef, pinRef, progressRef } = usePinnedProgress({
-    steps: 2,
+    /**
+     * 2 → 3. 은하수 구간을 실제로 "보이게" 하려면 스크롤 예산이 필요하다.
+     * 200vh 에서는 확대·은하수·라인·타워가 100vh 안에 다 들어가 은하수가
+     * 서너 프레임 만에 스쳐 지나갔다. 300vh 면 각 단계가 눈에 남는다.
+     */
+    steps: 3,
     scrub: 1,
-    /* 인덱스는 JSX 가 안 쓴다. 기본 매핑은 p=0.5 에서 setState 가 떠서
-       전환 중 히어로가 리렌더되고 띠 위치가 한 프레임 튄다. */
-    mapProgress: () => 0,
     onProgress: (p) => {
       // ⚠️ 매 프레임 호출된다. setState 금지. 스타일만 직접 쓴다.
       if (reducedRef.current === null) reducedRef.current = prefersReducedMotionSync();
@@ -228,39 +227,109 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const t = clamp01((p - fadeStart) / span);
       const sphere = sphereLayerRef.current;
       const tower = towerLayerRef.current;
-      const riseLayer = towerRiseRef.current;
       const host = canvasHostRef.current;
       const reduced = reducedRef.current === true;
       if (reduced) {
+        if (sphereBgRef.current) sphereBgRef.current.style.opacity = "";
+        if (host) host.style.opacity = "";
+        if (glLinesRef.current) glLinesRef.current.style.opacity = "";
+        if (stageClipRef.current) stageClipRef.current.style.opacity = "";
         if (sphere) {
+          sphere.style.zIndex = "";
           sphere.style.opacity = String(1 - t);
           sphere.style.transform = "none";
         }
         if (host) host.style.transform = "scale(1)";
-        if (tower) tower.style.opacity = String(t);
-        if (riseLayer) riseLayer.style.transform = "scale(1)";
+        if (tower) {
+          tower.style.opacity = String(t);
+          tower.style.transform = "scale(1)";
+        }
       } else {
         /* 확대는 캔버스 CSS 가 아니라 3D 그룹이 맡는다(scene-sphere).
            여기서 키우면 픽셀이 늘어나 흐려진다. */
         if (host) host.style.transform = "scale(1)";
-        /* 구체가 화면을 채운 뒤에야 투명해진다. 타워와 겹치지 않는다. */
-        const dump = clamp01((t - 0.58) / 0.2);
-        const dumpEase = dump * dump * (3 - 2 * dump);
-        if (sphere) {
-          sphere.style.opacity = String(1 - dumpEase);
-          sphere.style.transform = "none";
+        /**
+         * 수정요청(26.08.25) — 구체 → **은하수** → 라인 → 타워.
+         *
+         * 예전 값(dump 0.58, rise 0.74)은 구체가 최대로 커진 직후 바로 지워서,
+         * 파티클이 원반으로 펴지는 장면이 화면에 **한 번도 안 남았다**
+         * (진행도 0.6 근처가 흰 화면 한 장이었다).
+         *
+         * 이제 은하수(scene-sphere 의 CUE.galaxy = 0.40~0.72)가 다 펴지고
+         * 라인이 올라온 **뒤에야** 파티클을 걷는다. 0.88 부터 0.99 까지 —
+         * 은하수를 보여주는 구간이 실제 스크롤로 충분히 길어야 한다는 요청 때문에
+         * 핀 길이도 200vh → 300vh 로 늘렸다.
+         */
+        /**
+         * ## 순서: **2번 섹션 배경 먼저 → 그 위에 은하수 → 라인**
+         *
+         * 수정요청(26.08.25-2): "검은 배경 같은 거 쓰지 마. 2번 섹션 bg 가 먼저
+         * 나오고 은하수가 그 위에 모이고, 그다음에 라인으로 바뀌게."
+         *
+         * 앞 버전은 은하수 구간에 어두운 딤을 깔았다. 파티클이 가산 블렌딩이라
+         * 밝은 하늘 위에서 묻히는 걸 배경을 눌러 해결했는데, 그 결과 히어로 한가운데
+         * **검은 화면**이 생겼다 — 시안에 없는 톤이다.
+         *
+         * 대신 **타워 하늘을 먼저 깔았다.** 타워 상단이 중간 톤 블루(140,180,234)라
+         * 가산 흰 입자가 그대로 산다. 구체 쪽 파스텔 하늘(거의 흰색)만 빠지면 된다.
+         *
+         * 그래서 레이어를 셋으로 쪼개 각자 다른 곡선을 준다:
+         *   · `.sphereBg`  (파스텔 하늘) — 먼저 빠진다
+         *   · `.towerLayer` (2번 섹션 배경) — 그 자리를 먼저 채운다
+         *   · `.canvasHost` (파티클)      — 맨 마지막에 빠진다
+         */
+        const bgIn = clamp01((t - 0.22) / 0.22);
+        const bgEase = bgIn * bgIn * (3 - 2 * bgIn);
+
+        /* 구체 하늘이 빠지고 타워 하늘이 그 자리를 받는다 */
+        const sbg = sphereBgRef.current;
+        if (sbg) sbg.style.opacity = String(1 - bgEase);
+        if (tower) {
+          tower.style.opacity = String(bgEase);
+          /* 크게 들어와 자리 잡는 인상은 유지하되, 은하수와 겹치는 동안은
+             거의 제자리여야 배경이 흔들리지 않는다 */
+          tower.style.transform = `scale(${1.16 - bgEase * 0.16})`;
         }
-        /* 구체가 거의 사라진 뒤에 타워가 조금 큰 채로 들어와 자리 잡는다.
-           스케일은 타워·하늘만. 띠까지 줄이면 전환이 끝나는 순간 한 번 틱한다. */
-        const rise = clamp01((t - 0.74) / 0.2);
-        const riseEase = rise * rise * (3 - 2 * rise);
-        if (tower) tower.style.opacity = String(riseEase);
-        if (riseLayer) riseLayer.style.transform = `scale(${1.38 - riseEase * 0.38})`;
+
+        /**
+         * ⚠️ 파티클을 타워 **위**로 올린다.
+         *
+         * 두 레이어 다 `--z-canvas-bg: 0` 이라 DOM 순서상 타워가 위에 그려진다.
+         * 그대로 두면 배경을 먼저 깐 순간 은하수가 뒤로 숨는다.
+         * `.sphereLayer` 는 will-change 로 자체 스태킹 컨텍스트라 자식 z-index 로는
+         * 못 빠져나온다 — **레이어 자체**를 올려야 한다.
+         * (마퀴도 같이 올라오지만 이 시점엔 이미 투명하다.)
+         */
+        if (sphere) {
+          sphere.style.opacity = "1";
+          sphere.style.transform = "none";
+          sphere.style.zIndex = bgIn > 0.001 ? "1" : "";
+        }
+
+        /**
+         * ## 은하수 ↔ 라인 **크로스페이드**
+         *
+         * 수정요청: "라인은 처음에는 안 나와. 배경 나오고 → 은하수 자리 잡고 →
+         * 은하수 fade out 되면서 라인이 fade in."
+         *
+         * 앞 버전은 타워 레이어를 통째로 띄워서 실크 라인이 **배경과 같이** 들어왔다.
+         * 그러면 은하수가 자리 잡기도 전에 라인이 이미 보여서 "파티클이 라인이 된다"는
+         * 인과가 사라진다. 라인만 따로 잡아 은하수가 빠지는 곡선의 **거울상**으로 넣는다.
+         */
+        const { gxCrossStart, gxCrossEnd } = getGlobeTune();
+        const cross = clamp01(
+          (t - gxCrossStart) / Math.max(0.02, gxCrossEnd - gxCrossStart),
+        );
+        const crossEase = cross * cross * (3 - 2 * cross);
+        if (host) host.style.opacity = String(1 - crossEase);
+        if (glLinesRef.current) glLinesRef.current.style.opacity = String(crossEase);
+        /* WebGL 미지원 폴백(정지 PNG 띠)도 같은 곡선을 탄다 */
+        if (stageClipRef.current) stageClipRef.current.style.opacity = String(crossEase);
       }
       const cs = copySphereRef.current;
       const ct = copyTowerRef.current;
-      if (cs) cs.style.opacity = String(1 - clamp01(t * 1.9));
-      if (ct) ct.style.opacity = String(clamp01((t - 0.72) * 3.2));
+      if (cs) cs.style.opacity = String(1 - clamp01(t * 2.4));
+      if (ct) ct.style.opacity = String(clamp01((t - 0.86) * 6));
       // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)
       const mq = marqueeRef.current;
       if (mq) mq.style.opacity = String(1 - clamp01(t * 2.4));
@@ -275,8 +344,12 @@ export function HeroSection({ messages }: HeroSectionProps) {
        * 패럴랙스 — 타워가 등장한 뒤 구간을 다시 0~1 로 편다.
        * 뒤판은 한 장(가장 멀다), 광선만 더 빨리 흘린다.
        */
-      /* 물결은 타워가 받기 시작할 때 같이 착지한다 */
-      const ribbonIn = fadeStart + span * 0.7;
+      /**
+       * 물결(라인)은 **은하수가 다 펴진 직후**에 올라온다.
+       * 요청: "파티클들만 은하수를 먼저 보여주고 라인들이 나와야 해."
+       * CUE.galaxy 가 t=0.72 에 끝나므로 그 지점을 시작으로 잡는다.
+       */
+      const ribbonIn = fadeStart + span * 0.72;
       const u = reducedRef.current ? 0 : clamp01((p - ribbonIn) / (1 - ribbonIn));
       shift(pxBackdropRef.current, 0.6 * u, -1.1 * u);
       /* 셰이더 판은 그룹 이동까지 캔버스 안에서 처리한다 — 여기서 또 밀면 두 배가 된다 */
@@ -432,13 +505,13 @@ export function HeroSection({ messages }: HeroSectionProps) {
       ref={sectionRef}
       className={styles.section}
       /* 구체 → 타워 전환에 스크롤 2화면을 쓴다 */
-      style={{ height: "200vh" }}
+      style={{ height: "300vh" }}
       aria-label="Hero"
     >
       <div ref={pinRef} className={styles.pinShell}>
         {/* ── 배경 레이어 ─────────────────────────────────────────────── */}
         <div ref={sphereLayerRef} className={styles.sphereLayer} aria-hidden>
-          <div className={styles.sphereBg} />
+          <div ref={sphereBgRef} className={styles.sphereBg} />
 
           {/* 시그니처 마퀴 — Figma 2:410 : top 583, Marcellus 108px, `*` 구분자.
               ⚠️ 자리가 여기인 게 중요하다: **배경 뒤, 캔버스 앞**.
@@ -464,7 +537,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
             시안에서는 타워/광선이 카피 위에 있지만, 타워가 본문을 덮으면
             가독성이 떨어져서 카피는 그대로 위(z-content)에 둔다. */}
         <div ref={towerLayerRef} className={styles.towerLayer} aria-hidden>
-          <div ref={towerRiseRef} className={styles.towerRise}>
           <div className={styles.towerSky} />
           {HERO_ASSETS_READY && towerMounted ? (
             <>
@@ -502,58 +574,8 @@ export function HeroSection({ messages }: HeroSectionProps) {
                   </div>
                 </div>
 
-                {/* 상단 구름 — 8:2881 + 평행이동 복사본 8:2892. 타워 첨탑 주변
-                    하늘을 뿌옇게 만든다(스프라이트 opacity 40%, 블렌드 없음). */}
-                <div className={styles.cloudTop} aria-hidden>
-                  {TOWER_CLOUDS_TOP.map((c) => (
-                    <TowerSpriteImg key={c.node} sprite={c} />
-                  ))}
-                  {TOWER_CLOUDS_TOP.map((c) => (
-                    <TowerSpriteImg
-                      key={`${c.node}-b`}
-                      sprite={{
-                        ...c,
-                        node: `${c.node}-b`,
-                        x: c.x + TOWER_CLOUD_TOP_OFFSET.x,
-                        y: c.y + TOWER_CLOUD_TOP_OFFSET.y,
-                      }}
-                    />
-                  ))}
-                </div>
-
-                {/* BGN 워터마크 — 8:759. **타워 뒤**(상단 구름과 하단 구름 띠 사이) */}
-                <TowerSpriteImg sprite={TOWER_WATERMARK} />
-
-                {/* 롯데타워 — 8:2946. 시안(2:493)의 우측 기둥.
-                    직전 리팩터링에서 빠져 하늘만 남아 있었다(2차 수정 확인 중 발견).
-                    8:2947 `bg` 사각형이 마스크라 그 박스로 먼저 자르고 사진을 넣는다.
-                    띠(stageClip·WebGL 캔버스)보다 **앞에 두면 안 된다** — 시안에서
-                    띠가 타워를 가로질러 지나간다. */}
-                <div className={styles.towerCrop}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className={styles.towerPic}
-                    src={HERO_ASSETS.tower}
-                    alt=""
-                    decoding="async"
-                    loading="lazy"
-                  />
-                </div>
-
-                {/* 하단 구름 띠 — 8:2904 세 덩어리, soft-light. 타워 밑동과
-                    스카이라인을 안개로 감싼다(시안에서 타워 **앞**이다). */}
-                {TOWER_CLOUD_BANDS.map((band, bi) => (
-                  <div
-                    key={`band-${bi}`}
-                    className={clsx(styles.px, styles.cloudBand)}
-                    data-band={bi}
-                    aria-hidden
-                  >
-                    {band.map((c) => (
-                      <TowerSpriteImg key={c.node} sprite={c} />
-                    ))}
-                  </div>
-                ))}
+                {/* 워터마크 SVG·구름·타워 스프라이트는 쓰지 않는다.
+                    뒤판(`img_01_bg02`) 한 장에 이미 들어 있다. */}
 
                 {/* 광선/웨이브 — 8:2949. 시안에서 프레임 마스크로 잘려 있다.
                     clip 을 패럴랙스 래퍼 바깥에 둬야 잘리는 사각형이 안 움직인다.
@@ -584,7 +606,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
               </div>
             </>
           ) : null}
-          </div>
 
           {/**
            * 띠 캔버스 — 타워 에셋과 **따로, 더 일찍** 올린다.
@@ -600,7 +621,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
            * 위치는 타워 블록 **뒤**다 — 형제 순서가 곧 z 순서라 띠가 타워 위에 온다.
            */}
           {glRibbons ? (
-            <div className={styles.stageClip}>
+            <div ref={glLinesRef} className={styles.stageClip}>
               <RibbonScene progressRef={ribbonProgressRef} active={sceneActive} />
             </div>
           ) : null}

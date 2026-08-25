@@ -64,12 +64,13 @@ const RECOMMEND_SCORES = [98, 91, 88] as const;
 /** 2:1178. i18n messages 에 없는 문구라 시안 리터럴로 둔다(문구 추가 필요 — 보고 참조). */
 const RECOMMEND_HEAD = "추천시력교정술";
 
-/** 카드 스태거 간격(초). 기획안의 "짧은 시차" — 0.13 이 4장에서 '쫘라라락'으로 읽힌다. */
-const CARD_STEP = 0.13;
-/** 카드 등장이 시작되는 타임라인 위치 — 헤드라인 wipe 와 살짝 겹친다. */
-const CARD_AT = 0.35;
+/** 카드 스태거(초). 0.13 이면 4장이 겹쳐 '쫘라락'으로 보여 순서가 안 읽힌다.
+ *  한 장이 자리를 잡은 뒤 다음이 따라오게 둔다. */
+const CARD_STEP = 0.4;
+/** 카드 타임라인은 그리드가 뷰포트에 들어올 때 시작하므로 0. */
+const CARD_AT = 0;
 /** 카드가 안착한 뒤 비주얼이 시작되기까지의 지연 */
-const VIZ_DELAY = 0.35;
+const VIZ_DELAY = 0.28;
 
 export function AiSystemSection({ messages }: AiSystemSectionProps) {
   const sectionRef = useRef<HTMLElement>(null);
@@ -132,9 +133,10 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         value.textContent = formatNumeric(0, spec);
       }
 
+      const grid = section.querySelector("[data-ai-grid]");
+
       const tl = gsap.timeline({
         defaults: { ease: "power3.out" },
-        // 카드 4장이 다 보이기 전에 터지면 마지막 장이 화면 밖에서 끝난다 → 조금 늦게.
         scrollTrigger: { trigger: section, start: "top 78%", once: true },
       });
 
@@ -147,13 +149,20 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         // scaleX 로 키우면 안에 든 글자까지 눌려 보이므로 wipe 로 연다.
         .to(decos, { clipPath: "inset(0 0% 0 0)", duration: 0.7, clearProps: "clipPath" }, 0.25);
 
-      tl.to(
+      /* 카드는 섹션 전체가 아니라 **그리드가 보일 때** 시작한다.
+         예전엔 섹션 top 78% 에서 이미 끝나, 카드 구간에 도착하면 4장이 다 떠 있었다. */
+      const cardTl = gsap.timeline({
+        defaults: { ease: "power3.out" },
+        scrollTrigger: { trigger: grid ?? section, start: "top 82%", once: true },
+      });
+
+      cardTl.to(
         cards,
         {
           autoAlpha: 1,
           y: 0,
           scale: 1,
-          duration: 0.8,
+          duration: 0.7,
           stagger: CARD_STEP,
           clearProps: "opacity,visibility,transform",
         },
@@ -165,7 +174,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
         const cardDraws = pick<SVGGeometryElement>(card, "[data-draw]");
         if (cardDraws.length > 0) {
-          tl.to(
+          cardTl.to(
             cardDraws,
             { strokeDashoffset: 0, duration: 1.1, ease: "power2.inOut", stagger: 0.08 },
             at,
@@ -174,7 +183,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
         const cardArts = pick<HTMLImageElement>(card, "[data-art]");
         if (cardArts.length > 0) {
-          tl.to(
+          cardTl.to(
             cardArts,
             {
               autoAlpha: 1,
@@ -189,7 +198,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
         const cardRows = pick<HTMLElement>(card, "[data-row]");
         if (cardRows.length > 0) {
-          tl.to(
+          cardTl.to(
             cardRows,
             { autoAlpha: 1, x: 0, duration: 0.5, stagger: 0.08, clearProps: "opacity,transform" },
             at + 0.15,
@@ -198,7 +207,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
         const cardBadges = pick<HTMLElement>(card, "[data-badge]");
         if (cardBadges.length > 0) {
-          tl.to(
+          cardTl.to(
             cardBadges,
             {
               autoAlpha: 1,
@@ -214,7 +223,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         }
 
         const counter = counters.find((entry) => entry.card === card);
-        if (counter) tl.add(countUpTween(counter.value, counter.spec), at + 0.2);
+        if (counter) cardTl.add(countUpTween(counter.value, counter.spec), at + 0.2);
       });
 
       /**
@@ -227,7 +236,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
 
       const replayViz = (card: HTMLElement) => {
         if (!hoverable.matches || prefersReducedMotionSync()) return;
-        if (tl.isActive() || tl.progress() < 1) return;
+        if (cardTl.isActive() || cardTl.progress() < 1) return;
 
         hoverTls.get(card)?.kill();
 
@@ -299,7 +308,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
           휠이 통째로 네이티브로 새면서 페이지가 한 번에 튀고 GNB 가 깜빡였다.
           내부 스크롤 판별은 Lenis 의 `allowNestedScroll` 이 축까지 보고 처리한다
           (`smooth-scroll-provider.tsx`) — 모바일 가로 스와이프는 그대로 산다. */}
-      <ol className={styles.grid}>
+      <ol className={styles.grid} data-ai-grid>
         {messages.steps.map((step, index) => (
           <li
             key={step.step}

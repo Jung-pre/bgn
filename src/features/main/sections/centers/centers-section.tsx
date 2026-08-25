@@ -1,13 +1,18 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 import clsx from "clsx";
 import Link from "next/link";
+import { MQ } from "@/shared/config/breakpoints";
 import { useIsMobileLayout } from "@/shared/lib/use-media-query";
 import { useSectionReveal } from "@/features/main/sections/common/use-section-reveal";
 import type { CentersSectionMessages } from "@/shared/i18n/messages";
 import { useCentersAccordion, GROUP_REVEAL_AFTER } from "./use-centers-accordion";
 import styles from "./centers-section.module.css";
+
+/** `cursor-plus.png` 는 192(@2x). 화면 표시는 원사이즈 96, 핫스팟은 원 중심. */
+const PLUS_CURSOR = 96;
+const PLUS_HOTSPOT = PLUS_CURSOR / 2;
 
 /**
  * 진료 센터 — 가로 아코디언. Figma `2:1950` / Container `2:1951`.
@@ -155,6 +160,38 @@ export function CentersSection({ messages }: CentersSectionProps) {
      모바일은 스와이퍼라 6장이 전부 보인다 — 거기서 창 밖 카드를
      aria-hidden 처리하면 실제로 보이는 카드가 스크린리더에서 사라진다. */
   const windowed = !isMobile;
+  const trackWrapRef = useRef<HTMLDivElement>(null);
+  const plusCursorRef = useRef<HTMLDivElement>(null);
+
+  /* 커스텀 `cursor:` 는 192 PNG 를 1:1 로 그려 Chrome 128 제한에 걸린다.
+     2x 에셋은 화질용이고, 표시는 96 CSS px 고정이어야 해서 DOM 으로 그린다.
+     좌표는 ref 에 직접 쓴다 — 매 프레임 setState 금지. */
+  useEffect(() => {
+    const wrap = trackWrapRef.current;
+    const cursor = plusCursorRef.current;
+    if (!wrap || !cursor) return;
+    if (!window.matchMedia(MQ.hoverable).matches) return;
+
+    const move = (e: PointerEvent) => {
+      const overCard = (e.target as Element | null)?.closest?.(`.${styles.item}`);
+      if (!overCard) {
+        delete cursor.dataset.on;
+        return;
+      }
+      cursor.dataset.on = "";
+      cursor.style.transform = `translate3d(${e.clientX - PLUS_HOTSPOT}px, ${e.clientY - PLUS_HOTSPOT}px, 0)`;
+    };
+    const leave = () => {
+      delete cursor.dataset.on;
+    };
+
+    wrap.addEventListener("pointermove", move);
+    wrap.addEventListener("pointerleave", leave);
+    return () => {
+      wrap.removeEventListener("pointermove", move);
+      wrap.removeEventListener("pointerleave", leave);
+    };
+  }, []);
 
   return (
     <section
@@ -169,7 +206,7 @@ export function CentersSection({ messages }: CentersSectionProps) {
         {messages.title}
       </h2>
 
-      <div className={styles.trackWrap} data-reveal-item>
+      <div ref={trackWrapRef} className={styles.trackWrap} data-reveal-item>
         <ul
           ref={trackRef}
           className={styles.track}
@@ -269,35 +306,24 @@ export function CentersSection({ messages }: CentersSectionProps) {
                   </span>
 
                   {/**
-                   * 역할 분리 — 이게 이 컴포넌트의 핵심 규칙이다.
+                   * 시안의 `+`(Figma 2:1984)는 카드 위 버튼이 아니라 **마우스 포인터**다.
                    *
-                   * 예전에는 카드 전체가 하나의 `<Link>` 였고 "1탭 펼치기 / 2탭 이동"
-                   * 이었다. 그런데 펼쳐진 뒤에는 카드 아무 데나 눌러도 페이지가 넘어가서,
-                   * 사진을 보려고 클릭했다가 이동해 버린다. 시안이 `+` 를 크게 그려 둔
-                   * 이유가 있다 — **이동 버튼은 `+` 다.**
+                   *   옆(비활성) 카드 → 펼치기만. 상세로 가지 않는다
+                   *   이미 열린 카드   → 그 클릭만 상세 링크
                    *
-                   *   접힌 카드  → 카드 전체가 "펼치기" 버튼
-                   *   펼친 카드  → `+` 만 상세로 가는 링크, 나머지는 아무 동작 없음
+                   * 링크 여부는 `expanded` 가 아니라 **활성 인덱스**다. `≡` 그룹
+                   * 모드에서는 4장이 동시에 펼쳐지는데, 옆 장을 눌러도 이동하면 안 된다.
                    *
-                   * 두 요소가 배타적으로만 렌더되므로 같은 자리에서 포커스가 겹치지 않는다.
+                   * 포커스에서 select 하지 않는다. mousedown → focus → select 로
+                   * 버튼이 링크로 바뀌면 같은 클릭이 이동으로 새어 나간다.
                    */}
-                  {expanded ? (
+                  {i === activeIndex ? (
                     <Link
                       href={center.href}
-                      className={styles.plus}
+                      className={styles.detailHit}
                       aria-label={`${center.name} 자세히 보기`}
                       tabIndex={collapsed ? -1 : undefined}
-                    >
-                      <svg viewBox="0 0 48 48" aria-hidden focusable="false">
-                        <path
-                          d="M24 10v28M10 24h28"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    </Link>
+                    />
                   ) : (
                     <button
                       type="button"
@@ -305,8 +331,6 @@ export function CentersSection({ messages }: CentersSectionProps) {
                       aria-label={`${center.name} 펼치기`}
                       aria-expanded={false}
                       tabIndex={collapsed ? -1 : undefined}
-                      /* 키보드 tab 이동만으로도 카드가 펼쳐져야 내용을 읽을 수 있다 */
-                      onFocus={() => select(i)}
                       onClick={() => select(i)}
                     />
                   )}
@@ -376,6 +400,7 @@ export function CentersSection({ messages }: CentersSectionProps) {
           </button>
         </div>
       </div>
+      <div ref={plusCursorRef} className={styles.plusCursor} aria-hidden />
     </section>
   );
 }

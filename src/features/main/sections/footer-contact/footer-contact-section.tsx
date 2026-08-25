@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
@@ -157,6 +158,7 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
               haze={0.48}
               showCore={false}
               interactive={false}
+              pointerFollow
               fitSize={0.81}
             />
           </div>
@@ -182,14 +184,18 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
           decoding="async"
         />
         {/* 시안 8:2770 우측 — 잠실 도심 + 롯데타워 와이어프레임(알파 버전 wire-3) */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className={styles.wireCity}
-          src="/main/img_12_wire03.webp"
-          alt=""
-          loading="lazy"
-          decoding="async"
-        />
+        <div className={styles.wireCityClip}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className={styles.wireCity}
+            src="/main/img_12_wire03.webp"
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+          {/* 타워 선화 위로만 하이라이트. 공중에 떠 있는 + 점은 쓰지 않는다. */}
+          <span className={styles.towerSheen} />
+        </div>
       </div>
       {/* 시안 2:2903 / 2:2902 장식 원. 선화와 같이 카피 페이드인 때 나온다.
           plus-lighter 그룹 밖에 둔다 — 같이 넣으면 1px 선이 빛줄기처럼 굵어진다. */}
@@ -257,7 +263,7 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
                 </div>
               ))}
             </dl>
-            <p className={styles.hoursNote}>{messages.hoursNote}</p>
+            {messages.hoursNote ? <p className={styles.hoursNote}>{messages.hoursNote}</p> : null}
           </div>
         </div>
 
@@ -289,14 +295,17 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
           </div>
 
           <div className={styles.bottomRight}>
-            {/* 시안 2:2968 은 199×30 벡터 로고다. SVG 에셋이 없어 텍스트로 대체. */}
+            {/* 시안 2:2968 — 199×30. 에셋은 2x PNG `logo_footer.png`(398×60). */}
             <p className={styles.logo}>
-              <span className={styles.logoMark} lang="en">
-                BGN
-              </span>
-              <span className={styles.logoName}>밝은눈안과병원</span>
+              <Image
+                src="/main/logo_footer.png"
+                alt="BGN 밝은눈안과병원"
+                width={199}
+                height={30}
+                className={styles.logoImage}
+              />
             </p>
-            <p className={styles.copyright} lang="en">
+            <p className={styles.copyright} lang="en" data-font="body">
               {messages.copyright}
             </p>
           </div>

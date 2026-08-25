@@ -540,15 +540,15 @@ const ko: Dictionary = {
       "BGN밝은눈안과 잠실점은\n9세부터 80세까지 당신의 평생의 눈 건강을\n믿고 맡길 수 있는 곳이 되도록 노력하겠습니다",
     ],
     tel: "1600-5770",
-    closedNotice: "일요일 휴진 | 공휴일 정상 진료(본원 사정에 따라 변동)",
-    hoursNote: "* 일요일은 정기 휴진입니다.",
+    closedNotice: "일요일 정기 휴진 | 공휴일 정상 진료(본원 사정에 따라 변동)",
+    hoursNote: "",
     branches: [
       {
         id: "jamsil",
         label: "BGN밝은눈안과의원 잠실",
         address: "서울특별시 송파구 올림픽로 300 롯데월드타워 11층",
         hours: [
-          { label: "평일(월~금)", value: "09:30 - 18:00" },
+          { label: "평일", value: "09:30 - 18:00" },
           { label: "토요일", value: "09:30 - 17:00" },
           { label: "점심시간", value: "13:00 - 14:00" },
         ],

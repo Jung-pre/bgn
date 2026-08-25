@@ -64,16 +64,8 @@
   position: absolute;
   inset: 0;
   z-index: var(--z-canvas-bg);
-  will-change: opacity;
+  will-change: opacity, transform;
   transform-origin: 50% 48%;
-}
-
-/* 타워 등장 확대. 띠(WebGL)는 이 래퍼 밖에 둬서 스케일 종료 틱을 안 탄다. */
-.towerRise {
-  position: absolute;
-  inset: 0;
-  transform-origin: 50% 48%;
-  will-change: transform;
 }
 
 .towerLayer {
@@ -170,10 +162,8 @@
 
 .towerSkyImg {
   position: absolute;
-  /* 납품 플레이트(img_01_bg02)는 창백한 라벤더라 그대로 깔면 .towerSky 의
-     블루를 전부 덮어 하늘이 하얗게 뜬다. 텍스처만 살리고 톤은 그라데이션이
-     쥐도록 0.3 — 스윕 계측에서 MAE 19.55 → 18.0. */
-  opacity: 0.3;
+  /* 플레이트 한 장 = 하늘·타워·BGN. SVG 워터마크를 얹지 않는다. */
+  opacity: 1;
   inset: 0;
   width: 100%;
   height: 100%;

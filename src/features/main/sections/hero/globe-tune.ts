@@ -70,6 +70,37 @@ export type GlobeTune = {
   /* --- 타워 크로스페이드 (`hero-section` onProgress) ----------------------- */
   fadeStart: number;
   fadeEnd: number;
+
+  /* --- 은하수 (구체 → 라인 전환) ------------------------------------------
+   * 좌표계: 구체 반경(1.69) 배수. 각도는 도(°).
+   * 기울기는 **고정**이다 — 전환 중에 돌지 않는다.
+   */
+  /** 화면상 기울기. +30 = 8시→2시(좌하→우상), -20 = 10시→4시(2번 섹션 라인) */
+  gxTiltDeg: number;
+  /** 깊이 회전. 0 이면 완전한 평면이라 벽에 붙은 그림이 된다 */
+  gxYawDeg: number;
+  /** 가로 위치 */
+  gxX: number;
+  /** 세로 위치 */
+  gxY: number;
+  /** 좌우 길이. 화면 밖까지 나가려면 5 이상 */
+  gxLength: number;
+  /** 밴드 두께 */
+  gxThick: number;
+  /** 파형 진폭 */
+  gxAmp: number;
+  /** 밴드 사이 세로 간격 */
+  gxGap: number;
+  /** 밴드 개수 1~3 */
+  gxBands: number;
+  /** 은하수일 때 배율(축소량). 클수록 작아진다 */
+  gxShrink: number;
+  /** 형성 구간 — 전환 진행도 t(0~1) */
+  gxStart: number;
+  gxEnd: number;
+  /** 은하수 → 라인 크로스페이드 구간 */
+  gxCrossStart: number;
+  gxCrossEnd: number;
 };
 
 /** 패널에서 확정한 히어로 실측값. */
@@ -115,6 +146,21 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
 
   fadeStart: 0.16,
   fadeEnd: 0.78,
+
+  gxTiltDeg: 15,
+  gxYawDeg: 15,
+  gxX: 0.08,
+  gxY: -1.2,
+  gxLength: 5.4,
+  gxThick: 1.45,
+  gxAmp: 0.62,
+  gxGap: 0.14,
+  gxBands: 3,
+  gxShrink: 3.8,
+  gxStart: 0.29,
+  gxEnd: 0.64,
+  gxCrossStart: 0.29,
+  gxCrossEnd: 0.92,
 };
 
 let current: GlobeTune = { ...GLOBE_TUNE_DEFAULTS };
