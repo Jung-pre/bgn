@@ -153,8 +153,8 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
             <SphereScene
               active={earthActive}
               progressRef={earthProgressRef}
-              intensity={0.82}
-              haze={0.7}
+              intensity={0.58}
+              haze={0.48}
               showCore={false}
               interactive={false}
               fitSize={0.81}

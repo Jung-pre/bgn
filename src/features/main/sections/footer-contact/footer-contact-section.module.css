@@ -192,11 +192,12 @@
   will-change: opacity;
 }
 
-/* 선화·코너 글로우만 시안 792 프레임에 맞춘다.
-   지구는 핀된 100vh 를 채워야 히어로와 비슷한 크기가 나온다. */
+/* 선화·링만 시안 792 프레임에 맞춘다.
+   지구는 핀된 100vh 를 채워야 히어로와 비슷한 크기가 나온다.
+   코너 글로우(`::after`)는 여기 넣지 않는다 — 792 박스에 가두면
+   100vh 핀 화면에서 박스 가장자리가 가로·세로 단면으로 보인다. */
 .stage .wires,
-.stage .rings,
-.stage .footer::after {
+.stage .rings {
   inset: auto 0;
   top: 50%;
   height: 49.5rem;
