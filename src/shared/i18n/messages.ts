@@ -287,8 +287,8 @@ const ko: Dictionary = {
       { name: "송윤중", title: "원장", photo: "/main/img_02_doctor04.webp" },
       { name: "김민경", title: "원장", photo: "/main/img_02_doctor05.webp" },
       { name: "이연호", title: "원장", photo: "/main/img_02_doctor06.webp" },
-      { name: "김소현", title: "원장", photo: "/main/img_02_doctor07.webp" },
-      { name: "이수민", title: "원장", photo: "/main/img_02_doctor08.webp" },
+      { name: "김소현", title: "원장", photo: "/main/img_02_doctor08.webp" },
+      { name: "이수민", title: "원장", photo: "/main/img_02_doctor07.webp" },
     ],
   },
 

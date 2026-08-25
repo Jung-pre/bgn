@@ -43,6 +43,21 @@ export const HERO_ASSETS = {
   particles: "/main/img_01_particles01.webp",
 } as const;
 
+/**
+ * 타워 씬(메인_02) 하단 의료진 컷아웃.
+ * 파일 번호 01→08 순이 아니라 7·8번째만 맞바꾼다(08 = 김소현, 07 = 이수민).
+ */
+export const TOWER_DOCTORS = [
+  "/main/img_02_doctor01.webp",
+  "/main/img_02_doctor02.webp",
+  "/main/img_02_doctor03.webp",
+  "/main/img_02_doctor04.webp",
+  "/main/img_02_doctor05.webp",
+  "/main/img_02_doctor06.webp",
+  "/main/img_02_doctor08.webp",
+  "/main/img_02_doctor07.webp",
+] as const;
+
 /** 파일이 `public/main/` 에 모두 들어와 있다. */
 export const HERO_ASSETS_READY = true;
 

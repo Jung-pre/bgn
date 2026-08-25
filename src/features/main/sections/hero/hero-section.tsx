@@ -12,6 +12,7 @@ import type { HeroSectionMessages } from "@/shared/i18n/messages";
 import {
   HERO_ASSETS,
   HERO_ASSETS_READY,
+  TOWER_DOCTORS,
   TOWER_LINES,
   TOWER_STAGE,
   type TowerSprite,
@@ -112,6 +113,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
   const towerLayerRef = useRef<HTMLDivElement>(null);
   const copySphereRef = useRef<HTMLDivElement>(null);
   const copyTowerRef = useRef<HTMLDivElement>(null);
+  const towerTeamRef = useRef<HTMLDivElement>(null);
   const scrollHintRef = useRef<HTMLDivElement>(null);
   /**
    * 마퀴는 **구체 씬에만** 있다. 시안 타워 프레임(8:733)에는 마퀴가 없다.
@@ -288,6 +290,8 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const scene1Out = 1 - clamp01(t * 2.4);
       if (cs) cs.style.opacity = String(scene1Out);
       if (ct) ct.style.opacity = String(clamp01((t - 0.86) * 6));
+      const team = towerTeamRef.current;
+      if (team) team.style.opacity = String(clamp01((t - 0.86) * 6));
       // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)
       const mq = marqueeRef.current;
       if (mq) mq.style.opacity = String(scene1Out);
@@ -586,6 +590,25 @@ export function HeroSection({ messages }: HeroSectionProps) {
             </p>
           </div>
         </div>
+
+        {/* 타워 씬 하단 의료진 — Figma 2:3143. 카피(.inner) 위여야 호버가 먹는다.
+            다리 페이드는 마스크라 뒤 실크·점묘가 비쳐 보인다. */}
+        {towerMounted ? (
+          <div ref={towerTeamRef} className={styles.towerTeam} aria-hidden>
+            {TOWER_DOCTORS.map((src) => (
+              <div key={src} className={styles.towerTeamItem}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className={styles.towerTeamImg}
+                  src={src}
+                  alt=""
+                  decoding="async"
+                  loading="eager"
+                />
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {/* 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 + 40 흰 채움 */}
         <div ref={scrollHintRef} className={styles.scrollHint} data-hero-fade>
