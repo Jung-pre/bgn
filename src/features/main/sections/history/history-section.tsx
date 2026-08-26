@@ -220,6 +220,7 @@ function SlotPhoto({
     /* eslint-disable-next-line @next/next/no-img-element -- 카드 크기에 맞춘 컷이라 리사이즈 이점이 없다 */
     <img
       className={styles.slotPhoto}
+      data-history-slot
       data-variant={photo.variant}
       src={photo.src}
       alt={photo.alt}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { MQ } from "@/shared/config/breakpoints";
 import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 
@@ -88,6 +89,10 @@ export function useHistoryReveal<T extends HTMLElement>() {
             opacity: i === 0 ? 1 : 0,
             visibility: i === 0 ? "visible" : "hidden",
           });
+        });
+        gsap.set(gsap.utils.toArray<HTMLElement>("[data-history-slot]", section), {
+          rotation: 0,
+          clearProps: "transform",
         });
         // 타임라인 노드는 전부 활성 상태로 확정 (CSS 가 이 속성을 본다)
         gsap.set(sets, { attr: { "data-visible": "true" } });
@@ -344,6 +349,37 @@ export function useHistoryReveal<T extends HTMLElement>() {
           },
         });
         place(0);
+      }
+
+      /**
+       * ── ③-b 모바일 슬롯 사진: 들어오며 −8°, 화면 중앙에서 0° ──
+       * 트리거는 회전하는 img 가 아니라 부모 칸 — 기울어진 AABB 로
+       * start/end 가 밀리면 중앙을 지나도 0 이 안 된다.
+       * 끝은 `center center`. 사진 중심이 화면 중앙에 닿는 순간 정면.
+       * scrub 은 true(지연 없음). 0.45 + Lenis 라 중앙을 넘어도 따라오지 못했다.
+       */
+      const slotPhotos = gsap.utils.toArray<HTMLElement>("[data-history-slot]", section);
+      if (slotPhotos.length > 0) {
+        const mm = gsap.matchMedia();
+        mm.add(MQ.mobile, () => {
+          slotPhotos.forEach((photo) => {
+            const frame = photo.parentElement ?? photo;
+            gsap.set(photo, { rotation: -8, force3D: true });
+            gsap.to(photo, {
+              rotation: 0,
+              ease: "none",
+              force3D: true,
+              overwrite: "auto",
+              scrollTrigger: {
+                trigger: frame,
+                start: "center 80%",
+                end: "center 50%",
+                scrub: true,
+                invalidateOnRefresh: true,
+              },
+            });
+          });
+        });
       }
 
       // ── ④ 중앙 축이 스크롤을 따라 그려진다 ────────────────────────────

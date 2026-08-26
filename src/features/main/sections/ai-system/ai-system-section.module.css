@@ -520,6 +520,12 @@
 }
 
 /* 모바일 — 가로 스와이프, 우측 카드가 peek 되게 (시안 p4_06) */
+/* --- 모바일 스크롤 인디케이터 ------------------------------------------------
+   시안 68:3850. PC 에는 없다 — 가로 캐러셀 자체가 모바일 전용이다. */
+.scrollHint {
+  display: none;
+}
+
 @media (max-width: 768px) {
   /* 시안 실측(엣지/잉크 프로파일) — 위 81 / 아래 85.
      전역 --gap-section(120)은 모바일에서 과하다.
@@ -610,5 +616,44 @@
   /* ul 기본 margin-block-end 16px 이 카드 아래 여백에 그대로 더해진다 */
   .grid {
     margin-bottom: 0;
+  }
+
+  /**
+   * 스크롤 인디케이터 — 시안 68:3850 실측.
+   *   카드 밑변 y646 → 행 윗변 y674 = 28 · 행 높이 24(아이콘 박스)
+   *   20(거터) + 303(트랙) + 8 + 24(아이콘) + 20(거터) = 375 ✔
+   */
+  .scrollHint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 28px;
+    padding-inline: var(--mobile-gutter);
+  }
+
+  .hintTrack {
+    position: relative;
+    flex: 1 1 auto;
+    height: 2px;
+    background: #e4e4e4;
+    overflow: hidden;
+  }
+
+  .hintThumb {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    /* 시안 x20~230 / 트랙 303 = 69.6% */
+    width: 69.6%;
+    background: #0072ec;
+    /* rAF 로 직접 쓰므로 transition 은 손끝을 따라오는 감만 준다 */
+    transition: translate 0.12s linear;
+  }
+
+  .hintIcon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    color: #0a2048;
   }
 }

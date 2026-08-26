@@ -312,8 +312,24 @@ function RibbonCamera() {
   return null;
 }
 
+/**
+ * 세로 화면에서 띠 **폭**에만 곱하는 값.
+ *
+ * 띠 폭은 1920 시안 좌표(`TOWER_LINES[].h`)에서 온다. 세로 화면은 가로가
+ * 1/5 로 줄어드는데 띠는 그대로라 화면을 통째로 덮고, 그 아래 뒤판
+ * (`img_01_bg02_mo.webp` — 타워·BGN·띠가 이미 구워져 있다)과 그 위 카피를
+ * 같이 지운다. 시안 68:3415 대비 실측으로 하늘 y140 이 +31, 카피 바로 위가
+ * +44 만큼 하얗게 떠 있었다.
+ *
+ * **셰이더·색·꼬임·그레인은 손대지 않는다.** 지오메트리 폭만 줄인다.
+ */
+const MOBILE_THIN = 0.62;
+
 function Ribbons() {
   const groupRef = useRef<THREE.Group>(null);
+  const size = useThree((s) => s.size);
+  /* 두 값(0.62 / 1)만 오가므로 리사이즈마다 items 가 다시 만들어지지 않는다 */
+  const thin = size.width <= 768 ? MOBILE_THIN : 1;
 
   const items = useMemo(() => {
     const membraneVert = COMMON_GLSL + MEMBRANE_VERT_BODY;
@@ -322,7 +338,7 @@ function Ribbons() {
       const sprite = TOWER_LINES[conf.slot];
       if (!sprite) return [];
       const len = (sprite.w + EDGE_BLEED * 2) * PX;
-      const halfW = (sprite.h * PX) / 2;
+      const halfW = ((sprite.h * PX) / 2) * thin;
       const cx = sprite.x + sprite.w / 2;
       const cy = sprite.y + sprite.h / 2;
       const rotZ = -(sprite.rotate ?? 0) * DEG;
@@ -364,7 +380,7 @@ function Ribbons() {
         };
       });
     });
-  }, []);
+  }, [thin]);
 
   const matRefs = useRef<(THREE.ShaderMaterial | null)[]>([]);
   const itemGroupRefs = useRef<(THREE.Group | null)[]>([]);

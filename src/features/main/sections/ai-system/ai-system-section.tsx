@@ -9,6 +9,7 @@ import { Marquee } from "@/components/marquee/marquee";
 import type { AiStepMessages, AiSystemSectionMessages } from "@/shared/i18n/messages";
 import { renderWithEmphasis } from "@/shared/lib/render-emphasis";
 import { countUpTween, formatNumeric, parseNumericLabel } from "./count-up";
+import { ScrollHint } from "./scroll-hint";
 import styles from "./ai-system-section.module.css";
 
 /**
@@ -74,6 +75,7 @@ const VIZ_DELAY = 0.28;
 
 export function AiSystemSection({ messages }: AiSystemSectionProps) {
   const sectionRef = useRef<HTMLElement>(null);
+  const gridRef = useRef<HTMLOListElement>(null);
 
   useGSAP(
     () => {
@@ -308,7 +310,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
           휠이 통째로 네이티브로 새면서 페이지가 한 번에 튀고 GNB 가 깜빡였다.
           내부 스크롤 판별은 Lenis 의 `allowNestedScroll` 이 축까지 보고 처리한다
           (`smooth-scroll-provider.tsx`) — 모바일 가로 스와이프는 그대로 산다. */}
-      <ol className={styles.grid} data-ai-grid>
+      <ol ref={gridRef} className={styles.grid} data-ai-grid>
         {messages.steps.map((step, index) => (
           <li
             key={step.step}
@@ -331,6 +333,9 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
           </li>
         ))}
       </ol>
+
+      {/* 시안 68:3850 하단의 스크롤 인디케이터. 모바일에서만 보인다 */}
+      <ScrollHint scrollerRef={gridRef} />
 
       {/* 섹션 전환 디바이더 — 히어로와 같은 시그니처 마퀴. 카드 뒤로 흐른다. */}
       {/* 시안 2:1088 의 고스트 텍스트는 **속 빈 아웃라인이 아니라 채운 글자**다.
