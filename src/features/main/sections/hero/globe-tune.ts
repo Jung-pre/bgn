@@ -34,6 +34,10 @@ export type GlobeTune = {
   bodyFill: number;
   /** 림 라이트 가산. `col += rim * uRim`. */
   bodyRim: number;
+  /** 유리 반사. 크고 작은 하이라이트 여러 개의 세기. */
+  bodySpec: number;
+  /** 반사 이동 속도 배수. 1 ≈ 큰 빛 18초 주기. */
+  bodySpecSpeed: number;
   /** 내부 코스틱. `col += cau * uCau`. */
   bodyCau: number;
   /** 두께 진주 산란. `mix(PEARL, thick^2 * uPearl)`. */
@@ -120,6 +124,8 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
   /* 3차 피드백 "뒤가 안 보여야" — 심 알파 1.0, 잔여 투과 0 */
   bodyFill: 1,
   bodyRim: 0.125,
+  bodySpec: 0.5,
+  bodySpecSpeed: 1,
   bodyCau: 0.02,
   bodyPearl: 0,
   /* 판 반경 1.02R 기준 0.98 = 파티클 구 실루엣(1.0R). 페이드가 전부
@@ -173,7 +179,7 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
 let current: GlobeTune = { ...GLOBE_TUNE_DEFAULTS };
 const listeners = new Set<() => void>();
 let appliedGen = 0;
-const TUNE_GEN = 2;
+const TUNE_GEN = 6;
 
 export function getGlobeTune(): GlobeTune {
   if (appliedGen !== TUNE_GEN) {

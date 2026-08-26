@@ -186,6 +186,8 @@ function Panel({ onClose }: { onClose: () => void }) {
         <Slider label="채움 알파" k="bodyFill" min={0.4} max={1} step={0.005} tune={tune} />
         <Slider label="가장자리" k="bodyEdge" min={0.7} max={1} step={0.005} tune={tune} />
         <Slider label="림" k="bodyRim" min={0} max={0.2} step={0.005} tune={tune} />
+        <Slider label="반사" k="bodySpec" min={0} max={1.2} step={0.01} tune={tune} />
+        <Slider label="반사 속도" k="bodySpecSpeed" min={0} max={2.4} step={0.05} tune={tune} />
         <Slider label="코스틱" k="bodyCau" min={0} max={0.15} step={0.005} tune={tune} />
         <Slider label="진주 산란" k="bodyPearl" min={0} max={0.4} step={0.01} tune={tune} />
       </Group>

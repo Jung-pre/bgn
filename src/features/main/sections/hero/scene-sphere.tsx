@@ -233,6 +233,11 @@ function Globe({
    * 부모 → 자식 순서가 보장된다(한 프레임 지연 없음).
    */
   const bodyCoverRef = useRef(1);
+  /**
+   * 포인터가 반사 궤도에 더하는 드리프트(구 디스크).
+   * 빛 자체는 셰이더 `uTime` 이 여러 개로 돌리고, 커서는 궤도를 살짝만 민다.
+   */
+  const lightXYRef = useRef({ x: 0, y: 0 });
   const eased = useRef({ x: 0, y: 0 });
   /** 진입 회전 진행도 — "지구형태가 약간 돌면서 등장" */
   const intro = useRef(reduced ? 1 : 0);
@@ -396,6 +401,13 @@ function Globe({
     const target = inside ? 1 : 0;
     push.current.strength += (target - push.current.strength) * (1 - Math.exp(-delta * 7));
 
+    /* 커서는 반사 궤도를 밀 뿐, 광원 자체는 아니다. */
+    const lx = inside ? eased.current.x * 0.2 : 0;
+    const ly = inside ? eased.current.y * 0.16 : 0;
+    const kL = 1 - Math.exp(-delta * 3.4);
+    lightXYRef.current.x += (lx - lightXYRef.current.x) * kL;
+    lightXYRef.current.y += (ly - lightXYRef.current.y) * kL;
+
     // 진입 회전: 0 → 1 로 한 번만 차오른다 (약 1.8초)
     if (intro.current < 1) intro.current = Math.min(1, intro.current + delta / 1.8);
     const introEase = 1 - Math.pow(1 - intro.current, 3);
@@ -446,6 +458,7 @@ function Globe({
             instant={reduced}
             live={interactive}
             coverRef={bodyCoverRef}
+            lightXYRef={lightXYRef}
           />
         </mesh>
         <GlobeHaze intensity={haze} instant={reduced} live={interactive} />
@@ -723,6 +736,7 @@ const POINT_FRAGMENT = /* glsl */ `
   uniform float uOpacity;
   uniform float uTint;
   uniform float uSoft;
+  uniform float uTime;
   varying float vScale;
   varying vec2 vScreen;
   varying float vGalaxy;
@@ -790,6 +804,16 @@ const POINT_FRAGMENT = /* glsl */ `
     /* ⚠️ 은하수 구간에서는 이 억제를 푼다. 구체일 때 대륙이 뭉치는 걸 막는 보정인데
        원반으로 펴진 뒤에도 걸려 있으면 띠의 왼쪽 절반만 어두워져 반쪽만 보인다. */
     col *= 1.0 - hot * 0.46 * (1.0 - vGalaxy);
+    /* 바디와 같이 사이드 링을 돌되, 도트는 더 약하게. 켜짐도 같은 박자. */
+    vec2 g0 = vec2(cos(uTime * 0.26), sin(uTime * 0.22)) * vec2(0.70, 0.56);
+    vec2 g1 = vec2(cos(uTime * 0.41 + 2.4), sin(uTime * 0.33 + 1.6)) * vec2(0.80, 0.66);
+    vec2 d0 = vScreen - g0;
+    vec2 d1 = vScreen - g1;
+    float pk0 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 0.000));
+    float pk1 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 2.513));
+    float pg = 1.0 - (1.0 - exp(-dot(d0, d0) / 0.05) * 0.14 * pk0) * (1.0 - exp(-dot(d1, d1) / 0.014) * 0.11 * pk1);
+    pg *= mix(0.25, 1.0, smoothstep(0.28, 0.66, length(vScreen)));
+    col += pg * (1.0 - vGalaxy);
 
     /* 은하수는 배경(밝은 하늘)과 붙어 있어 그대로 두면 묻힌다.
        가산 블렌딩이라 광량을 올리는 것이 곧 가시성이다. */
@@ -1203,6 +1227,9 @@ const BODY_FRAGMENT = /* glsl */ `
   uniform float uCau;
   uniform float uPearl;
   uniform float uEdge;
+  uniform float uSpec;
+  uniform vec2 uLightXY;
+  uniform float uTime;
 
   /* 시안(205:421 / img_01_sphere01) 안쪽은 강철 블루가 아니다.
      좌 피치·라벤더 → 가운데 진주 → 우측에만 하늘.
@@ -1312,6 +1339,37 @@ const BODY_FRAGMENT = /* glsl */ `
     col *= 1.0 - hot * 0.28;
 
     /**
+     * 빛반사 — 궤도 5개. 같은 박자에 켜짐을 엇갈려 화면에 2~3개만 남긴다.
+     */
+    vec2 drift = uLightXY * 0.55;
+    vec2 w0 = vec2(cos(uTime * 0.26 + 0.2), sin(uTime * 0.22 + 0.1)) * vec2(0.72, 0.58) + drift;
+    vec2 w1 = vec2(cos(uTime * 0.33 + 2.5), sin(uTime * 0.28 + 1.8)) * vec2(0.82, 0.70) + drift * 0.5;
+    vec2 w2 = vec2(cos(uTime * 0.47 + 4.2), sin(uTime * 0.40 + 3.6)) * vec2(0.78, 0.64);
+    vec2 w3 = vec2(cos(uTime * 0.39 + 5.4), sin(uTime * 0.35 + 0.9)) * vec2(0.86, 0.60);
+    vec2 w4 = vec2(cos(uTime * 0.54 + 1.3), sin(uTime * 0.46 + 4.8)) * vec2(0.74, 0.76);
+    float k0 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 0.000));
+    float k1 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 2.513));
+    float k2 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 5.027));
+    float k3 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 1.257));
+    float k4 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 3.770));
+    float b0 = exp(-dot(p - w0, p - w0) / 0.12) * 0.38 * k0;
+    float b1 = exp(-dot(p - w1, p - w1) / 0.040) * 0.48 * k1;
+    float b2 = exp(-dot(p - w2, p - w2) / 0.013) * 0.34 * k2;
+    float b3 = exp(-dot(p - w3, p - w3) / 0.007) * 0.26 * k3;
+    float b4 = exp(-dot(p - w4, p - w4) / 0.009) * 0.24 * k4;
+    float rimW = pow(smoothstep(0.72, 0.995, r), 2.6);
+    float cresMove = rimW * exp(-dot(p - w1, p - w1) / 0.10) * 0.50 * k1;
+    float spec = 1.0 - (1.0 - b0) * (1.0 - b1);
+    spec = 1.0 - (1.0 - spec) * (1.0 - b2);
+    spec = 1.0 - (1.0 - spec) * (1.0 - b3);
+    spec = 1.0 - (1.0 - spec) * (1.0 - b4);
+    spec = 1.0 - (1.0 - spec) * (1.0 - cresMove);
+    /* 디스크 한가운데는 세기를 깎는다 — 스쳐 지나가도 겹쳐 타지 않게 */
+    spec *= mix(0.34, 1.0, smoothstep(0.26, 0.66, r));
+    vec3 glass = vec3(1.0, 0.997, 0.992);
+    col += glass * spec * uSpec;
+
+    /**
      * 수정요청(2차): "뒤에 글자가 아예 안 보이게끔 젤리공 같은 느낌".
      * 0.80 은 마퀴가 20% 로 비쳐 고대비 글자가 그대로 읽혔다. 0.95 로 막되,
      * 젤리 인상은 알파가 아니라 내부 산란(아래 PEARL·cau 상향)이 만든다 —
@@ -1327,6 +1385,7 @@ function GlobeBodyMaterial({
   instant,
   live,
   coverRef,
+  lightXYRef,
 }: {
   intensity: number;
   instant: boolean;
@@ -1339,6 +1398,7 @@ function GlobeBodyMaterial({
    * 기본 불투명도를 잃지 않으면서 스크롤로만 걷어낸다.
    */
   coverRef?: RefObject<number>;
+  lightXYRef?: RefObject<{ x: number; y: number }>;
 }) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const fade = useRef(instant ? 1 : 0);
@@ -1359,6 +1419,9 @@ function GlobeBodyMaterial({
           uCau: { value: d.bodyCau },
           uPearl: { value: d.bodyPearl },
           uEdge: { value: d.bodyEdge },
+          uSpec: { value: d.bodySpec },
+          uLightXY: { value: new THREE.Vector2(0, 0) },
+          uTime: { value: 0 },
         },
         transparent: true,
         depthTest: false,
@@ -1368,7 +1431,16 @@ function GlobeBodyMaterial({
         premultipliedAlpha: true,
         toneMapped: false,
       }),
-    [intensity, instant, d.bodyFill, d.bodyRim, d.bodyCau, d.bodyPearl, d.bodyEdge],
+    [
+      intensity,
+      instant,
+      d.bodyFill,
+      d.bodyRim,
+      d.bodySpec,
+      d.bodyCau,
+      d.bodyPearl,
+      d.bodyEdge,
+    ],
   );
 
   useEffect(() => () => material.dispose(), [material]);
@@ -1383,11 +1455,24 @@ function GlobeBodyMaterial({
       const uCau = m.uniforms.uCau;
       const uPearl = m.uniforms.uPearl;
       const uEdge = m.uniforms.uEdge;
+      const uSpec = m.uniforms.uSpec;
       if (uFill) uFill.value = t.bodyFill;
       if (uRim) uRim.value = t.bodyRim;
       if (uCau) uCau.value = t.bodyCau;
       if (uPearl) uPearl.value = t.bodyPearl;
       if (uEdge) uEdge.value = t.bodyEdge;
+      if (uSpec) uSpec.value = t.bodySpec;
+    }
+    const uLightXY = m.uniforms.uLightXY;
+    if (uLightXY) {
+      const xy = lightXYRef?.current;
+      uLightXY.value.set(xy?.x ?? 0, xy?.y ?? 0);
+    }
+    const uTime = m.uniforms.uTime;
+    const specSpeed = t?.bodySpecSpeed ?? d.bodySpecSpeed;
+    if (uTime) {
+      if (instant) uTime.value = 2.6;
+      else uTime.value += delta * specSpeed;
     }
     const target = (t ? t.cover : intensity) * (coverRef?.current ?? 1);
     const o = m.uniforms.uOpacity;
