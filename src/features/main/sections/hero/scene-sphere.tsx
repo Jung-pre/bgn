@@ -86,7 +86,12 @@ const WIDTH_FIT = { desktop: 1.05, mobileHero: 1.28 } as const;
 
 function globeFitScale(width: number, height: number, sizeMul: number, mobileHero: boolean) {
   const fit = mobileHero ? WIDTH_FIT.mobileHero : WIDTH_FIT.desktop;
-  return Math.min(1, (width / height) * fit) * sizeMul;
+  /**
+   * 모바일 히어로 캔버스는 확대 시 상단이 안 잘리게 화면 끝까지 올린다.
+   * 구 크기는 예전 `top: 10vh` 캔버스(높이 ≈ 90%)에 맞춘 값을 유지한다.
+   */
+  const h = mobileHero ? height * (0.9 / 1.02) : height;
+  return Math.min(1, (width / h) * fit) * sizeMul;
 }
 
 /**
@@ -124,6 +129,39 @@ const PUSH_RADIUS = 0.5;
  * 또렷하게 생겨서 병원 브랜드 톤과 안 맞는다.
  */
 const PUSH_MAX = 0.06;
+
+/** 드래그로 확정하기 전 최소 이동(px). 좌우·위아래 같다. */
+const DRAG_COMMIT_PX = 8;
+/** 손을 뗀 뒤 관성 감쇠. `exp(-delta * k)`. */
+const DRAG_INERTIA_K = 3.6;
+/** 이 스크롤 진행도 이후엔 타워 전환이 시작되므로 드래그를 끈다. */
+const DRAG_SCROLL_CUTOFF = 0.18;
+
+function isGlobeUiBlocker(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target.closest("[data-globe-no-drag]")) return true;
+  return Boolean(target.closest("a, button, input, textarea, select, label, [role='button']"));
+}
+
+/** 화면 NDC에서 구체 원판 안인지. x 는 aspect 로 원형 보정. */
+function globeDiskHit(
+  nx: number,
+  ny: number,
+  aspect: number,
+  radiusNdcY: number,
+  centerY = 0,
+): boolean {
+  const dx = nx * aspect;
+  const dy = ny - centerY;
+  return dx * dx + dy * dy <= radiusNdcY * radiusNdcY;
+}
+
+function globeRadiusNdcY(camera: THREE.Camera, worldRadius: number): number {
+  if (!(camera instanceof THREE.PerspectiveCamera)) return 0.45;
+  const dist = Math.max(0.01, camera.position.length());
+  const halfH = Math.tan((camera.fov * Math.PI) / 360) * dist;
+  return worldRadius / halfH;
+}
 
 export interface PointerPush {
   /** NDC x (-1..1) */
@@ -276,6 +314,29 @@ function Globe({
   const push = useRef<PointerPush>({ x: 0, y: 0, strength: 0 });
   /** 마지막 커서 위치(뷰포트 좌표). NDC 변환은 프레임 안에서 한다. */
   const client = useRef({ x: 0, y: 0, has: false });
+  /** useFrame 이 매 프레임 갱신. 포인터 히트테스트가 현재 스케일을 읽는다. */
+  const hitScaleRef = useRef(1);
+  /** 모바일 히어로에서 구를 내린 만큼 NDC y 중심. 히트테스트와 공유. */
+  const hitCenterYRef = useRef(0);
+  /**
+   * 드래그 회전. state 금지 — 매 프레임 값이므로 ref.
+   * `hold` 는 잡고 있는 동안 멈춘 자전 시간. idle = (elapsed - hold) * rate.
+   */
+  const dragRef = useRef({
+    id: -1,
+    down: false,
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastY: 0,
+    lastT: 0,
+    yaw: 0,
+    pitch: 0,
+    velYaw: 0,
+    velPitch: 0,
+    hold: 0,
+  });
 
   /**
    * ⚠️ R3F 의 `state.pointer` 를 쓰지 않고 window 에서 직접 받는다.
@@ -290,27 +351,122 @@ function Globe({
    * 카피를 드래그 선택할 수 없게 된다. window 에서 받으면 위에 무엇이 덮이든
    * 상관없고, 앞으로 오버레이가 하나 더 생겨도 조용히 깨지지 않는다.
    *
-   * 여기서는 좌표만 저장한다 — `getBoundingClientRect()` 는 레이아웃 읽기라
+   * 드래그도 같은 이유다. 히트는 구체 원판(NDC 원)만, 카피·버튼은 제외.
+   * 원판을 잡으면 좌우(yaw)·위아래(pitch) 둘 다 돌린다. 페이지 스크롤은
+   * 제목·스크롤 힌트·원판 밖에서.
+   *
+   * 좌표만 저장한다 — `getBoundingClientRect()` 는 레이아웃 읽기라
    * pointermove 마다 하면 GSAP 이 레이아웃을 더럽힌 직후 강제 리플로가 난다.
-   * 실제 변환은 rAF 안(= `useFrame`)에서 프레임당 한 번만.
+   * 호버 NDC 변환은 rAF 안(= `useFrame`)에서 프레임당 한 번만.
+   * 드래그 히트/감도는 pointerdown·확정 순간에만 rect 를 읽는다.
    */
   useEffect(() => {
+    const clearDragCursor = () => {
+      document.documentElement.style.cursor = "";
+      document.body.style.userSelect = "";
+      const shell = gl.domElement.closest("section");
+      if (shell instanceof HTMLElement) shell.style.cursor = "";
+    };
+
     const onMove = (e: PointerEvent) => {
       client.current.x = e.clientX;
       client.current.y = e.clientY;
       client.current.has = true;
+
+      const d = dragRef.current;
+      if (!interactive || reduced || !d.down || d.id !== e.pointerId) return;
+
+      /* 커밋 전 3px 에서도 네이티브 텍스트 선택이 붙지 않게. */
+      if (e.cancelable) e.preventDefault();
+
+      if (!d.dragging) {
+        const dist = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
+        if (dist < (e.pointerType === "touch" ? DRAG_COMMIT_PX : 3)) return;
+        d.dragging = true;
+        document.documentElement.style.cursor = "grabbing";
+      }
+      const now = performance.now();
+      const dt = Math.max(0.008, (now - d.lastT) / 1000);
+      const rect = gl.domElement.getBoundingClientRect();
+      const rNdc = globeRadiusNdcY(camera, GLOBE_RADIUS * hitScaleRef.current);
+      const rPx = (rNdc * rect.height) / 2;
+      const sens = Math.PI / Math.max(64, rPx * 2);
+      const dx = e.clientX - d.lastX;
+      const dy = e.clientY - d.lastY;
+      const dyaw = dx * sens;
+      /* 화면 아래(+)로 끌면 앞면이 아래로 — 손가락을 따라가게. */
+      const dpitch = dy * sens;
+      d.yaw += dyaw;
+      d.pitch += dpitch;
+      const kv = 1 - Math.exp(-dt * 18);
+      d.velYaw += (dyaw / dt - d.velYaw) * kv;
+      d.velPitch += (dpitch / dt - d.velPitch) * kv;
+      d.lastX = e.clientX;
+      d.lastY = e.clientY;
+      d.lastT = now;
     };
+
+    const onDown = (e: PointerEvent) => {
+      if (!interactive || reduced) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (isGlobeUiBlocker(e.target)) return;
+      if ((progressRef?.current ?? 0) > DRAG_SCROLL_CUTOFF) return;
+
+      const rect = gl.domElement.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const ny = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+      const aspect = rect.width / rect.height;
+      const rNdc = globeRadiusNdcY(camera, GLOBE_RADIUS * hitScaleRef.current);
+      if (!globeDiskHit(nx, ny, aspect, rNdc * 1.08, hitCenterYRef.current)) return;
+
+      const d = dragRef.current;
+      d.id = e.pointerId;
+      d.down = true;
+      d.dragging = false;
+      d.startX = e.clientX;
+      d.startY = e.clientY;
+      d.lastX = e.clientX;
+      d.lastY = e.clientY;
+      d.lastT = performance.now();
+      d.velYaw = 0;
+      d.velPitch = 0;
+      document.body.style.userSelect = "none";
+      window.getSelection()?.removeAllRanges();
+      /* 원판 안에서는 텍스트 선택·터치 스크롤을 막는다. */
+      if (e.cancelable) e.preventDefault();
+    };
+
+    const onUp = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (d.id !== e.pointerId) return;
+      d.down = false;
+      d.dragging = false;
+      d.id = -1;
+      if (Math.abs(d.velYaw) < 0.12) d.velYaw = 0;
+      if (Math.abs(d.velPitch) < 0.12) d.velPitch = 0;
+      clearDragCursor();
+    };
+
     // relatedTarget 이 null 이면 창(문서) 밖으로 나간 것
     const onOut = (e: PointerEvent) => {
       if (!e.relatedTarget) client.current.has = false;
     };
-    window.addEventListener("pointermove", onMove, { passive: true });
+
+    window.addEventListener("pointermove", onMove, { passive: !interactive });
+    window.addEventListener("pointerdown", onDown, { passive: !interactive });
+    window.addEventListener("pointerup", onUp, { passive: true });
+    window.addEventListener("pointercancel", onUp, { passive: true });
     window.addEventListener("pointerout", onOut, { passive: true });
     return () => {
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("pointerout", onOut);
+      clearDragCursor();
     };
-  }, []);
+  }, [interactive, reduced, gl, camera, progressRef]);
 
   /**
    * 세로가 긴 화면에서 구체가 화면 밖으로 넘치지 않게 맞춘다.
@@ -384,6 +540,26 @@ function Globe({
     bodyCoverRef.current = 1 - smoothRange(zoomTNow, CUE.bodyOut[0], CUE.bodyOut[1]);
     g.scale.setScalar(fitted * grow);
     bodyGroupRef.current?.scale.setScalar(fitted * grow);
+    hitScaleRef.current = fitted * grow;
+    /**
+     * 모바일 히어로: 캔버스는 화면 상단까지인데, 구의 시각 위치는
+     * 예전 `top: 10vh` 와 같게 살짝 내려 둔다. 확대되면 파티클이 그
+     * 여유 공간으로 올라가서 상단이 직선으로 안 잘린다.
+     */
+    if (isMobile && interactive) {
+      const cam = _state.camera;
+      const dist = Math.abs(cam.position.z);
+      const fovDeg = cam instanceof THREE.PerspectiveCamera ? cam.fov : 38;
+      const visibleH = 2 * Math.tan(((fovDeg * Math.PI) / 180) / 2) * dist;
+      const yKeep = -visibleH * 0.05;
+      g.position.y = yKeep;
+      if (bodyGroupRef.current) bodyGroupRef.current.position.y = yKeep;
+      hitCenterYRef.current = yKeep / (visibleH * 0.5);
+    } else {
+      g.position.y = 0;
+      if (bodyGroupRef.current) bodyGroupRef.current.position.y = 0;
+      hitCenterYRef.current = 0;
+    }
     if (bodyMeshRef.current) bodyMeshRef.current.visible = tune ? tune.showBody : true;
     if (coreRef.current) coreRef.current.visible = showCore && (tune ? tune.showCore : true);
 
@@ -439,22 +615,49 @@ function Globe({
     //
     // 한반도가 첫 프레임부터 정면 중앙. introYaw 기본 0.
     // scrollYaw 0.35 는 전환 끝에 한국이 약 20° 만 옆으로 가게 줄인 값.
+    const drag = dragRef.current;
+    if (interactive) {
+      if (drag.dragging) {
+        drag.hold += delta;
+      } else if (drag.velYaw !== 0 || drag.velPitch !== 0) {
+        drag.yaw += drag.velYaw * delta;
+        drag.pitch += drag.velPitch * delta;
+        const damp = Math.exp(-delta * DRAG_INERTIA_K);
+        drag.velYaw *= damp;
+        drag.velPitch *= damp;
+        if (Math.abs(drag.velYaw) < 0.02) drag.velYaw = 0;
+        if (Math.abs(drag.velPitch) < 0.02) drag.velPitch = 0;
+      }
+    }
     const idle = interactive
-      ? _state.clock.elapsedTime * (tune?.spinRate ?? 0)
+      ? (_state.clock.elapsedTime - drag.hold) * (tune?.spinRate ?? 0)
       : _state.clock.elapsedTime * 0.07;
     const yawKeep = interactive ? 1 - zoomTNow * 0.85 : 1;
-    /* 진입이 끝나기 전에는 포인터로 각도를 밀지 않는다 — 첫 화면이 한반도 정면. */
-    const pointerAmt = introEase;
+    /* 진입이 끝나기 전에는 포인터로 각도를 밀지 않는다 — 첫 화면이 한반도 정면.
+       드래그 중에는 호버 추종이 각도를 뺏지 않게 끈다. */
+    const pointerAmt = drag.dragging ? 0 : introEase;
     g.rotation.y =
       FOCUS_ROTATION_Y +
       yawTrim +
       (1 - introEase) * (tune ? tune.introYaw : 0.12) +
       scrollNow * (tune?.scrollYaw ?? 0.35) * yawKeep +
       eased.current.x * (tune?.pointerYaw ?? 0.3) * pointerAmt +
-      idle;
-    // 지축 기울기를 고정으로 주고 그 위에 포인터 반응을 얹는다
+      idle +
+      drag.yaw;
+    // 지축 기울기를 고정으로 주고 그 위에 포인터 반응·드래그를 얹는다
     g.rotation.z = AXIAL_TILT;
-    g.rotation.x = pitchX + eased.current.y * (tune?.pointerPitch ?? 0.16) * pointerAmt;
+    g.rotation.x = pitchX + eased.current.y * (tune?.pointerPitch ?? 0.16) * pointerAmt + drag.pitch;
+
+    if (interactive) {
+      const aspect = _state.size.width / Math.max(1, _state.size.height);
+      const rNdc = globeRadiusNdcY(camera, GLOBE_RADIUS * fitted * grow);
+      const onDisk = inside && globeDiskHit(nx, ny, aspect, rNdc * 1.06, hitCenterYRef.current);
+      const shell = gl.domElement.closest("section");
+      if (shell instanceof HTMLElement && !drag.dragging) {
+        const next = onDisk ? "grab" : "";
+        if (shell.style.cursor !== next) shell.style.cursor = next;
+      }
+    }
 
     if (showCore) updateCore(coreRef.current, g, camera, introEase);
   });

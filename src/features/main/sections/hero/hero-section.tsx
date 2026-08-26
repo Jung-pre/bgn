@@ -5,6 +5,7 @@ import { useRef, useState, useSyncExternalStore } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
+import { MQ } from "@/shared/config/breakpoints";
 import { usePinnedProgress } from "@/features/main/sections/common/use-pinned-progress";
 import { useSceneActive } from "@/r3f/use-scene-active";
 import { Marquee } from "@/components/marquee/marquee";
@@ -141,6 +142,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
    * (매 프레임 setState 금지 규칙은 ref 가드로 지킨다)
    */
   const [towerMounted, setTowerMounted] = useState(false);
+  const [zoomedDoctor, setZoomedDoctor] = useState<number | null>(null);
   const towerMountedRef = useRef(false);
   const towerIntroOn = useRef(false);
   const playTowerIntroRef = useRef(() => {});
@@ -663,8 +665,18 @@ export function HeroSection({ messages }: HeroSectionProps) {
             {/* 카피 바로 아래, 제목과 같은 폭. 호버는 카피(.inner) 위여야 먹는다. */}
             {towerMounted ? (
               <div ref={towerTeamRef} className={styles.towerTeam} data-tower-fade>
-                {TOWER_DOCTORS.map((src) => (
-                  <div key={src} className={styles.towerTeamItem}>
+                {TOWER_DOCTORS.map((src, index) => (
+                  <div
+                    key={src}
+                    className={clsx(
+                      styles.towerTeamItem,
+                      zoomedDoctor === index && styles.towerTeamZoomed,
+                    )}
+                    onClick={() => {
+                      if (!window.matchMedia(MQ.mobile).matches) return;
+                      setZoomedDoctor((current) => (current === index ? null : index));
+                    }}
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       className={styles.towerTeamImg}
