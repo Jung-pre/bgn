@@ -276,9 +276,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
          * 2번 섹션 실크 라인이 제자리 페이드인으로 받는다.
          */
         const { gxCrossStart, gxCrossEnd } = getGlobeTune();
-        const cross = clamp01(
-          (t - gxCrossStart) / Math.max(0.02, gxCrossEnd - gxCrossStart),
-        );
+        const cross = clamp01((t - gxCrossStart) / Math.max(0.02, gxCrossEnd - gxCrossStart));
         const crossEase = cross * cross * (3 - 2 * cross);
         if (host) host.style.opacity = String(1 - crossEase);
         if (glLinesRef.current) glLinesRef.current.style.opacity = String(crossEase);
@@ -289,7 +287,18 @@ export function HeroSection({ messages }: HeroSectionProps) {
       const ct = copyTowerRef.current;
       const scene1Out = 1 - clamp01(t * 2.4);
       if (cs) cs.style.opacity = String(scene1Out);
-      if (ct) ct.style.opacity = String(clamp01((t - 0.86) * 6));
+      if (ct) {
+        /**
+         * 수정요청(3차): "글씨가 한꺼번에 나타나는 것보다 좌→우로".
+         * opacity 를 한 번에 올리는 대신 clip-path 로 왼쪽부터 닦아 낸다.
+         * 스크럽에 물려 있으므로 스크롤 속도가 곧 등장 속도다.
+         * 인셋을 음수로 넉넉히 둬야 글로우·그림자가 경계에서 잘리지 않는다.
+         */
+        const wipe = clamp01((t - 0.8) * 4.2);
+        const wipeEase = wipe * wipe * (3 - 2 * wipe);
+        ct.style.opacity = String(clamp01((t - 0.8) * 9));
+        ct.style.clipPath = `inset(-12% ${(1 - wipeEase) * 104 - 4}% -12% -6%)`;
+      }
       const team = towerTeamRef.current;
       if (team) team.style.opacity = String(clamp01((t - 0.86) * 6));
       // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)

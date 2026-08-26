@@ -66,23 +66,13 @@ export function ClosingSphereSection() {
   return (
     <section ref={sectionRef} className={styles.section} aria-hidden>
       <div ref={hostRef} className={styles.canvasHost}>
-        {/* 시안 2:2893 은 대륙이 거의 안 읽히는 안개 덩어리다.
-            · intensity  — 파티클 밝기를 셰이더 단계에서 낮춘다(CSS opacity 는 배경이 비쳐 탁해진다)
-            · haze       — 반대로 껍질 산란광은 거의 그대로 둔다
-            · showCore   — 한반도 파란 코어는 시안에 없다. 브랜드 포커스를 두 번 반복하면 히어로가 희석된다
-            · interactive — 히어로 튜닝 스토어는 읽지 않는다
-            · pointerFollow — 히어로와 같은 커서 추종·반발만 켠다
-
-            ⚠️ intensity 하나만 내리면 안 된다. 시안 프레임을 스캔해 배경 대비 편차를
-            재보면 안쪽이 +10~+20 으로 **고르게 차 있고** 테두리는 +24 밖에 안 된다.
-            즉 그림을 지배하는 건 파티클이 아니라 헤이즈다. 예전 값(intensity 0.5,
-            헤이즈 동반 하락)은 테두리 +124 / 안쪽 +8 이라 정반대의 "빛나는 링"이었다.
-            지금 값에서 12×6 영역평균 MAE 12.28 → 3.79 (배경 이미지 단독이 4.25). */}
+        {/* 히어로 지구와 같은 점·대륙 밝기. 코어만 빼서 브랜드 포커스를 한 번만 둔다.
+            튜닝 스토어는 읽지 않고 GLOBE_TUNE_DEFAULTS 스냅샷을 쓴다. */}
         <SphereScene
           active={active}
           progressRef={progressRef}
-          intensity={0.12}
-          haze={0.9}
+          intensity={0.8}
+          haze={0.32}
           showCore={false}
           interactive={false}
           pointerFollow

@@ -112,27 +112,33 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
   showCore: false,
 
   size: 0.86,
-  intensity: 0.73,
+  /* 이전 가산 도트 스택 기준값 — "흰색에 빛나는" 그 밀도 */
+  intensity: 0.82,
   haze: 0.32,
   cover: 1,
 
-  bodyFill: 0.985,
-  bodyRim: 0.17,
+  /* 3차 피드백 "뒤가 안 보여야" — 심 알파 1.0, 잔여 투과 0 */
+  bodyFill: 1,
+  bodyRim: 0.125,
   bodyCau: 0.02,
   bodyPearl: 0,
-  bodyEdge: 0.94,
+  /* 판 반경 1.02R 기준 0.98 = 파티클 구 실루엣(1.0R). 페이드가 전부
+     실루엣 **밖**에서 일어나 공 안쪽 투과가 0 이 된다. */
+  bodyEdge: 0.98,
 
   haloOpacity: 1,
-  shellOpacity: 0.37,
-  landOpacity: 0.23,
+  shellOpacity: 0.52,
+  landOpacity: 0.43,
   haloSize: 0.044,
-  shellSize: 0.032,
-  landSize: 0.036,
+  shellSize: 0.029,
+  landSize: 0.037,
   haloPush: 1.2,
   shellPush: 1,
   landPush: 0.85,
 
-  spinRate: 0,
+  /* 수정요청(3차) "호버 안 해도 천천히 지구가 돌도록"(시작은 한국 정면).
+     0.025 rad/s ≈ 4분에 한 바퀴 — 눈에 띄되 어지럽지 않은 속도. */
+  spinRate: 0.025,
   introYaw: 0,
   scrollYaw: 0.35,
   pointerYaw: 0.3,
@@ -160,14 +166,20 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
   gxStart: 0.29,
   gxEnd: 0.64,
   /** 타워가 자리 잡은 직후 — 더 줄어들기 전에 파티클을 걷는다 */
-  gxCrossStart: 0.42,
-  gxCrossEnd: 0.58,
+  gxCrossStart: 0.66,
+  gxCrossEnd: 0.84,
 };
 
 let current: GlobeTune = { ...GLOBE_TUNE_DEFAULTS };
 const listeners = new Set<() => void>();
+let appliedGen = 0;
+const TUNE_GEN = 2;
 
 export function getGlobeTune(): GlobeTune {
+  if (appliedGen !== TUNE_GEN) {
+    appliedGen = TUNE_GEN;
+    current = { ...GLOBE_TUNE_DEFAULTS };
+  }
   return current;
 }
 

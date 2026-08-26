@@ -430,20 +430,17 @@ function Globe({
       {/* 회전 그룹 밖 — 껍질의 산란광이라 구체와 같이 돌면 안 된다 */}
       <group ref={bodyGroupRef} scale={fitScale}>
         {/**
-         * ## ⚠️ 바디 평판은 **회전 그룹 밖**이어야 한다
+         * ## ⚠️ 젤리공 몸통 판 — 회전 그룹 **밖**, 파티클보다 **먼저**.
          *
-         * 처음엔 아래 `groupRef` 안(파티클과 같은 그룹)에 넣었다. 그 그룹은 매
-         * 프레임 Y 축으로 돌기 때문에 **평판이 같이 뒤집힌다** — 옆으로 서는 순간
-         * 화면에는 선으로 눌려 아무것도 못 가린다.
-         *
-         * 실측이 그대로 나왔다: 마퀴가 구체 **안에서 오히려 더 잘 보였다**
-         * (실효 투과율 140%). 알파를 아무리 올려도 안 되던 이유가 이거다.
-         * 산란광(GlobeHaze)이 같은 이유로 이미 여기 있다.
-         *
+         * (3차 사고 기록) 레이어 교체 스크립트가 첫 `{/**` 주석을 잘못 짚어
+         * 이 mesh 와 회전 그룹 여는 태그까지 지워 버렸다 — 몸통이 사라져
+         * 도트만 떠 있고, 도트마저 회전 그룹 밖이라 한반도 정면도 깨졌다.
+         * 이 블록이 없으면 그 사고 상태다.
          * renderOrder -3 → 헤이즈(-2)·파티클보다 먼저 깔린다.
          */}
         <mesh ref={bodyMeshRef} renderOrder={-3} frustumCulled={false}>
-          <planeGeometry args={[GLOBE_RADIUS * 1.97, GLOBE_RADIUS * 1.97]} />
+          {/* 판(0.985R)이 파티클 구(1.0R)보다 작으면 실루엣에 틈 고리가 남는다 */}
+          <planeGeometry args={[GLOBE_RADIUS * 2.04, GLOBE_RADIUS * 2.04]} />
           <GlobeBodyMaterial
             intensity={intensity}
             instant={reduced}
@@ -453,27 +450,18 @@ function Globe({
         </mesh>
         <GlobeHaze intensity={haze} instant={reduced} live={interactive} />
       </group>
-      {/* 수정요청(2차) "질감이 더 투명같지않게" — 레이어 알파를 시안 실측값
-          (0.55/0.95/1.0)으로 복원. 직전 커밋에서 0.20/0.36/0.42 로 내려가
-          구체가 속이 비쳐 보였고, 클로징 스피어 튜닝(intensity 0.12)도
-          이 원본 알파를 기준으로 잰 값이라 복원이 곧 회귀 수정이다. */}
+
+      {/**
+       * 최종 합의(3차 피드백):
+       *  · 몸통 = 위의 젤리공(디자인 플레이트 실측 파스텔)
+       *  · 도트 = **이전의 가산 흰 빛 입자** — "흰색에 빛나는 애들"
+       *  · 파란 수채 워시·일반 블렌딩 흰 막은 제거 — 희뿌연 막의 정체.
+       */}
       <group
         ref={groupRef}
         rotation={[FOCUS_PITCH_X, FOCUS_ROTATION_Y + FOCUS_YAW_TRIM, AXIAL_TILT]}
         scale={fitScale}
       >
-        <PointLayer
-          cloud={halo}
-          kind="halo"
-          color="#ffffff"
-          size={0.03}
-          opacity={1.0 * intensity}
-          instant={reduced}
-          tint={1.0}
-          pointerRef={push}
-          pushScale={pointerFollow ? 1.2 : 0}
-          live={interactive}
-        />
         <PointLayer
           cloud={shell}
           kind="shell"
@@ -482,6 +470,7 @@ function Globe({
           opacity={0.8 * intensity}
           instant={reduced}
           tint={1.0}
+          frontOnly
           pointerRef={push}
           pushScale={pointerFollow ? 1 : 0}
           live={interactive}
@@ -494,6 +483,7 @@ function Globe({
           opacity={0.28 * intensity}
           instant={reduced}
           tint={1.0}
+          frontOnly
           pointerRef={push}
           pushScale={pointerFollow ? 0.85 : 0}
           live={interactive}
@@ -579,11 +569,28 @@ const POINT_VERTEX = /* glsl */ `
   uniform vec4 uGxShape;      // (length, thick, amp, gap)
   uniform float uGxBands;
   uniform float uTime;
+  uniform float uFrontOnly;
   varying float vScale;
   varying vec2 vScreen;
   varying float vGalaxy;
+  varying float vTw;
+  varying float vFront;
 
   void main() {
+    /* 앞반구 페이드 — 뷰 공간에서 카메라를 향한 점만 남긴다.
+       불투명 몸통(레퍼런스 Auremin) 위 무늬라 뒷면 점이 겹쳐 보이면 안 된다. */
+    vec3 dirView = normalize(mat3(modelViewMatrix) * normalize(position));
+    /* 3차 피드백 "뒤에 대륙은 안 보여야 한다" — 젤리공 판은 renderOrder -3 로
+       **먼저** 그려지고 도트는 깊이 판정 없이 그 위에 얹히므로, 뒷반구 도트가
+       판을 뚫고 보였다. 카메라 z=6·반경 ~1.45 기준 보이는 실루엣이
+       dirView.z ≈ R/d ≈ 0.28 — 그 아래(뒷면)만 걷고 림 반짝임은 남긴다. */
+    vFront = uFrontOnly > 0.5 ? smoothstep(0.06, 0.3, dirView.z) : 1.0;
+
+    /* 수정요청(3차): "빛 요소들이 반사되며 이동되도록 … 계속 움직이도록".
+       입자마다 위상이 다른 느린 명멸 — 무늬는 그대로 두고 빛만 흐른다. */
+    float twSeed = fract(sin(dot(position.xy, vec2(12.9898, 78.233))) * 43758.5453);
+    vTw = 0.82 + 0.18 * sin(uTime * (0.5 + twSeed * 0.9) + twSeed * 6.2831);
+
     /**
      * ## 구체 → 은하수
      *
@@ -666,13 +673,26 @@ const POINT_VERTEX = /* glsl */ `
       vec2 d = (ndc - uPointer) * vec2(uAspect, 1.0);
       float dist = length(d);
       float f = 1.0 - smoothstep(0.0, uPushRadius, dist);
-      f *= f; // 가장자리를 더 부드럽게, 중심을 더 세게
+      /* f² 는 중심이 너무 뾰족해 커서 밑에 점 구멍이 남는다 — 완만하게 */
+      f *= 0.35 + 0.65 * f;
 
-      // 커서와 정확히 겹친 입자는 방향이 정의되지 않는다. 위쪽으로 흘려보낸다.
+      /**
+       * 수정요청(3차): "구멍으로 요소가 사라지는 느낌이 아니라 질감이 **위로
+       * 올라오며** 자연스럽게 웨이브 타는 형식"(레퍼런스 Auremin).
+       *
+       * 예전엔 커서에서 방사형으로 밀어냈다 — 커서 자리가 비어 구멍으로
+       * 읽혔다. 이제 커서 주변 입자를 **화면 위(+y)로 들어올리고**, 커서
+       * 거리를 위상으로 하는 링 웨이브를 태운다. 시간이 흐르면 마루가
+       * 바깥으로 번져 나가 물결이 인다. 방사 성분은 마루에만 살짝 —
+       * 자리를 비우는 게 아니라 결이 부풀어 오르는 그림이 된다.
+       */
+      float crest = sin(dist * 16.0 - uTime * 4.0) * 0.5 + 0.5;
+      float lift = f * (0.55 + 0.45 * crest);
       vec2 dir = dist > 1e-4 ? d / dist : vec2(0.0, 1.0);
-      ndc += dir * vec2(1.0 / uAspect, 1.0) * f * uPush;
+      ndc.y += lift * uPush;
+      ndc += dir * vec2(1.0 / uAspect, 1.0) * f * crest * uPush * 0.3;
       clip.xy = ndc * clip.w;
-      grow = f;
+      grow = lift;
     }
 
     gl_Position = clip;
@@ -702,9 +722,12 @@ const POINT_FRAGMENT = /* glsl */ `
   uniform vec3 uColor;
   uniform float uOpacity;
   uniform float uTint;
+  uniform float uSoft;
   varying float vScale;
   varying vec2 vScreen;
   varying float vGalaxy;
+  varying float vTw;
+  varying float vFront;
 
   /**
    * 시안 2:416 픽셀 실측 팔레트.
@@ -723,7 +746,8 @@ const POINT_FRAGMENT = /* glsl */ `
   void main() {
     // 기본 gl_Point 는 사각형이다. 3px 짜리 사각형 2만 개는 격자무늬로 읽힌다.
     float d = length(gl_PointCoord - 0.5);
-    float a = smoothstep(0.5, 0.08, d);
+    float a = mix(smoothstep(0.5, 0.08, d), exp(-d * d * 9.0) - 0.11, uSoft);
+    a = max(a, 0.0);
     if (a < 0.01) discard;
 
     /* 가로로 살구/라벤더 → 하늘, 세로로 살구 ↔ 라벤더.
@@ -772,7 +796,7 @@ const POINT_FRAGMENT = /* glsl */ `
     /* 배경이 어두운 딤이 아니라 **2번 섹션 하늘**이라 그만큼 더 밝아야 산다 */
     col *= 1.0 + vGalaxy * 0.28;
     /* 은하수는 1까지 올리지 않는다. 최대 0.8 */
-    float alpha = a * vScale * uOpacity * mix(1.0, 0.8, vGalaxy);
+    float alpha = a * vScale * uOpacity * vTw * vFront * mix(1.0, 0.8, vGalaxy);
 
     gl_FragColor = vec4(col, min(alpha, mix(1.0, 0.8, vGalaxy)));
   }
@@ -785,12 +809,12 @@ const POINT_FRAGMENT = /* glsl */ `
  * 파티클을 라인 밴드로 모으는 은하수 모프는 쓰지 않는다.
  */
 const CUE = {
-  /** 확대 — 여기까지 최대 배율. 이 곡선이 "좋다"고 한 그 모션이다. */
-  zoomIn: [0.0, 0.46],
+  /** 확대 — 여기까지 최대 배율. */
+  zoomIn: [0.0, 0.4],
   /** 원형 평판(바디) 소멸 — 확대가 끝나기 전에 걷어 파티클만 남긴다 */
-  bodyOut: [0.26, 0.48],
-  /** 다시 축소 — 끝까지 가지 않고, 페이드가 시작될 크기에서 멈춘다 */
-  zoomOut: [0.34, 0.52],
+  bodyOut: [0.22, 0.4],
+  /** 다시 축소. 시작을 zoomIn 끝보다 뒤로 둬서 그 사이가 **확대 유지**다. */
+  zoomOut: [0.58, 0.76],
 } as const;
 
 /** smoothstep(a,b,x) 와 같다 */
@@ -828,6 +852,9 @@ function PointLayer({
   opacity,
   instant,
   tint,
+  normalBlend = false,
+  frontOnly = false,
+  soft = false,
   pointerRef,
   pushScale,
   live,
@@ -857,6 +884,17 @@ function PointLayer({
    * 다만 육지와 껍질의 차이를 크게 두면 대륙이 껍질에서 떨어져 나온 것처럼
    * 보이므로 1 을 기준으로 ±20% 안쪽에서만 흔든다.
    */
+  /**
+   * 3차 수정요청(레퍼런스 Auremin) — 가산이 아니라 **일반 알파 블렌딩**.
+   * 가산은 밝은 배경 위에서 색을 흰쪽으로만 밀어 "파란 수채 대륙"이 불가능하다
+   * (파랑을 아무리 진하게 줘도 흰 몸통 위에서 하늘색 광으로 떠 버린다).
+   */
+  normalBlend?: boolean;
+  /** 앞반구만 — 불투명한 공 위 무늬라 뒷면 점이 비치면 안 된다 */
+  frontOnly?: boolean;
+  /** 1 이면 점을 가우시안으로 푼다 — 수채 물감 워시용. 디스크 윤곽이 남으면
+      물감이 아니라 뽁뽁이가 된다(3차 캡처에서 확인). */
+  soft?: boolean;
   pushScale: number;
   /** 히어로만 라이브 스토어를 읽는다. */
   live: boolean;
@@ -891,12 +929,14 @@ function PointLayer({
           uGxShape: { value: new THREE.Vector4(5.4, 1.45, 0.62, 0.14) },
           uGxBands: { value: 3 },
           uTime: { value: 0 },
+          uFrontOnly: { value: frontOnly ? 1 : 0 },
+          uSoft: { value: soft ? 1 : 0 },
         },
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: normalBlend ? THREE.NormalBlending : THREE.AdditiveBlending,
       }),
-    [color, size, opacity, instant, tint],
+    [color, size, opacity, instant, tint, normalBlend, frontOnly, soft],
   );
 
   // useMemo 로 만든 객체는 R3F 가 자동 dispose 해 주지 않는다.
@@ -921,6 +961,9 @@ function PointLayer({
 
     const us = m.uniforms.uSize;
     if (us) us.value = layerSize;
+    /* 웨이브·트윙클의 시계. 갱신을 안 하면(예전 상태) 둘 다 정지화면이 된다 */
+    const ut = m.uniforms.uTime;
+    if (ut) ut.value += delta;
     const ur = m.uniforms.uPushRadius;
     if (ur) ur.value = pRad;
 
@@ -1177,8 +1220,8 @@ const BODY_FRAGMENT = /* glsl */ `
     /* 구면 법선을 복원해 한쪽에서 빛이 드는 젤리로 만든다 */
     float z = sqrt(max(0.0, 1.0 - r * r));
     vec3 n = vec3(p, z);
-    /* 예전 (-0.42, 0.46) 은 좌상단이 하이라이트로 하얗게 날아갔다. */
-    float lit = clamp(dot(n, normalize(vec3(0.18, 0.12, 0.96))), 0.0, 1.0);
+    /* 3차(레퍼런스 Auremin): 빛은 좌상단에서 온다 — 우하로 갈수록 가라앉는다 */
+    float lit = clamp(dot(n, normalize(vec3(-0.34, 0.3, 0.88))), 0.0, 1.0);
 
     /**
      * ## 불투명한 원반이 아니라 **반투명 젤**
@@ -1222,12 +1265,17 @@ const BODY_FRAGMENT = /* glsl */ `
     /* 림 라이트 — 젤리의 가장자리가 밝게 서는 그 느낌 */
     float rim = pow(smoothstep(0.70, 1.0, r), 2.2);
 
-    /* 안쪽 팔레트 — 평판 UV라 구체가 돌아도 색이 따라 돌지 않는다 */
+    /* 안쪽 팔레트 — 디자인 플레이트(img_01_sphere01) 100×100 실측 9점 재현.
+       상 (224,209,199) 피치 / 좌·좌하 (225,201,204) 핑크 / 우하 (191,184,201)
+       라벤더 / 중 (152,194,242) 하늘 심장. 예전 램프는 위가 라벤더·우측이
+       파랑이라 디자인과 반대로 차가웠다. 평판 UV라 회전과 무관하다. */
     float x = p.x * 0.5 + 0.5;
     float y = p.y * 0.5 + 0.5;
-    vec3 left = mix(WARM, LAV, smoothstep(0.10, 0.82, y));
-    vec3 tint = mix(left, PEARL, smoothstep(0.20, 0.48, x) * 0.35);
-    tint = mix(tint, COOL, smoothstep(0.30, 0.92, x) * 0.38);
+    vec3 PEACH = vec3(0.878, 0.82, 0.78);
+    vec3 PINKD = vec3(0.882, 0.788, 0.80);
+    vec3 LAVD = vec3(0.78, 0.755, 0.82);
+    vec3 tint = mix(PINKD, PEACH, smoothstep(0.35, 0.9, y));
+    tint = mix(tint, LAVD, smoothstep(0.42, 0.95, x) * 0.75);
 
     /* 색은 tint, 조명은 명암만. 대비를 세게 주면 속이 돌처럼 무거워진다. */
     vec3 shade = mix(tint, uShade, 0.10);
@@ -1237,20 +1285,26 @@ const BODY_FRAGMENT = /* glsl */ `
     col += cau * uCau;
 
     /**
-     * 젤리 심장 — 수정요청(2차) 레퍼런스 픽셀 실측:
-     *   중심 (167,205,246) / 중우측 (136,182,225) — **채도 있는 하늘색 발광**.
-     *   젤리로 읽히는 건 성에 껍질이 아니라 이 파란 심장이다. 우리는 중심이
-     *   (227,233,248) 흰색이라 그냥 뿌연 공이었다.
-     * 내부 평균 휘도도 시안 199 vs 우리 228 — 0.93 배로 가라앉힌다.
+     * 3차 수정요청 — 레퍼런스(auremin.com) 몸통 재현.
+     *
+     * 파란 심장·분홍 기운(2차 젤리공)은 걷는다. 레퍼런스 몸통은
+     *  · 거의 **흰 무광 공**이고(가운데가 가장 밝은 아이보리 화이트)
+     *  · 우측 가장자리 안쪽에 **청회색 명암 크레센트**가 돈다
+     *  · 색은 대륙(파란 수채)이 만든다 — 몸통은 캔버스다.
+     * 색감만 디자인: 순크림 대신 브랜드 쪽 한기가 도는 흰색을 쓴다.
      */
-    vec3 HEART = vec3(0.47, 0.68, 0.92);
-    vec2 hc = p - vec2(0.10, 0.0);
-    float heart = exp(-dot(hc, hc) / 0.15);
-    col = mix(col, HEART, heart * 0.85);
-    /* 좌하단 분홍 기운 — 시안 (216,204,216) */
-    vec2 pc = p - vec2(-0.52, -0.45);
-    col = mix(col, vec3(0.88, 0.80, 0.86), exp(-dot(pc, pc) / 0.18) * 0.35);
-    col *= 0.96;
+    /* 흰 섞음 최소 — 0.22 도 디자인 웜톤을 잡아먹었다("희뿌옇다" 지적) */
+    col = mix(col, vec3(0.972, 0.978, 0.992), 0.08);
+    /* 명암은 레퍼런스 구조(좌상단 빛)만 — 그늘은 중성 라벤더로 살짝 */
+    col = mix(col, vec3(0.74, 0.73, 0.83), (1.0 - lit) * 0.26);
+    /* 디자인 플레이트(img_01_sphere01) 실측 — 중앙 (152,194,242)의 하늘빛
+       심장. 0.4 로는 (182,199,233)까지밖에 못 가서 희뿌옇다는 지적을 받았다.
+       0.66 이면 중앙이 실측값에 ±6 안으로 붙는다. */
+    vec2 hc = p - vec2(0.12, -0.02);
+    col = mix(col, vec3(0.57, 0.75, 0.95), exp(-dot(hc, hc) / 0.4) * 0.66);
+    /* 우측 크레센트(레퍼런스 명암 띠) — 색은 브랜드 블루 그레이 */
+    float cres = smoothstep(0.62, 0.97, r) * smoothstep(-0.1, 0.7, p.x);
+    col = mix(col, vec3(0.47, 0.62, 0.86), cres * 0.36);
     col += rim * uRim;
     /* 좌상단 핫스팟 — 대륙이 흰 덩어리로 뭉개지지 않게 */
     float hot = smoothstep(0.52, 0.0, x) * smoothstep(0.36, 0.82, y);

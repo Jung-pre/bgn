@@ -59,10 +59,10 @@ export const RIBBON_LAYER_IDS = ["r0", "r1", "r2", "r3"] as const;
 export type RibbonLayerId = (typeof RIBBON_LAYER_IDS)[number];
 
 export const RIBBON_LAYER_LABELS: Record<RibbonLayerId, string> = {
-  r0: "띠 1 흰·파랑",
-  r1: "띠 2 알록달록",
-  r2: "띠 3 알록달록",
-  r3: "띠 4 흰·파랑",
+  r0: "띠 1 파랑·핑크·크림",
+  r1: "띠 2 핑크·파랑·크림",
+  r2: "띠 3 크림·핑크·파랑",
+  r3: "띠 4 크림·파랑·핑크",
 };
 
 /** `scene-ribbons.tsx` CONFS 와 같은 실측값. 패널 리셋이 여기로 돌아온다. */
@@ -76,14 +76,14 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
 
   ampMul: 0.72,
   twistMul: 0.66,
-  speedMul: 1,
+  speedMul: 1.5,
   timeScale: 1,
-  bodyAlphaMul: 1,
+  bodyAlphaMul: 0.88,
   roseMul: 1,
   goldMul: 1,
   blueMul: 1,
   iridMul: 1,
-  grainMul: 2.0,
+  grainMul: 0.7,
   dotSizeMul: 1,
 
   groupScale: 1,
@@ -99,10 +99,10 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
     twistDir: 1,
     phase: 0,
     speed: 0.55,
-    bodyAlpha: 0.62,
+    bodyAlpha: 0.88,
     rose: 0,
     gold: 0,
-    blue: 0.95,
+    blue: 0,
     streak: 0.2,
   },
   r1: {
@@ -112,10 +112,10 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
     twistDir: 1,
     phase: 2.1,
     speed: 0.62,
-    bodyAlpha: 0.66,
-    rose: 1.05,
-    gold: 0.55,
-    blue: 0.88,
+    bodyAlpha: 0.92,
+    rose: 0,
+    gold: 0,
+    blue: 0,
     streak: 0.42,
   },
   r2: {
@@ -125,10 +125,10 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
     twistDir: -1,
     phase: 4.4,
     speed: 0.5,
-    bodyAlpha: 0.58,
-    rose: 0.82,
-    gold: 0.62,
-    blue: 0.78,
+    bodyAlpha: 0.8,
+    rose: 0,
+    gold: 0,
+    blue: 0,
     streak: 0.55,
   },
   r3: {
@@ -138,18 +138,24 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
     twistDir: 1,
     phase: 1.3,
     speed: 0.45,
-    bodyAlpha: 0.42,
+    bodyAlpha: 1,
     rose: 0,
     gold: 0,
-    blue: 0.92,
+    blue: 0,
     streak: 0.22,
   },
 };
 
 let current: RibbonTune = structuredClone(RIBBON_TUNE_DEFAULTS);
 const listeners = new Set<() => void>();
+let appliedGen = 0;
+const TUNE_GEN = 7;
 
 export function getRibbonTune(): RibbonTune {
+  if (appliedGen !== TUNE_GEN) {
+    appliedGen = TUNE_GEN;
+    current = structuredClone(RIBBON_TUNE_DEFAULTS);
+  }
   return current;
 }
 
