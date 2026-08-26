@@ -660,27 +660,25 @@ export function HeroSection({ messages }: HeroSectionProps) {
                 mark="tower"
               />
             </p>
+            {/* 카피 바로 아래, 제목과 같은 폭. 호버는 카피(.inner) 위여야 먹는다. */}
+            {towerMounted ? (
+              <div ref={towerTeamRef} className={styles.towerTeam} data-tower-fade>
+                {TOWER_DOCTORS.map((src) => (
+                  <div key={src} className={styles.towerTeamItem}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className={styles.towerTeamImg}
+                      src={src}
+                      alt=""
+                      decoding="async"
+                      loading="eager"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
-
-        {/* 타워 씬 하단 의료진 — Figma 2:3143. 카피(.inner) 위여야 호버가 먹는다.
-            다리 페이드는 마스크라 뒤 실크·점묘가 비쳐 보인다. */}
-        {towerMounted ? (
-          <div ref={towerTeamRef} className={styles.towerTeam} aria-hidden data-tower-fade>
-            {TOWER_DOCTORS.map((src) => (
-              <div key={src} className={styles.towerTeamItem}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  className={styles.towerTeamImg}
-                  src={src}
-                  alt=""
-                  decoding="async"
-                  loading="eager"
-                />
-              </div>
-            ))}
-          </div>
-        ) : null}
 
         {/* 스크롤 인디케이터 — Figma 2:471 : left 80 / top 760, 2×128 바 + 40 흰 채움 */}
         <div ref={scrollHintRef} className={styles.scrollHint} data-hero-fade>

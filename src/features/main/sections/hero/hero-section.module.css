@@ -229,22 +229,22 @@
 }
 
 /**
- * 타워 씬 의료진 컷아웃 — Figma `2:3143`
- * 840 × 200 @ (80, 575), 카드 140 × 200, x간격 100 → 40px 겹침.
+ * 타워 씬 의료진 컷아웃 — Figma `2:3143` 비율(카드 140, −40 겹침).
  *
- * 시안 라디얼(`at 50% 24.48%`)은 타원이 얼굴 높이라 목에서 잘린다.
- * 박스 크기는 시안 그대로 두고, 페이드만 허리 컷에 붙인다.
+ * 폭은 위 타이틀(`BGN 밝은눈안과`)에 맞춘다. 시안 좌표 840×200 @ y575 는
+ * 제목보다 좁고, vh 기준 top 이라 화면이 높을수록 글자와 벌어졌다.
+ * 페이드는 허리 컷에 붙인다(시안 라디얼은 얼굴 높이에서 잘린다).
  */
 .towerTeam {
   will-change: opacity, transform;
-  position: absolute;
-  left: var(--content-side-pad);
-  top: 62.5%; /* 575 / 920 */
-  z-index: var(--z-content);
   display: flex;
   align-items: flex-end;
-  width: 43.75%; /* 840 / 1920 */
+  width: 100%;
+  min-width: 0;
+  /* 제목 fit-content 가 이미지 원본 폭으로 늘어나지 않게 */
+  contain: inline-size;
   aspect-ratio: 840 / 200;
+  margin-top: 8px;
   opacity: 0;
   pointer-events: none;
   -webkit-mask-image: linear-gradient(
@@ -407,6 +407,10 @@
 
 .copyTower {
   margin-top: 38.8vh;
+  /* 제목 잉크 폭으로 줄여, 아래 8인 컷아웃이 같은 넓이를 쓰게 한다 */
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
   opacity: 0;
   pointer-events: none;
 }
