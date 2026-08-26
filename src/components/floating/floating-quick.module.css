@@ -1,19 +1,27 @@
 /* ==========================================================================
    퀵메뉴 — 치수는 전부 Figma 실측이다.
-     · 닫힘  `2:2403` : 토글 80 / 마스코트 80 / 세로 간격 8 / 말풍선은 마스코트 왼쪽
-     · 열림  `2:665`  : 버튼 72, 토글 중심 기준 좌표는 tsx 의 FAN_OFFSET
-     · 모바일 `2:3412`: 바 335×60, 항목 54×48, 아이콘 20, 마스코트 FAB 60
+     · PC   `95:3857` (26.08 개편) : 브랜드 원 120, 버튼 72 × 5개, 마스코트 80.
+       **접힘이 기본이고 원을 누르면 펼쳐진다.** 원 중심 기준 좌표는 tsx 의 FAN_OFFSET.
+       1920×920 프레임 실측 — 원 (1720,682)~(1840,802) / 마스코트 (1740,812)~(1820,892).
+       ⚠️ 열려도 원은 흰 × 로 바뀌지 않는다 — 시안은 펼친 상태에도 브랜드 원이다.
+     · 모바일 : 바 335×60(20,728), 항목 54 × **5개**, 아이콘 20, 마스코트 60(295,660)
    ========================================================================== */
 
-/* 브랜드 그라데이션 원본: Figma radial(#8D79FF → #0072EC), 원점이 좌상단 모서리다.
-   토큰(--primary-sub-500 / --primary-500)이 정확히 같은 두 끝값이라 토큰을 쓴다.
-   중간 스톱은 시안 그대로 두 색의 보간이라 생략해도 육안 차이가 없다. */
+/**
+ * 브랜드 그라데이션 원본: Figma radial(#8D79FF → #0072EC), 원점이 좌상단 모서리다.
+ * 토큰(--primary-sub-500 / --primary-500)이 정확히 같은 두 끝값이라 토큰을 쓴다.
+ *
+ * ⚠️ 스톱 위치(20%→100%)가 시안보다 **한참 느슨했다.** 시안 95:3857 의 대각
+ * 프로파일을 실측하면 원 지름의 20% 지점에서 이미 #5776F7, 35% 에서 #2173F0 로
+ * 떨어지고 중심은 본색이다. 우리 값은 같은 자리가 #8778FE / #6777FA 라 버튼이
+ * 통째로 보라로 떴다. 두 실측점으로 역산하면 **0% → 48%** 다.
+ */
 .fanRoot,
 .bottomDock {
   --quick-brand-gradient: radial-gradient(
     120% 120% at 0% 0%,
-    var(--primary-sub-500) 20%,
-    var(--primary-500) 100%
+    var(--primary-sub-500) 0%,
+    var(--primary-500) 48%
   );
 }
 
@@ -23,15 +31,19 @@
 
 /* 시안 1920 기준 right 80 / bottom 32. 1920 미만에서는 vw 로 줄어들되
    40px 아래로는 내려가지 않게 잡았다(프로젝트의 clamp 스케일링 관례). */
+/**
+ * 기준점은 **브랜드 원의 오른쪽 변**이다.
+ * 시안 1920 프레임에서 원 오른쪽 1840 → 우측 여백 80, 마스코트 밑변 892 → 하단 28.
+ * 상자 높이 210 = 원 위 682 에서 마스코트 밑 892 까지. 팬 버튼은 이 상자 밖으로
+ * 넘치는 게 정상이라 overflow 를 자르지 않는다.
+ */
 .fanRoot {
   position: fixed;
   right: clamp(40px, 4.1667vw, 80px);
-  bottom: clamp(24px, 1.6667vw, 32px);
+  bottom: clamp(20px, 1.4583vw, 28px);
   z-index: var(--z-quickfab);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  width: 120px;
+  height: 210px;
   /* GNB 와 같은 곡선·길이로 사라져야 두 요소가 따로 노는 느낌이 안 든다 */
   transition: opacity 0.35s ease;
 }
@@ -60,11 +72,14 @@
   pointer-events: none;
 }
 
-/* 팬 좌표의 원점. 토글과 같은 크기라 `left/top 50%` 가 곧 토글 중심이다 */
+/* 팬 좌표의 원점. 브랜드 원과 같은 크기라 `left/top 50%` 가 곧 원의 중심이다 */
 .fanArea {
-  position: relative;
-  width: 80px;
-  height: 80px;
+  position: absolute;
+  right: 0;
+  /* 마스코트(80) 밑변에서 원 밑변까지 = 892 − 802 = 90 */
+  bottom: 90px;
+  width: 120px;
+  height: 120px;
 }
 
 .fanList {
@@ -87,6 +102,7 @@
   width: 72px;
   height: 72px;
   /* 토글 중심에 정확히 겹쳐 둔 뒤 offset 만큼 민다 */
+  /* 자기 크기(72)의 절반만큼 당겨야 `left/top:50%` 가 버튼 중심이 된다 */
   margin: -36px 0 0 -36px;
   transform: translate3d(0, 0, 0) scale(0.4);
   opacity: 0;
@@ -94,7 +110,7 @@
     transform 0.42s cubic-bezier(0.34, 1.4, 0.64, 1),
     opacity 0.24s ease;
   /* 닫힐 때는 펼침의 역순으로 빨려 들어가야 자연스럽다 */
-  transition-delay: calc((3 - var(--fan-i)) * 40ms);
+  transition-delay: calc((4 - var(--fan-i)) * 40ms);
 }
 
 .fanRoot[data-open] .fanItem {
@@ -128,6 +144,12 @@
   flex: none;
 }
 
+/* 웹블로그만 20×20 이다(95:3909). 24 로 키우면 B 가 다른 아이콘보다 크게 보인다 */
+.fanIconSm {
+  width: 20px;
+  height: 20px;
+}
+
 .fanLabel {
   font-size: var(--fs-13);
   font-weight: var(--weight-semibold);
@@ -142,19 +164,22 @@
 /* 카카오 옐로 — I2:665;658:4422 linear-gradient(135deg,#FFF3C9 10.42%,#F9E000 50.23%)
    카카오 가이드상 심볼은 검정이라 라벨도 #131313 (시안 값 그대로) */
 .theme_kakao {
-  background-image: linear-gradient(135deg, #fff3c9 10.42%, #f9e000 50.23%);
+  /* 스톱은 실측 재역산(원 대각 20% 에서 #FCEC7F) — 10.42/50.23 은 너무 늦게 닫힌다 */
+  background-image: linear-gradient(135deg, #fff3c9 5%, #f9e000 46%);
   color: #131313;
 }
 
 /* 네이버 그린 — I2:665;658:4428 radial(#79E9AB → #07BC66), 원점 좌상단 */
 .theme_naver {
-  background-image: radial-gradient(120% 120% at 0% 0%, #79e9ab 20%, #07bc66 100%);
+  /* 실측 대각 20% = #51D992 → 0%/55% */
+  background-image: radial-gradient(120% 120% at 0% 0%, #79e9ab 0%, #07bc66 55%);
   color: var(--color-white);
 }
 
 /* 이벤트 퍼플 — I2:665;658:4431 radial(#B987FF → #673DFF), 원점 좌상단 */
 .theme_event {
-  background-image: radial-gradient(120% 120% at 0% 0%, #b987ff 20%, #9062ff 60%, #673dff 100%);
+  /* 실측 대각 20% = #996BFF / 35% = #7A4EFF → 0%/50% */
+  background-image: radial-gradient(120% 120% at 0% 0%, #b987ff 0%, #673dff 50%);
   color: var(--color-white);
 }
 
@@ -164,9 +189,27 @@
   color: var(--color-white);
 }
 
-/* ── 토글 ─────────────────────────────────────────────────────────────── */
-.fanToggle {
-  position: relative;
+/* 웹블로그 네이비 — 95:3908 실측 대각 프로파일
+   좌상 #065D95 → #0B429F → 본색 #0C3BA1. 다른 버튼과 같은 좌상단 원점 radial. */
+.theme_blog {
+  /* 실측 대각 20% = #065D95 / 35% = #0B429F / 본색 #0C3BA1 → 두 점 역산으로
+     시작색은 청록(#008388), 스톱은 0%/37% 다. */
+  background-image: radial-gradient(120% 120% at 0% 0%, #008388 0%, #0c3ba1 37%);
+  color: var(--color-white);
+}
+
+/* ── 브랜드 원 ─────────────────────────────────────────────────────────── */
+/**
+ * 시안 95:3916 — 120×120.
+ * 안쪽 배치 실측(원 좌상단 기준): 워드마크 (25.5,32) 70×42 / "퀵메뉴" (40,78) 41×24.
+ * 두 요소 중심이 모두 x=60.5 라 세로 스택 + 가운데 정렬로 재현된다(간격 78−74=4).
+ * 그라디언트도 바뀌었다 — 예전 보라(#8D79FF)→파랑이 아니라 **시안(cyan)→파랑**이다
+ * (실측 좌상 #00C4DE → 본색 #009BEB).
+ */
+.fanBrand {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
   /* 팬 항목이 이 원 뒤에서 나와야 해서 stacking 을 한 단 올린다 */
   z-index: 1;
   display: flex;
@@ -174,71 +217,57 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: 80px;
-  height: 80px;
-  padding-top: 4px;
+  margin: 0;
+  padding-top: 6px;
   border-radius: var(--radius-full);
-  background-image: var(--quick-brand-gradient);
+  background-image: radial-gradient(120% 120% at 0% 0%, #00cfe0 14%, #009beb 72%);
   color: var(--color-white);
   /* 시안 실측: 2px 2px 12px rgba(126,156,190,0.2) */
   box-shadow: 2px 2px 12px rgba(126, 156, 190, 0.2);
-  transition:
-    background-color 0.3s ease,
-    transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-/* 열림 상태는 흰 원 + 회색 × 다 (시안 I2:665;658:4462) */
-.fanRoot[data-open] .fanToggle {
-  background-image: none;
-  background-color: var(--color-white);
-  color: var(--gray-500);
+.fanBrand:hover {
+  transform: scale(1.04);
 }
 
-.toggleMark {
-  width: 40px;
-  height: 24px;
+.brandMark {
+  width: 70px;
+  height: 42px;
   flex: none;
 }
 
-.toggleLabel {
-  font-size: var(--fs-13);
+/* 시안 라벨 상자 41×24 — 3글자라 글자당 13.7 → 14px */
+.brandLabel {
+  font-size: 14px;
   font-weight: var(--weight-semibold);
-  line-height: 1.25;
-  letter-spacing: -0.65px;
+  line-height: 24px;
+  letter-spacing: -0.7px;
 }
 
-.toggleClose {
-  width: 40px;
-  height: 40px;
-}
-
-/* ── 말풍선 + 마스코트 ─────────────────────────────────────────────────── */
-.chatRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 시안: whitebg-90 + backdrop-blur 6, 테두리 gray-100, 글자는 그라데이션 클립 */
+/* ── 말풍선 ───────────────────────────────────────────────────────────── */
 /**
+ * 마스코트 **왼쪽**에 붙는다. 루트가 120 폭이라 왼쪽으로 넘쳐 나가는 게 정상이다.
+ *   right 108 = 마스코트 오른쪽 여백(20) + 마스코트 폭(80) + 8
+ *     ⚠️ 100 이면 알약이 캐릭터에 3px 까지 붙는다. 마스코트 이미지는 80 박스
+ *     안에서 좌우 3.4px 씩 비워 두고 그려지기 때문이다(원본 알파 실측 x0.084~0.916).
+ *     시안에 말풍선이 없어 기준이 없으므로, 예전 배치의 간격 8 을 **눈에 보이는
+ *     캐릭터 기준**으로 맞춘다.
+ *   bottom 20 = 마스코트(80)의 세로 중앙에 알약(≈38)을 맞춘다
+ *
  * ## ⚠️ 알약 배경과 글자 그라데이션은 **다른 요소**여야 한다
- *
- * 수정요청(26.08.24) p3 "박스 컬러 디자인 확인필요".
- * 원인은 이 한 줄이었다 — 같은 요소에 흰 배경과 글자 그라데이션을 같이 걸었다:
- *
- *   background: var(--whitebg-90);            // 흰 알약
- *   background-image: linear-gradient(...);   // 뒤에 와서 위를 덮는다
- *   background-clip: text;                    // 배경 **전체**를 글자 모양으로 자른다
- *
  * `background-clip: text` 는 그 요소의 배경을 통째로 글자 실루엣에 가둔다.
- * 흰 알약도 같이 잘려서 사라지고 테두리만 남았다 — 그래서 시안의 흰 박스가
- * 화면에서는 비치는 회색으로 보였다.
+ * 한 요소에 흰 배경과 글자 그라데이션을 같이 걸면 흰 알약까지 잘려 사라진다
+ * (수정요청 26.08.24 p3 "박스 컬러 디자인 확인필요"의 원인이었다).
  *
- * 시안(48:312 / I48:312;318:259) 값:
- *   배경 rgba(255,255,255,.9) · 테두리 1px #f2f2f2 · radius 9999 · 패딩 10/16
- *   blur 6px · 글자 13 SemiBold, #8d79ff → #0072ec 그라데이션
+ * 시안(48:312) 값: rgba(255,255,255,.9) · 1px #f2f2f2 · radius 9999 · 패딩 10/16
+ *                  blur 6 · 13 SemiBold · #8d79ff → #0072ec
  */
 .bubble {
+  position: absolute;
+  right: 108px;
+  bottom: 20px;
+  z-index: 2;
   margin: 0;
   padding: 10px 16px;
   background: var(--whitebg-90);
@@ -269,11 +298,20 @@
   pointer-events: none;
 }
 
+/* ── 마스코트 ─────────────────────────────────────────────────────────── */
+/**
+ * 시안 95:3921 — 원 바로 아래(1740,812 / 80×80).
+ * 상자 오른쪽 변 1820 = 기준점(1840)에서 20 왼쪽, 밑변이 상자 바닥이다.
+ * 접힘·펼침 어느 쪽에서도 **자리가 같다** — 상태가 바뀔 때 마스코트가 튀지 않는다.
+ */
 .mascotButton {
+  position: absolute;
+  right: 20px;
+  bottom: 0;
+  z-index: 2;
   display: block;
   width: 80px;
   height: 80px;
-  flex: none;
   /* 시안이 원본을 확대해 잘라 쓰므로 80×80 밖은 잘라 낸다.
      시안의 클립 영역은 정사각이다 — 원형으로 깎으면 마스코트 지느러미가 잘린다. */
   overflow: hidden;
@@ -284,12 +322,28 @@
   transform: translateY(-4px);
 }
 
-/* 시안은 원본을 110.08% 로 키우고 좌 -5.04% / 상 -3.16% 만큼 밀어 여백을 잘라낸다 */
+/**
+ * 원본(1254², 알파 여백 포함)을 88 로 키워 80 박스에 넣고 여백을 잘라낸다.
+ *
+ * ## ⚠️ `max-width: none` 이 없으면 이 트릭이 **반쪽만** 먹는다
+ * 전역 리셋의 `img { max-width: 100% }` 가 폭을 80 으로 도로 잘라서, 세로만
+ * 88 로 늘어난 채 `object-fit: contain` 이 80×80 으로 레터박스한다. 그런데
+ * 음수 마진은 그대로 살아 있어서 결과가 **캐릭터가 시안보다 작고(66.6 → 시안 74)
+ * 원 중심에서 4px 왼쪽으로 밀린** 그림이 됐다(정렬 지적 사항).
+ *
+ * ## 값의 근거 — 시안 95:3915 실측
+ *   캐릭터 아트 74×78, 가로는 원 중심과 **일치**, 세로는 박스 윗변에 붙는다.
+ *   원본 알파 bbox 는 캔버스의 x 8.45~91.55% / y 3.03~93.38% 이므로
+ *     88 로 그리면 아트 73.2×79.5
+ *     가로 중심 맞추기 → margin-left  80/2 − 88/2 = −4
+ *     윗변 맞추기     → margin-top   −0.0303 × 88 = −2.67
+ */
 .mascotImage {
-  width: 110.08%;
-  height: 110.08%;
-  margin-left: -5.04%;
-  margin-top: -3.16%;
+  max-width: none;
+  width: 88px;
+  height: 88px;
+  margin-left: -4px;
+  margin-top: -2.67px;
   object-fit: contain;
 }
 
@@ -349,7 +403,8 @@
   border-radius: var(--radius-sm);
 }
 
-/* 항목 4개 균등 배치 — 시안 `48:3101` 은 `justify-between` 이다 */
+/* 항목 5개 균등 배치 — 바 335 / 좌우 패딩 16 / space-between 이면
+   요청 이미지 실측(중심 간격 62.1, 항목 54 → 간격 8.1)과 그대로 맞는다 */
 .bottomList {
   display: flex;
   align-items: center;
@@ -387,7 +442,7 @@
 
 /* 전역 리셋에 focus 스타일이 없다. 원형 컨트롤이라 링도 원형으로 맞춰 준다 */
 .fanButton:focus-visible,
-.fanToggle:focus-visible,
+.fanBrand:focus-visible,
 .mascotButtonMo:focus-visible {
   outline: 2px solid var(--brand-primary);
   outline-offset: 3px;
@@ -402,11 +457,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* 펼침도 모션이다 — 위치는 그대로 두고 트랜지션만 끊는다 */
+  /* 등장도 모션이다 — 위치는 그대로 두고 트랜지션·애니메이션만 끊는다 */
   .fanRoot,
   .fanItem,
   .fanButton,
-  .fanToggle,
+  .fanBrand,
   .bubble,
   .mascotButton,
   .bottomBar {
@@ -414,6 +469,7 @@
   }
 
   .fanButton:hover,
+  .fanBrand:hover,
   .mascotButton:hover {
     transform: none;
   }

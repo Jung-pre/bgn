@@ -10,7 +10,7 @@ import {
   KakaoTalkIcon,
   MapPinIcon,
   NaverIcon,
-  QuickCloseIcon,
+  WebBlogIcon,
 } from "./quick-icons";
 import styles from "./floating-quick.module.css";
 
@@ -18,10 +18,13 @@ import styles from "./floating-quick.module.css";
  * 상시 노출 퀵 액션.
  *
  * 시안에서 PC 와 모바일이 **완전히 다른 형태**다:
- *  - PC (Figma `2:2403` 닫힘 / `2:665` 열림): 우하단.
- *    평상시엔 `BGn 퀵메뉴` 그라데이션 원(80) + 그 아래 마스코트(80),
- *    마스코트 왼쪽에 말풍선. 원을 누르면 색이 다른 원형 버튼 4개가
- *    부채꼴로 펼쳐지고, 원 자리는 흰 원 + × 로 바뀐다.
+ *  - PC (Figma `95:3857`, 26.08 개편): 우하단.
+ *    평상시엔 `BGn 퀵메뉴` 그라데이션 원(**120**) + 그 아래 마스코트(80),
+ *    마스코트 왼쪽에 말풍선. 원을 누르면 색이 다른 원형 버튼 **5개**
+ *    (오시는 길·카톡상담·네이버예약·이벤트·웹블로그)가 부채꼴로 펼쳐진다.
+ *    ⚠️ 개편에서 바뀐 건 **원 크기(80→120)·그라디언트(보라→시안)·항목 5개·좌표**다.
+ *    토글 자체는 그대로다 — 펼침이 기본이 아니다. 그리고 열려도 원은 흰 × 로
+ *    바뀌지 않는다(시안 95:3857 에서 열린 상태에도 `BGn 퀵메뉴` 가 그대로다).
  *  - 모바일 (Figma `2:3412`): 하단 고정 바(335×60) 5구성.
  *    좌 2 / 마스코트 FAB / 우 2. 마스코트만 바 위로 8px 돌출한다.
  *
@@ -32,32 +35,41 @@ export interface FloatingQuickProps {
   messages: GnbMessages;
 }
 
-type QuickId = "kakao" | "naver" | "event" | "map";
+type QuickId = "kakao" | "naver" | "event" | "map" | "blog";
 
 const ICONS: Record<QuickId, ComponentType<{ className?: string }>> = {
   kakao: KakaoTalkIcon,
   naver: NaverIcon,
   event: EventSparkleIcon,
   map: MapPinIcon,
+  blog: WebBlogIcon,
 };
 
 /**
- * PC 팬아웃 좌표 — 토글 원(80×80) **중심**을 원점으로 한 각 버튼(72×72) 중심 오프셋.
- * Figma `2:665` 실측값 그대로다(반지름이 88~101 로 제각각이라 각도·반지름 공식으로
- * 만들면 시안과 어긋난다. 4개뿐이므로 좌표를 박는 편이 정확하다).
+ * PC 팬 좌표 — 브랜드 원(120×120) **중심**을 원점으로 한 각 버튼(72×72) 중심 오프셋.
+ *
+ * Figma `95:3857`(1920×920 프레임) 실측. 원 중심은 (1780, 742)다.
+ *   오시는 길 (1674,787) → 중심 (1710, 823)
+ *   카톡상담  (1632,722) → 중심 (1668, 758)
+ *   네이버예약(1650,644) → 중심 (1686, 680)
+ *   이벤트    (1720,604) → 중심 (1756, 640)
+ *   웹블로그  (1798,620) → 중심 (1834, 656)
+ * 반지름이 107~112 로 제각각이라 각도·반지름 공식으로 만들면 시안과 어긋난다.
  */
 const FAN_OFFSET: Record<QuickId, { x: number; y: number }> = {
-  event: { x: 56, y: -70 },
-  naver: { x: -24, y: -94 },
-  kakao: { x: -92, y: -42 },
-  map: { x: -80, y: 36 },
+  map: { x: -70, y: 81 },
+  kakao: { x: -112, y: 16 },
+  naver: { x: -94, y: -62 },
+  event: { x: -24, y: -102 },
+  blog: { x: 54, y: -86 },
 };
 
-/** 펼침 스태거 순서. 시안에 순서 지정이 없어 아래(오시는 길)→위로 훑는 각도 순으로 잡았다 */
-const FAN_ORDER: QuickId[] = ["map", "kakao", "naver", "event"];
+/** 등장 스태거 순서 — 아래(오시는 길)에서 시계 방향으로 훑는 각도 순 */
+const FAN_ORDER: QuickId[] = ["map", "kakao", "naver", "event", "blog"];
 
-/** 모바일 하단바 — 최신 시안 `48:3101` 은 마스코트가 빠진 **4구성**이다 */
-const BAR_ORDER: QuickId[] = ["map", "kakao", "naver", "event"];
+/** 모바일 하단바 — 웹블로그가 더해져 **5구성**이다. 바(335)·패딩(16)·space-between
+ *  조합이 그대로라 항목만 늘리면 간격 8.1 로 균등 배치된다(요청 이미지 실측). */
+const BAR_ORDER: QuickId[] = ["map", "kakao", "naver", "event", "blog"];
 
 export function FloatingQuick({ messages }: FloatingQuickProps) {
   const isMobile = useIsMobileLayout();
@@ -83,14 +95,9 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
     io.observe(footer);
     return () => io.disconnect();
   }, []);
+
   const toggleRef = useRef<HTMLButtonElement>(null);
   const fanListId = useId();
-
-  /** i18n 배열 순서에 배치를 의존하면 문구를 한 줄 옮겼을 때 레이아웃이 깨진다. id 로만 찾는다 */
-  const labelOf = useCallback(
-    (id: QuickId) => messages.quickActions.find((a) => a.id === id)?.label ?? id,
-    [messages.quickActions],
-  );
 
   /* 열려 있을 때만 Esc·바깥 클릭을 듣는다. 닫힌 상태에서 문서 리스너를 물고 있을 이유가 없다. */
   useEffect(() => {
@@ -114,6 +121,12 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
       document.removeEventListener("pointerdown", onPointerDown);
     };
   }, [isOpen]);
+
+  /** i18n 배열 순서에 배치를 의존하면 문구를 한 줄 옮겼을 때 레이아웃이 깨진다. id 로만 찾는다 */
+  const labelOf = useCallback(
+    (id: QuickId) => messages.quickActions.find((a) => a.id === id)?.label ?? id,
+    [messages.quickActions],
+  );
 
   /* ── 모바일: 하단 고정 바 ─────────────────────────────────────────────── */
   /**
@@ -171,32 +184,26 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
       data-at-footer={atFooter || undefined}
     >
       <div className={styles.fanArea}>
+        {/* 열려도 흰 × 로 바뀌지 않는다 — 시안 95:3857 은 펼친 상태에도 브랜드 원이다 */}
         <button
           ref={toggleRef}
           type="button"
-          className={styles.fanToggle}
+          className={styles.fanBrand}
           aria-expanded={isOpen}
           aria-controls={fanListId}
           aria-label={isOpen ? "빠른 메뉴 닫기" : "빠른 메뉴 열기"}
           onClick={() => setIsOpen((v) => !v)}
         >
-          {isOpen ? (
-            <QuickCloseIcon className={styles.toggleClose} />
-          ) : (
-            <>
-              <BgnMarkIcon className={styles.toggleMark} />
-              <span className={styles.toggleLabel}>{messages.quickMenu}</span>
-            </>
-          )}
+          <BgnMarkIcon className={styles.brandMark} />
+          <span className={styles.brandLabel}>{messages.quickMenu}</span>
         </button>
 
         {/*
           목록이 토글 **뒤에** 와야 열자마자 Tab 한 번으로 첫 항목에 닿는다.
-          겹침 순서는 `.fanToggle { z-index: 1 }` 로 잡아 뒀다(항목이 토글 뒤에서 나온다).
+          겹침 순서는 `.fanBrand { z-index: 1 }` 로 잡아 뒀다(항목이 원 뒤에서 나온다).
 
           닫힘 상태에서 항목이 포커스를 받으면 안 된다. 조건부 렌더 대신 `inert` 를 쓰는 이유는
-          닫힘 트랜지션(토글 뒤로 빨려 들어가는 모션)을 보여줘야 하기 때문이다.
-          `inert` 는 포커스·클릭·AT 노출을 한 번에 막아 준다.
+          닫힘 트랜지션(원 뒤로 빨려 들어가는 모션)을 보여줘야 하기 때문이다.
         */}
         <ul id={fanListId} className={styles.fanList} inert={!isOpen}>
           {FAN_ORDER.map((id, i) => {
@@ -220,7 +227,7 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
                   className={clsx(styles.fanButton, styles[`theme_${id}`])}
                   data-action={id}
                 >
-                  <Icon className={styles.fanIcon} />
+                  <Icon className={clsx(styles.fanIcon, id === "blog" && styles.fanIconSm)} />
                   <span className={styles.fanLabel}>{labelOf(id)}</span>
                 </button>
               </li>
@@ -229,25 +236,24 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
         </ul>
       </div>
 
-      <div className={styles.chatRow}>
-        {/* 평상시 노출되는 말풍선 — 팬 오픈 시 숨긴다 */}
-        <p className={clsx(styles.bubble, isOpen && styles.bubbleHidden)} aria-hidden={isOpen}>
-          {/* 그라데이션 글자는 별도 span — 알약 배경까지 clip 되면 안 된다 */}
-          <span className={styles.bubbleText}>{messages.chatbotBubble}</span>
-        </p>
-        <button type="button" className={styles.mascotButton} aria-label={messages.chatbotBubble}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- 위 주석과 같은 이유 */}
-          <img
-            className={styles.mascotImage}
-            src="/main/img_00_mascot-icon01.webp"
-            alt=""
-            width={80}
-            height={80}
-            loading="lazy"
-            decoding="async"
-          />
-        </button>
-      </div>
+      {/* 평상시 노출되는 말풍선 — 팬 오픈 시 숨긴다 */}
+      <p className={clsx(styles.bubble, isOpen && styles.bubbleHidden)} aria-hidden={isOpen}>
+        {/* 그라데이션 글자는 별도 span — 알약 배경까지 clip 되면 안 된다 */}
+        <span className={styles.bubbleText}>{messages.chatbotBubble}</span>
+      </p>
+
+      <button type="button" className={styles.mascotButton} aria-label={messages.chatbotBubble}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- 장식용 고정 크기 아이콘 */}
+        <img
+          className={styles.mascotImage}
+          src="/main/img_00_mascot-icon01.webp"
+          alt=""
+          width={80}
+          height={80}
+          loading="lazy"
+          decoding="async"
+        />
+      </button>
     </div>
   );
 }

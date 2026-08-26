@@ -58,11 +58,11 @@ export function MegaMenu({
    * 닫힘 transform 이 한 프레임에 점프한다.
    */
   const [painted, setPainted] = useState(open);
+  if (open && !painted) {
+    setPainted(true);
+  }
   useEffect(() => {
-    if (open) {
-      setPainted(true);
-      return;
-    }
+    if (open) return;
     const id = window.setTimeout(() => setPainted(false), 500);
     return () => window.clearTimeout(id);
   }, [open]);

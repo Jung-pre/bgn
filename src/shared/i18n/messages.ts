@@ -235,6 +235,8 @@ const ko: Dictionary = {
       { id: "event", label: "이벤트" },
       { id: "kakao", label: "카톡상담" },
       { id: "map", label: "오시는 길" },
+      /* 시안 95:3908 에서 추가된 5번째 — PC 팬에만 있고 모바일 바에는 없다 */
+      { id: "blog", label: "웹블로그" },
     ],
     chatbotBubble: "무엇이든 물어보세요!",
   },
