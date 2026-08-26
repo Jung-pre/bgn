@@ -236,6 +236,7 @@
  * 박스 크기는 시안 그대로 두고, 페이드만 허리 컷에 붙인다.
  */
 .towerTeam {
+  will-change: opacity, transform;
   position: absolute;
   left: var(--content-side-pad);
   top: 62.5%; /* 575 / 920 */
@@ -397,7 +398,7 @@
 .copy {
   grid-area: 1 / 1;
   align-self: start;
-  will-change: opacity;
+  will-change: opacity, transform;
 }
 
 .copySphere {
@@ -474,6 +475,7 @@
  *    title 프레임(910×197)은 gap 0 이다 — 53(=42×1.25) + 144(=160×0.9) = 197.
  */
 .towerEyebrow {
+  will-change: opacity, transform;
   margin: 0;
   font-size: var(--fs-hero-eyebrow);
   font-weight: var(--weight-semibold);
@@ -482,7 +484,12 @@
   color: var(--color-white);
 }
 
+.towerWord {
+  white-space: nowrap;
+}
+
 .towerTitle {
+  will-change: opacity, transform;
   margin: 0;
   font-size: var(--fs-hero-name);
   font-weight: var(--weight-bold);

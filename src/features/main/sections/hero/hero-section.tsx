@@ -142,6 +142,9 @@ export function HeroSection({ messages }: HeroSectionProps) {
    */
   const [towerMounted, setTowerMounted] = useState(false);
   const towerMountedRef = useRef(false);
+  const towerIntroOn = useRef(false);
+  const playTowerIntroRef = useRef(() => {});
+  const resetTowerIntroRef = useRef(() => {});
 
   /**
    * 띠 셰이더에 넘길 진행도. `usePinnedProgress` 의 progressRef 는 섹션 원본
@@ -200,8 +203,14 @@ export function HeroSection({ messages }: HeroSectionProps) {
       if (reduced) {
         if (sphereBgRef.current) sphereBgRef.current.style.opacity = "";
         if (host) host.style.opacity = "";
-        if (glLinesRef.current) glLinesRef.current.style.opacity = "";
-        if (stageClipRef.current) stageClipRef.current.style.opacity = "";
+        if (glLinesRef.current) {
+          glLinesRef.current.style.opacity = "";
+          glLinesRef.current.style.transform = "";
+        }
+        if (stageClipRef.current) {
+          stageClipRef.current.style.opacity = "";
+          stageClipRef.current.style.transform = "";
+        }
         if (sphere) {
           sphere.style.zIndex = "";
           sphere.style.opacity = String(1 - t);
@@ -279,28 +288,39 @@ export function HeroSection({ messages }: HeroSectionProps) {
         const cross = clamp01((t - gxCrossStart) / Math.max(0.02, gxCrossEnd - gxCrossStart));
         const crossEase = cross * cross * (3 - 2 * cross);
         if (host) host.style.opacity = String(1 - crossEase);
-        if (glLinesRef.current) glLinesRef.current.style.opacity = String(crossEase);
+        applyRise(glLinesRef.current, crossEase, 36);
         /* WebGL 미지원 폴백(정지 PNG 띠)도 같은 곡선을 탄다 */
-        if (stageClipRef.current) stageClipRef.current.style.opacity = String(crossEase);
+        applyRise(stageClipRef.current, crossEase, 36);
       }
       const cs = copySphereRef.current;
       const ct = copyTowerRef.current;
       const scene1Out = 1 - clamp01(t * 2.4);
       if (cs) cs.style.opacity = String(scene1Out);
       if (ct) {
-        /**
-         * 수정요청(3차): "글씨가 한꺼번에 나타나는 것보다 좌→우로".
-         * opacity 를 한 번에 올리는 대신 clip-path 로 왼쪽부터 닦아 낸다.
-         * 스크럽에 물려 있으므로 스크롤 속도가 곧 등장 속도다.
-         * 인셋을 음수로 넉넉히 둬야 글로우·그림자가 경계에서 잘리지 않는다.
-         */
-        const wipe = clamp01((t - 0.8) * 4.2);
-        const wipeEase = wipe * wipe * (3 - 2 * wipe);
-        ct.style.opacity = String(clamp01((t - 0.8) * 9));
-        ct.style.clipPath = `inset(-12% ${(1 - wipeEase) * 104 - 4}% -12% -6%)`;
+        ct.style.clipPath = "none";
+        ct.style.transform = "none";
+        clearWipeX(ct);
+        if (reduced) {
+          ct.style.opacity = String(t);
+        } else if (t >= 0.66) {
+          ct.style.opacity = "1";
+          if (!towerIntroOn.current) {
+            towerIntroOn.current = true;
+            playTowerIntroRef.current();
+          }
+        } else if (t < 0.56) {
+          if (towerIntroOn.current) {
+            towerIntroOn.current = false;
+            resetTowerIntroRef.current();
+          }
+          ct.style.opacity = "0";
+        }
       }
       const team = towerTeamRef.current;
-      if (team) team.style.opacity = String(clamp01((t - 0.86) * 6));
+      if (team && reduced) {
+        team.style.opacity = String(t);
+        team.style.transform = "none";
+      }
       // 마퀴는 구체 카피와 같은 곡선으로 빠진다(시안 타워 프레임에 마퀴가 없다)
       const mq = marqueeRef.current;
       if (mq) mq.style.opacity = String(scene1Out);
@@ -355,6 +375,47 @@ export function HeroSection({ messages }: HeroSectionProps) {
       );
     },
     { scope: sectionRef },
+  );
+
+  /** 2번 카피 — 1번과 같은 글자 스태거 등장. 스크럽이 아니라 한 번 재생. */
+  useGSAP(
+    () => {
+      const root = sectionRef.current;
+      const charsOf = () => gsap.utils.toArray<HTMLElement>("[data-tower-char]", root);
+      const fadesOf = () => gsap.utils.toArray<HTMLElement>("[data-tower-fade]", root);
+      let tl: gsap.core.Timeline | null = null;
+
+      if (prefersReducedMotionSync()) {
+        gsap.set([...charsOf(), ...fadesOf()], { autoAlpha: 1, y: 0, clearProps: "transform" });
+        resetTowerIntroRef.current = () => {};
+        playTowerIntroRef.current = () => {};
+        return;
+      }
+
+      resetTowerIntroRef.current = () => {
+        tl?.kill();
+        tl = null;
+        gsap.set(charsOf(), { autoAlpha: 0, y: 40 });
+        gsap.set(fadesOf(), { autoAlpha: 0, y: 16 });
+      };
+      playTowerIntroRef.current = () => {
+        resetTowerIntroRef.current();
+        const chars = charsOf();
+        const fades = fadesOf();
+        const stagger = 0.075;
+        tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+        if (chars.length) tl.to(chars, { autoAlpha: 1, y: 0, duration: 0.6, stagger }, 0);
+        if (fades.length) {
+          tl.to(
+            fades,
+            { autoAlpha: 1, y: 0, duration: 0.7, stagger: 0.08 },
+            stagger * Math.max(0, chars.length - 1) + 0.15,
+          );
+        }
+      };
+      resetTowerIntroRef.current();
+    },
+    { scope: sectionRef, dependencies: [towerMounted] },
   );
 
   /**
@@ -588,13 +649,15 @@ export function HeroSection({ messages }: HeroSectionProps) {
           {/* 장면 2 — 세상을 선명하게 BGN 밝은눈안과
               Figma 2:3069 : BGN 160px / 밝은눈안과 138px */}
           <div ref={copyTowerRef} className={clsx(styles.copy, styles.copyTower)} aria-hidden>
-            <p className={styles.towerEyebrow}>{towerSlide?.eyebrow}</p>
+            <p className={styles.towerEyebrow} data-tower-fade>
+              {towerSlide?.eyebrow}
+            </p>
             <p className={styles.towerTitle}>
               <SplitBrandTitle
                 title={towerSlide?.title ?? ""}
                 brand={towerSlide?.brandToken ?? ""}
                 brandClassName={styles.brandTower}
-                animate={false}
+                mark="tower"
               />
             </p>
           </div>
@@ -603,7 +666,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
         {/* 타워 씬 하단 의료진 — Figma 2:3143. 카피(.inner) 위여야 호버가 먹는다.
             다리 페이드는 마스크라 뒤 실크·점묘가 비쳐 보인다. */}
         {towerMounted ? (
-          <div ref={towerTeamRef} className={styles.towerTeam} aria-hidden>
+          <div ref={towerTeamRef} className={styles.towerTeam} aria-hidden data-tower-fade>
             {TOWER_DOCTORS.map((src) => (
               <div key={src} className={styles.towerTeamItem}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -645,14 +708,17 @@ function SplitBrandTitle({
   brand,
   brandClassName,
   animate = true,
+  mark = "hero",
 }: {
   title: string;
   brand: string;
   /** CSS 모듈 인덱스 접근은 noUncheckedIndexedAccess 에서 undefined 가 섞인다 */
   brandClassName: string | undefined;
   animate?: boolean;
+  /** 2번 타이틀은 1번 인트로 셀렉터와 섞이면 안 된다 */
+  mark?: "hero" | "tower";
 }) {
-  const attr = animate ? { "data-hero-char": "" } : {};
+  const attr = animate ? (mark === "tower" ? { "data-tower-char": "" } : { "data-hero-char": "" }) : {};
 
   /**
    * ⚠️ 애니메이션이 없을 때는 **글자를 쪼개지 않는다.**
@@ -662,30 +728,30 @@ function SplitBrandTitle({
    * 일어나므로). 모바일 타워 카피가 시안(`2:3340`)의 `BGN` / `밝은눈안과` 가
    * 아니라 `BGN 밝은` / `눈안과` 로 끊겨 있던 원인이다.
    * 브랜드 글자(BGN)는 글자별 그라디언트 때문에 그대로 span 을 유지한다.
+   * 타워는 나머지 단어를 nowrap 으로 감싸 글자 스태거와 줄바꿈을 같이 지킨다.
    */
   const plain = !animate;
+  const chars = (text: string, key: string) =>
+    Array.from(text).map((ch, i) => (
+      <span key={`${key}${i}`} className={styles.char} aria-hidden {...attr}>
+        {ch}
+      </span>
+    ));
   if (!brand || !title.includes(brand)) {
-    return (
-      <>
-        {Array.from(title).map((ch, i) => (
-          <span key={i} className={styles.char} aria-hidden {...attr}>
-            {ch}
-          </span>
-        ))}
-      </>
-    );
+    return <>{plain ? title : chars(title, "t")}</>;
   }
   const [before, ...rest] = title.split(brand);
   const after = rest.join(brand);
+  const restBlock = plain ? (
+    after
+  ) : mark === "tower" ? (
+    <span className={styles.towerWord}>{chars(after, "a")}</span>
+  ) : (
+    chars(after, "a")
+  );
   return (
     <>
-      {plain
-        ? before
-        : Array.from(before ?? "").map((ch, i) => (
-            <span key={`b${i}`} className={styles.char} aria-hidden {...attr}>
-              {ch}
-            </span>
-          ))}
+      {plain ? before : chars(before ?? "", "b")}
       {/* `data-font="body"` — 시안의 히어로 `BGN` 은 영문이지만 Pretendard 다.
           이게 없으면 globals.css 의 `[lang|="en"]` 규칙이 Belleza 로 바꿔 버린다.
 
@@ -707,18 +773,24 @@ function SplitBrandTitle({
           {ch}
         </span>
       ))}
-      {plain
-        ? after
-        : Array.from(after).map((ch, i) => (
-            <span key={`a${i}`} className={styles.char} aria-hidden {...attr}>
-              {ch}
-            </span>
-          ))}
+      {restBlock}
     </>
   );
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/** 스크럽 등장 — 페이드 + 아주 짧은 상승. 끝나면 transform 을 비워 hover 와 안 싸운다. */
+function applyRise(el: HTMLElement | null, e: number, fromY: number) {
+  if (!el) return;
+  el.style.opacity = String(e);
+  el.style.transform = e >= 0.999 ? "none" : `translate3d(0, ${((1 - e) * fromY).toFixed(2)}px, 0)`;
+}
+
+function clearWipeX(el: HTMLElement) {
+  el.style.maskImage = "";
+  el.style.webkitMaskImage = "";
+}
 
 /** 시안 px → 스테이지 대비 %. 스테이지가 1920×920 비율이라 X/Y 가 같은 배율로 줄어든다. */
 const pct = (value: number, base: number) => `${((value / base) * 100).toFixed(4)}%`;
