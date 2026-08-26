@@ -53,6 +53,21 @@ export function MegaMenu({
   useScrollLock(open);
 
   /**
+   * 닫히는 동안에도 패널을 페인트해야 오른쪽 슬라이드가 끊기지 않는다.
+   * `inert` 를 `open` 과 같이 끄면 브라우저가 서브트리를 건너뛰어
+   * 닫힘 transform 이 한 프레임에 점프한다.
+   */
+  const [painted, setPainted] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setPainted(true);
+      return;
+    }
+    const id = window.setTimeout(() => setPainted(false), 500);
+    return () => window.clearTimeout(id);
+  }, [open]);
+
+  /**
    * 수정요청 p6 — 모바일 전체메뉴는 PC 를 좁힌 형태가 **아니다**(`48:3730`).
    * PC 는 대분류 1열 + 소분류 4열이 한 화면에 다 펼쳐지는 그리드지만,
    * 모바일은 **좌측 1depth 세로 리스트 + 우측 2depth 패널**의 2단 구조이고
@@ -107,7 +122,7 @@ export function MegaMenu({
   const withLocale = (href: string) => `/${locale}${href}`;
 
   return (
-    <div className={clsx(styles.root, open && styles.rootOpen)} inert={!open}>
+    <div className={clsx(styles.root, open && styles.rootOpen)} inert={!painted}>
       {/* 모바일에서만 실제로 보이는 여백 — 클릭하면 닫힌다 */}
       {/* 키보드에는 닫기 버튼과 Esc 가 이미 있으므로 탭 순서에서 뺀다 */}
       <button

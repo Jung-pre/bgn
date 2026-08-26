@@ -258,6 +258,16 @@
     right: var(--mobile-gutter);
   }
 
+  /**
+   * 메가메뉴가 오른쪽에서 덮으므로 pill 을 미리 끄지 않는다.
+   * 0.12s 페이드로 먼저 사라지면 햄버거만 끊기고 패널이 따로 날아온다.
+   */
+  .header[data-mega-open] {
+    opacity: 1;
+    pointer-events: none;
+    transition: none;
+  }
+
   /* 시안 `2:3451` 실측: 335×60 / padding-inline 20 / radius 8
      `whitebg-80` + blur 25 + `1px 2px 8px rgba(16,106,170,.12)` */
   .pill {

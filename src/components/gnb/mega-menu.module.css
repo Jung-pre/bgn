@@ -19,7 +19,7 @@
   overflow: hidden;
   /* 닫힘 슬라이드가 끝나기 전에는 숨기지 않는다. `rootOpen` 을 빼는 순간
      visibility 가 같이 hidden 이면 닫힘 모션이 통째로 잘린다. */
-  transition: visibility 0s linear 0.45s;
+  transition: visibility 0s linear 0.5s;
 }
 
 .rootOpen {
@@ -572,15 +572,30 @@
 
 /* --- 모바일 (≤768) — 좌측 20px 만 남기고 덮는다 ------------------------------ */
 @media (max-width: 768px) {
+  /**
+   * 오른쪽에서 들어와 오른쪽으로 나간다.
+   * 예전 ease-out 하나(0.33, 1, 0.68, 1)는 열릴 때도 닫힐 때도 **시작이 빨라**
+   * 팝처럼 보였다. 열림은 감속, 닫힘은 가속 — 양쪽 다 부드럽게.
+   */
   .panel {
     left: var(--mobile-gutter);
     grid-template-columns: 1fr;
-    transform: translateX(100%);
-    transition: transform 0.45s cubic-bezier(0.33, 1, 0.68, 1);
+    transform: translate3d(100%, 0, 0);
+    transition: transform 0.42s cubic-bezier(0.4, 0, 1, 1);
+    will-change: transform;
   }
 
   .rootOpen .panel {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .backdrop {
+    transition: opacity 0.42s ease;
+  }
+
+  .rootOpen .backdrop {
+    transition: opacity 0.5s ease;
   }
 
   .brandPanel {

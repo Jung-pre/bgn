@@ -725,6 +725,16 @@
     padding-left: 16px;
   }
 
+  /**
+   * 구체 캔버스만 내린다. `.sphereLayer` 를 옮기면 파스텔 하늘까지 같이 내려간다.
+   * `transform` 은 스크롤 콜백이 `scale(1)` 로 덮어쓰므로 top/bottom 으로 민다.
+   * 10vh 정도면 헤드라인과 떨어지되, 화면 한가운데를 비우지 않는다.
+   */
+  .canvasHost {
+    top: 10vh;
+    bottom: -2vh;
+  }
+
   /* 모바일 시안의 카피 세로 위치 — 2:3793(124/812) / 2:3380(285/812) */
   .copySphere {
     margin-top: 13.7vh;
