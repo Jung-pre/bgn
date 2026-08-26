@@ -45,12 +45,32 @@ const WAVE_STOPS = [
   { a: WAVE_CREAM, b: WAVE_BLUE, c: WAVE_PINK, mid: 0.714 },
 ] as const;
 
-/** 시안 fill 1~4. linear 스톱 + radial 두 장. CONFS 인덱스와 같다. */
+/** 시안 fill 1~4. linear 각도·스톱 + radial 두 장. CONFS 인덱스와 같다. */
 const FIGMA_FILLS = [
+  {
+    a: WAVE_CREAM,
+    b: WAVE_BLUE,
+    c: WAVE_PINK,
+    t: [0.2516, 0.5319, 0.8419] as const,
+    angle: 135,
+    radA: { cx: 0.8221, cy: 0.0, rx: 3.0145, ry: 1.3746 },
+    radB: { cx: 0.0946, cy: 1.0, rx: 4.6307, ry: 0.6437 },
+  },
+  {
+    a: WAVE_BLUE,
+    b: WAVE_CREAM,
+    c: WAVE_PINK,
+    t: [0.2059, 0.5004, 0.7948] as const,
+    angle: 145,
+    radA: { cx: 0.9616, cy: 0.0, rx: 1.4789, ry: 1.4016 },
+    radB: { cx: 0.0946, cy: 1.0, rx: 2.3457, ry: 0.6437 },
+  },
   {
     a: WAVE_BLUE,
     b: WAVE_PINK,
     c: WAVE_CREAM,
+    t: [0.0, 0.5, 1.0] as const,
+    angle: 180,
     radA: { cx: 0.7725, cy: 1.0, rx: 1.2129, ry: 0.5694 },
     radB: { cx: 0.1185, cy: 0.0, rx: 2.2267, ry: 0.6289 },
   },
@@ -58,22 +78,10 @@ const FIGMA_FILLS = [
     a: WAVE_PINK,
     b: WAVE_BLUE,
     c: WAVE_CREAM,
+    t: [0.0, 0.4952, 1.0] as const,
+    angle: 180,
     radA: { cx: 0.7746, cy: 0.0, rx: 1.2224, ry: 0.5705 },
     radB: { cx: 0.1456, cy: 1.0, rx: 2.0719, ry: 0.6128 },
-  },
-  {
-    a: WAVE_CREAM,
-    b: WAVE_PINK,
-    c: WAVE_BLUE,
-    radA: { cx: 0.7725, cy: 1.0, rx: 1.2129, ry: 0.5694 },
-    radB: { cx: 0.2246, cy: 0.0, rx: 1.61, ry: 0.5708 },
-  },
-  {
-    a: WAVE_CREAM,
-    b: WAVE_BLUE,
-    c: WAVE_PINK,
-    radA: { cx: 0.8221, cy: 0.0, rx: 3.0145, ry: 1.3746 },
-    radB: { cx: 0.0946, cy: 1.0, rx: 4.6307, ry: 0.6437 },
   },
 ] as const;
 
@@ -102,8 +110,8 @@ const CONFS: readonly RibbonConf[] = [
   {
     slot: 0,
     amp: 0.2,
-    twAmp: 2.6,
-    twFreq: 0.95,
+    twAmp: 1,
+    twFreq: 1.5,
     twistDir: 1,
     phase: 0.0,
     speed: 0.55,
@@ -115,8 +123,8 @@ const CONFS: readonly RibbonConf[] = [
   {
     slot: 1,
     amp: 0.15,
-    twAmp: 2.8,
-    twFreq: 1.45,
+    twAmp: 1.3,
+    twFreq: 1.75,
     twistDir: 1,
     phase: 2.1,
     speed: 0.62,
@@ -129,7 +137,7 @@ const CONFS: readonly RibbonConf[] = [
     slot: 2,
     amp: 0.16,
     twAmp: 2.5,
-    twFreq: 1.05,
+    twFreq: 0.75,
     twistDir: -1,
     phase: 4.4,
     speed: 0.5,
@@ -141,7 +149,7 @@ const CONFS: readonly RibbonConf[] = [
   {
     slot: 3,
     amp: 0.09,
-    twAmp: 2.1,
+    twAmp: 1.6,
     twFreq: 1.2,
     twistDir: 1,
     phase: 1.3,
@@ -236,6 +244,8 @@ const MEMBRANE_FRAG = /* glsl */ `
   uniform vec3 uBlueC;
   uniform float uMid;
   uniform float uSpecialFill;
+  uniform float uGradAngle;
+  uniform vec3 uStopT;
   uniform vec2 uRadACenter;
   uniform vec2 uRadARadii;
   uniform vec2 uRadBCenter;
@@ -294,8 +304,8 @@ const MEMBRANE_FRAG = /* glsl */ `
     float along = smoothstep(0.0, 0.01, u) * smoothstep(1.0, 0.99, u);
 
     /* ① 방향 기반 색 */
-    float fold = pow(abs(vRoll), 2.0);            /* 골 — 옆으로 서는 자리 */
-    float crest = pow(clamp(vTwist, 0.0, 1.0), 3.0); /* 정면 마루 */
+    float fold = pow(abs(vRoll), 1.35);
+    float crest = pow(clamp(vTwist, 0.0, 1.0), 2.2);
 
     /* GLSL ES 1.00: 선언은 블록 맨 앞. 중간에 float 를 끼우면 컴파일이
        실패하고, Three 가 이전 셰이더(흰 그레인)를 그대로 쓴다. */
@@ -330,19 +340,19 @@ const MEMBRANE_FRAG = /* glsl */ `
     vec3 cC;
     float g3;
     float speckle;
+    vec2 st;
+    vec2 gdir;
+    float gt;
 
     /* 시안 fill. 색은 스톱, 지직은 원래처럼 알파만 뚫는다. */
     if (uSpecialFill > 0.5) {
-      flow = fract(vUv.x * 1.15 - uTime * 0.16 + uPhase * 0.07);
-      k = flow * 3.0;
-      cA = mix(uStopA, uStopB, clamp(k, 0.0, 1.0));
-      cB = mix(uStopB, uStopC, clamp(k - 1.0, 0.0, 1.0));
-      cC = mix(uStopC, uStopA, clamp(k - 2.0, 0.0, 1.0));
-      lin = mix(cA, cB, step(1.0, k));
-      lin = mix(lin, cC, step(2.0, k));
-      box = vec2(fract(screenP - uTime * 0.08), vUv.y);
-      radA = 1.0 - smoothstep(0.0, 1.0, length((box - uRadACenter) / uRadARadii));
-      radB = 1.0 - smoothstep(0.0, 1.0, length((box - uRadBCenter) / uRadBRadii));
+      st = vec2(vUv.x, 1.0 - vUv.y);
+      gdir = vec2(sin(uGradAngle), -cos(uGradAngle));
+      gt = clamp(dot(st - vec2(0.5), gdir) + 0.5, 0.0, 1.0);
+      lin = mix(uStopA, uStopB, smoothstep(uStopT.x, uStopT.y, gt));
+      lin = mix(lin, uStopC, smoothstep(uStopT.y, uStopT.z, gt));
+      radA = 1.0 - smoothstep(0.0, 1.0, length((st - uRadACenter) / uRadARadii));
+      radB = 1.0 - smoothstep(0.0, 1.0, length((st - uRadBCenter) / uRadBRadii));
       lin = mix(lin, uWhite, 0.12 * radA + 0.12 * radB);
       dens = smoothstep(0.16, 0.52, core + (sand - 0.5) * 0.6);
       dens *= 0.84 + 0.3 * sand;
@@ -350,7 +360,7 @@ const MEMBRANE_FRAG = /* glsl */ `
       speckle = 0.5 + 0.5 * g3;
       dens *= mix(1.0, smoothstep(0.20, 0.58, speckle), clamp(uGrain * 0.38, 0.0, 0.9));
       col = lin;
-      alpha = dens * along * uBodyAlpha * (1.0 + fold * 0.22);
+      alpha = dens * along * uBodyAlpha;
     } else {
       dens = smoothstep(0.16, 0.52, core + (sand - 0.5) * 0.6);
       dens *= 0.84 + 0.3 * sand;
@@ -461,7 +471,7 @@ function RibbonCamera() {
  * **셰이더·색·꼬임·그레인은 손대지 않는다.** 지오메트리 폭만 줄인다.
  */
 const MOBILE_THIN = 0.62;
-const RIBBON_FILL_REV = 8;
+const RIBBON_FILL_REV = 11;
 
 function Ribbons() {
   const groupRef = useRef<THREE.Group>(null);
@@ -526,6 +536,8 @@ function Ribbons() {
             uBlueC: { value: WAVE_BLUE.clone() },
             uMid: { value: wave.mid },
             uSpecialFill: { value: 1 },
+            uGradAngle: { value: (fill.angle * Math.PI) / 180 },
+            uStopT: { value: new THREE.Vector3(fill.t[0], fill.t[1], fill.t[2]) },
             uRadACenter: { value: new THREE.Vector2(fill.radA.cx, fill.radA.cy) },
             uRadARadii: { value: new THREE.Vector2(fill.radA.rx, fill.radA.ry) },
             uRadBCenter: { value: new THREE.Vector2(fill.radB.cx, fill.radB.cy) },

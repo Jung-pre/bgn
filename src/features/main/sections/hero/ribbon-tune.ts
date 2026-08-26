@@ -59,10 +59,10 @@ export const RIBBON_LAYER_IDS = ["r0", "r1", "r2", "r3"] as const;
 export type RibbonLayerId = (typeof RIBBON_LAYER_IDS)[number];
 
 export const RIBBON_LAYER_LABELS: Record<RibbonLayerId, string> = {
-  r0: "띠 1 파랑·핑크·크림",
-  r1: "띠 2 핑크·파랑·크림",
-  r2: "띠 3 크림·핑크·파랑",
-  r3: "띠 4 크림·파랑·핑크",
+  r0: "띠 1 크림·파랑·핑크",
+  r1: "띠 2 파랑·크림·핑크",
+  r2: "띠 3 파랑·핑크·크림",
+  r3: "띠 4 핑크·파랑·크림",
 };
 
 /** `scene-ribbons.tsx` CONFS 와 같은 실측값. 패널 리셋이 여기로 돌아온다. */
@@ -75,15 +75,15 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   show3: true,
 
   ampMul: 0.72,
-  twistMul: 0.66,
+  twistMul: 1.98,
   speedMul: 1.5,
   timeScale: 1,
-  bodyAlphaMul: 0.88,
+  bodyAlphaMul: 1,
   roseMul: 1,
   goldMul: 1,
   blueMul: 1,
   iridMul: 1,
-  grainMul: 0.7,
+  grainMul: 1.11,
   dotSizeMul: 1,
 
   groupScale: 1,
@@ -94,8 +94,8 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
 
   r0: {
     amp: 0.2,
-    twAmp: 2.6,
-    twFreq: 0.95,
+    twAmp: 1,
+    twFreq: 1.5,
     twistDir: 1,
     phase: 0,
     speed: 0.55,
@@ -107,8 +107,8 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   },
   r1: {
     amp: 0.15,
-    twAmp: 2.8,
-    twFreq: 1.45,
+    twAmp: 1.3,
+    twFreq: 1.75,
     twistDir: 1,
     phase: 2.1,
     speed: 0.62,
@@ -121,7 +121,7 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   r2: {
     amp: 0.16,
     twAmp: 2.5,
-    twFreq: 1.05,
+    twFreq: 0.75,
     twistDir: -1,
     phase: 4.4,
     speed: 0.5,
@@ -133,7 +133,7 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   },
   r3: {
     amp: 0.09,
-    twAmp: 2.1,
+    twAmp: 1.6,
     twFreq: 1.2,
     twistDir: 1,
     phase: 1.3,
@@ -149,7 +149,7 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
 let current: RibbonTune = structuredClone(RIBBON_TUNE_DEFAULTS);
 const listeners = new Set<() => void>();
 let appliedGen = 0;
-const TUNE_GEN = 7;
+const TUNE_GEN = 9;
 
 export function getRibbonTune(): RibbonTune {
   if (appliedGen !== TUNE_GEN) {

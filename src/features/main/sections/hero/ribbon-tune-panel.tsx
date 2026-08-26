@@ -19,7 +19,6 @@ import {
 import styles from "./globe-tune-panel.module.css";
 
 function clientEnabled() {
-  if (process.env.NODE_ENV !== "production") return true;
   return new URLSearchParams(window.location.search).has("tune");
 }
 
@@ -211,10 +210,10 @@ function Panel({ onClose }: { onClose: () => void }) {
       <Group title="레이어" hint="꺼도 지오메트라는 남고, 화면에서만 숨깁니다.">
         <div className={styles.toggles}>
           <Toggle label="멤브레인" k="showMembrane" tune={tune} />
-          <Toggle label="띠 1 흰·파랑" k="show0" tune={tune} />
-          <Toggle label="띠 2 알록달록" k="show1" tune={tune} />
-          <Toggle label="띠 3 알록달록" k="show2" tune={tune} />
-          <Toggle label="띠 4 흰·파랑" k="show3" tune={tune} />
+          <Toggle label="띠 1 크림·파랑·핑크" k="show0" tune={tune} />
+          <Toggle label="띠 2 파랑·크림·핑크" k="show1" tune={tune} />
+          <Toggle label="띠 3 파랑·핑크·크림" k="show2" tune={tune} />
+          <Toggle label="띠 4 핑크·파랑·크림" k="show3" tune={tune} />
         </div>
       </Group>
 

@@ -172,14 +172,14 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
   gxStart: 0.29,
   gxEnd: 0.64,
   /** 타워가 자리 잡은 직후 — 더 줄어들기 전에 파티클을 걷는다 */
-  gxCrossStart: 0.66,
-  gxCrossEnd: 0.84,
+  gxCrossStart: 0.76,
+  gxCrossEnd: 0.94,
 };
 
 let current: GlobeTune = { ...GLOBE_TUNE_DEFAULTS };
 const listeners = new Set<() => void>();
 let appliedGen = 0;
-const TUNE_GEN = 6;
+const TUNE_GEN = 7;
 
 export function getGlobeTune(): GlobeTune {
   if (appliedGen !== TUNE_GEN) {

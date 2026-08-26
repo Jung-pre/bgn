@@ -629,7 +629,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
         {/* ── 카피 ───────────────────────────────────────────────────── */}
         <div className={styles.inner}>
           {/* 장면 1 — 세계를 향한 BGN의 도약
-              Figma 2:475 : left 80 / top 160, ExtraBold 96px, BGN 만 120px 그라데이션 */}
+              ExtraBold 6rem / BGN 만 타원 라디얼 (#8d79ff → #102c87) */}
           <div ref={copySphereRef} className={clsx(styles.copy, styles.copySphere)}>
             <p className={styles.line1} data-hero-fade>
               {sphereSlide?.eyebrow}

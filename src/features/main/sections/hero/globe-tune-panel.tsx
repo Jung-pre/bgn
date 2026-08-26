@@ -13,7 +13,6 @@ import {
 import styles from "./globe-tune-panel.module.css";
 
 function clientEnabled() {
-  if (process.env.NODE_ENV !== "production") return true;
   return new URLSearchParams(window.location.search).has("tune");
 }
 

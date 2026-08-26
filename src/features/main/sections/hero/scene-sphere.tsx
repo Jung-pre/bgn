@@ -804,14 +804,21 @@ const POINT_FRAGMENT = /* glsl */ `
     /* ⚠️ 은하수 구간에서는 이 억제를 푼다. 구체일 때 대륙이 뭉치는 걸 막는 보정인데
        원반으로 펴진 뒤에도 걸려 있으면 띠의 왼쪽 절반만 어두워져 반쪽만 보인다. */
     col *= 1.0 - hot * 0.46 * (1.0 - vGalaxy);
-    /* 바디와 같이 사이드 링을 돌되, 도트는 더 약하게. 켜짐도 같은 박자. */
-    vec2 g0 = vec2(cos(uTime * 0.26), sin(uTime * 0.22)) * vec2(0.70, 0.56);
-    vec2 g1 = vec2(cos(uTime * 0.41 + 2.4), sin(uTime * 0.33 + 1.6)) * vec2(0.80, 0.66);
+    /* 둥근 스포트. 바디와 같은 랜덤 헤맴 + 합쳐지면 한쪽이 꺼진다 */
+    vec2 g0 = vec2(
+      sin(uTime * 0.19) * 0.70 + sin(uTime * 0.47) * 0.28,
+      cos(uTime * 0.31) * 0.56 + cos(uTime * 0.53) * 0.20
+    );
+    vec2 g1 = vec2(
+      sin(uTime * 0.23 + 2.4) * 0.80 + sin(uTime * 0.59 + 1.1) * 0.32,
+      cos(uTime * 0.37 + 0.6) * 0.66 + cos(uTime * 0.41 + 2.0) * 0.24
+    );
+    float pk0 = smoothstep(0.04, 0.36, sin(uTime * 0.31));
+    float pk1 = smoothstep(0.04, 0.36, sin(uTime * 0.39 + 1.87));
+    pk1 *= 1.0 - smoothstep(0.26, 0.07, length(g0 - g1)) * pk0 * 0.9;
     vec2 d0 = vScreen - g0;
     vec2 d1 = vScreen - g1;
-    float pk0 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 0.000));
-    float pk1 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 2.513));
-    float pg = 1.0 - (1.0 - exp(-dot(d0, d0) / 0.05) * 0.14 * pk0) * (1.0 - exp(-dot(d1, d1) / 0.014) * 0.11 * pk1);
+    float pg = 1.0 - (1.0 - exp(-dot(d0, d0) / 0.055) * 0.14 * pk0) * (1.0 - exp(-dot(d1, d1) / 0.016) * 0.11 * pk1);
     pg *= mix(0.25, 1.0, smoothstep(0.28, 0.66, length(vScreen)));
     col += pg * (1.0 - vGalaxy);
 
@@ -837,8 +844,8 @@ const CUE = {
   zoomIn: [0.0, 0.4],
   /** 원형 평판(바디) 소멸 — 확대가 끝나기 전에 걷어 파티클만 남긴다 */
   bodyOut: [0.22, 0.4],
-  /** 다시 축소. 시작을 zoomIn 끝보다 뒤로 둬서 그 사이가 **확대 유지**다. */
-  zoomOut: [0.58, 0.76],
+  /** 다시 축소. 시작을 더 뒤로 둬 확대 화면이 1→2 전환까지 남는다. */
+  zoomOut: [0.7, 0.9],
 } as const;
 
 /** smoothstep(a,b,x) 와 같다 */
@@ -1239,6 +1246,14 @@ const BODY_FRAGMENT = /* glsl */ `
   const vec3 PEARL = vec3(0.84, 0.88, 0.96);
   const vec3 COOL  = vec3(0.42, 0.70, 0.98);
 
+  /* 서로 안 맞는 주기로 헤매서 궤도처럼 안 보이게 */
+  vec2 specWander(float t, vec2 amp, vec4 fq, vec2 ph) {
+    return vec2(
+      sin(t * fq.x + ph.x) * amp.x + sin(t * fq.z + ph.x * 2.13) * amp.x * 0.4,
+      cos(t * fq.y + ph.y) * amp.y + cos(t * fq.w + ph.y * 1.61) * amp.y * 0.36
+    );
+  }
+
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
     float r = length(p);
@@ -1339,31 +1354,36 @@ const BODY_FRAGMENT = /* glsl */ `
     col *= 1.0 - hot * 0.28;
 
     /**
-     * 빛반사 — 궤도 5개. 같은 박자에 켜짐을 엇갈려 화면에 2~3개만 남긴다.
+     * 둥근 스포트. 가까이 가면 하나로 붙고, 한쪽이 꺼지며 사라진다.
+     * 궤도는 서로소에 가까운 주기라 원 궤도처럼 안 읽힌다.
      */
-    vec2 drift = uLightXY * 0.55;
-    vec2 w0 = vec2(cos(uTime * 0.26 + 0.2), sin(uTime * 0.22 + 0.1)) * vec2(0.72, 0.58) + drift;
-    vec2 w1 = vec2(cos(uTime * 0.33 + 2.5), sin(uTime * 0.28 + 1.8)) * vec2(0.82, 0.70) + drift * 0.5;
-    vec2 w2 = vec2(cos(uTime * 0.47 + 4.2), sin(uTime * 0.40 + 3.6)) * vec2(0.78, 0.64);
-    vec2 w3 = vec2(cos(uTime * 0.39 + 5.4), sin(uTime * 0.35 + 0.9)) * vec2(0.86, 0.60);
-    vec2 w4 = vec2(cos(uTime * 0.54 + 1.3), sin(uTime * 0.46 + 4.8)) * vec2(0.74, 0.76);
-    float k0 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 0.000));
-    float k1 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 2.513));
-    float k2 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 5.027));
-    float k3 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 1.257));
-    float k4 = smoothstep(0.06, 0.40, sin(uTime * 0.36 + 3.770));
-    float b0 = exp(-dot(p - w0, p - w0) / 0.12) * 0.38 * k0;
-    float b1 = exp(-dot(p - w1, p - w1) / 0.040) * 0.48 * k1;
-    float b2 = exp(-dot(p - w2, p - w2) / 0.013) * 0.34 * k2;
-    float b3 = exp(-dot(p - w3, p - w3) / 0.007) * 0.26 * k3;
-    float b4 = exp(-dot(p - w4, p - w4) / 0.009) * 0.24 * k4;
-    float rimW = pow(smoothstep(0.72, 0.995, r), 2.6);
-    float cresMove = rimW * exp(-dot(p - w1, p - w1) / 0.10) * 0.50 * k1;
+    vec2 drift = uLightXY * 0.45;
+    vec2 w0 = specWander(uTime, vec2(0.70, 0.56), vec4(0.19, 0.31, 0.47, 0.53), vec2(0.2, 1.1)) + drift;
+    vec2 w1 = specWander(uTime, vec2(0.80, 0.66), vec4(0.23, 0.37, 0.59, 0.41), vec2(2.4, 0.6)) + drift * 0.5;
+    vec2 w2 = specWander(uTime, vec2(0.74, 0.60), vec4(0.29, 0.17, 0.61, 0.43), vec2(4.1, 3.2));
+    vec2 w3 = specWander(uTime, vec2(0.84, 0.58), vec4(0.13, 0.43, 0.67, 0.31), vec2(5.3, 1.8));
+    vec2 w4 = specWander(uTime, vec2(0.72, 0.70), vec4(0.41, 0.21, 0.53, 0.71), vec2(1.4, 4.7));
+    float k0 = smoothstep(0.04, 0.36, sin(uTime * 0.31 + 0.00));
+    float k1 = smoothstep(0.04, 0.36, sin(uTime * 0.39 + 1.87));
+    float k2 = smoothstep(0.04, 0.36, sin(uTime * 0.27 + 4.12));
+    float k3 = smoothstep(0.04, 0.36, sin(uTime * 0.44 + 2.61));
+    float k4 = smoothstep(0.04, 0.36, sin(uTime * 0.35 + 5.03));
+    /* 붙으면 나중 빛이 먼저 꺼져, 합쳐진 뒤 사라지는 그림 */
+    k1 *= 1.0 - smoothstep(0.26, 0.07, length(w0 - w1)) * k0 * 0.9;
+    k2 *= 1.0 - smoothstep(0.26, 0.07, length(w0 - w2)) * k0 * 0.9;
+    k2 *= 1.0 - smoothstep(0.26, 0.07, length(w1 - w2)) * k1 * 0.9;
+    k3 *= 1.0 - smoothstep(0.26, 0.07, length(w1 - w3)) * k1 * 0.9;
+    k4 *= 1.0 - smoothstep(0.26, 0.07, length(w0 - w4)) * k0 * 0.9;
+    k4 *= 1.0 - smoothstep(0.26, 0.07, length(w2 - w4)) * k2 * 0.9;
+    float b0 = exp(-dot(p - w0, p - w0) / 0.11) * 0.40 * k0;
+    float b1 = exp(-dot(p - w1, p - w1) / 0.042) * 0.48 * k1;
+    float b2 = exp(-dot(p - w2, p - w2) / 0.016) * 0.34 * k2;
+    float b3 = exp(-dot(p - w3, p - w3) / 0.009) * 0.26 * k3;
+    float b4 = exp(-dot(p - w4, p - w4) / 0.012) * 0.24 * k4;
     float spec = 1.0 - (1.0 - b0) * (1.0 - b1);
     spec = 1.0 - (1.0 - spec) * (1.0 - b2);
     spec = 1.0 - (1.0 - spec) * (1.0 - b3);
     spec = 1.0 - (1.0 - spec) * (1.0 - b4);
-    spec = 1.0 - (1.0 - spec) * (1.0 - cresMove);
     /* 디스크 한가운데는 세기를 깎는다 — 스쳐 지나가도 겹쳐 타지 않게 */
     spec *= mix(0.34, 1.0, smoothstep(0.26, 0.66, r));
     vec3 glass = vec3(1.0, 0.997, 0.992);
