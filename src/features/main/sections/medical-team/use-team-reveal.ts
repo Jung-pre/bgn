@@ -45,10 +45,12 @@ export function useTeamReveal<T extends HTMLElement>() {
       gsap.set(wipes, { clipPath: "inset(0 100% 0 0)" });
       if (marks.length > 0) gsap.set(marks, { clipPath: TITLE_MARK_WIPE.from });
       gsap.set(fades, { autoAlpha: 0, y: 16 });
+      /* 3차 수정요청 "내려갔을 때 하나씩 나타나는 인터랙션" — 폭을 키우고
+         간격을 벌려 '하나씩'이 읽히게 한다(0.09 는 한 덩어리로 보였다). */
       gsap.set(cards, {
         autoAlpha: 0,
-        y: 64,
-        scale: 0.96,
+        y: 76,
+        scale: 0.94,
         transformOrigin: "50% 80%",
       });
       if (controls) gsap.set(controls, { autoAlpha: 0, y: 12 });
@@ -112,7 +114,12 @@ export function useTeamReveal<T extends HTMLElement>() {
         /* 화면 밖 카드는 스태거에 넣지 않는다. 넣으면 왼쪽 투명 장이 먼저
            시간을 잡아먹고, 나중에 스와이프했을 때 y/alpha 가 0 으로 남아 있다. */
         if (offstage.length > 0) {
-          gsap.set(offstage, { autoAlpha: 1, y: 0, scale: 1, clearProps: "opacity,visibility,transform" });
+          gsap.set(offstage, {
+            autoAlpha: 1,
+            y: 0,
+            scale: 1,
+            clearProps: "opacity,visibility,transform",
+          });
         }
 
         tl.to(
@@ -121,8 +128,9 @@ export function useTeamReveal<T extends HTMLElement>() {
             autoAlpha: 1,
             y: 0,
             scale: 1,
-            duration: 0.7,
-            stagger: 0.09,
+            duration: 0.85,
+            ease: "power4.out",
+            stagger: 0.16,
             clearProps: "opacity,visibility,transform",
           },
           0.28,

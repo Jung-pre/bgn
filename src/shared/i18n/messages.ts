@@ -289,6 +289,8 @@ const ko: Dictionary = {
       { name: "송윤중", title: "원장", photo: "/main/img_02_doctor04.webp" },
       { name: "김민경", title: "원장", photo: "/main/img_02_doctor05.webp" },
       { name: "이연호", title: "원장", photo: "/main/img_02_doctor06.webp" },
+      /* 기존 1~8 순서에서 7·8만 자리 교체 → 1.2.3.4.5.6.8.7
+         doctor07 = 이수민, doctor08 = 김소현. */
       { name: "김소현", title: "원장", photo: "/main/img_02_doctor08.webp" },
       { name: "이수민", title: "원장", photo: "/main/img_02_doctor07.webp" },
     ],

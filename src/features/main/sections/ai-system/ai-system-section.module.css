@@ -134,11 +134,22 @@
  *   소유하고 있어서 hover 가 transform 을 만지면 트윈 도중 값이 서로 덮는다.
  */
 @media (hover: hover) {
+  /* 3차 수정요청 "호버했을시에 살짝만 더 효과" — 들림을 2px 더 주고
+     사진이 따라서 미세하게 확대된다. 카드 자체 scale 은 안 건다(글자 블러). */
   .card:hover {
-    translate: 0 -6px;
+    translate: 0 -8px;
     border-color: rgba(255, 255, 255, 0.9);
     background: linear-gradient(180deg, var(--whitebg-80) 18%, rgba(131, 205, 255, 0.52) 100%);
     box-shadow: 2px 10px 24px 0 rgba(16, 106, 170, 0.2);
+  }
+
+  .card:hover .art img {
+    scale: 1.045;
+  }
+
+  .card .art img {
+    transition: scale 0.35s ease;
+    transform-origin: 50% 60%;
   }
 
   /* 4번 연보라 카드는 같은 원리로 연보라 쪽을 올린다 */
