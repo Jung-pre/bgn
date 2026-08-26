@@ -281,7 +281,9 @@
    */
   .section {
     min-height: 0;
-    padding-block: 0 var(--gap-section);
+    /* 하단 --gap-section 은 마지막 흰 카드 뒤에 네이비 띠를 만든다.
+       다음 섹션(이벤트)이 바로 이어지므로 비우지 않는다. */
+    padding-block: 0;
     background:
       url("/main/img_09_bg01_mo.webp") repeat-y center top / 100% 100svh,
       var(--brand-navy);
@@ -301,6 +303,7 @@
   }
 
   .track {
+    flex: none;
     flex-direction: column;
     width: 100%;
     transform: none !important; /* GSAP 이 남긴 x 를 무력화 */
@@ -348,6 +351,11 @@
     position: static;
     font-size: var(--fs-32);
     white-space: nowrap;
+  }
+
+  /* 마지막 카드 아래를 비우면 이벤트 섹션 앞에 흰 칸이 남는다 */
+  .card:last-child {
+    padding-bottom: 16px;
   }
 
   /* viewBox 가 1920 → 375 로 바뀌었으므로 글자도 그 좌표계로 다시 잡는다.
