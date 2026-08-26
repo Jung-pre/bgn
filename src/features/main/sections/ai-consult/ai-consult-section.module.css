@@ -303,11 +303,25 @@
   multiply 를 VideoSlot 안쪽 video 에 주면 `.root { overflow: hidden }` 이
   스태킹을 끊어 흰 사각형이 그대로 남는다. 호스트에 올려야 섹션 흰 배경과
   하단 메시만 눌리고, B 본체(회청)는 흰 위에서는 톤이 거의 그대로다.
+
+  iOS 는 <video> 를 불투명 CALayer 로 합성해서 multiply 가 검정 사각형이 된다.
+  블렌드만 끄면 영상 원본(흰 바탕)이 그대로 나온다. 섹션도 흰 배경이라 이음매가 거의 없다.
 */
 .objectVideo {
   border-radius: var(--radius-lg);
   background: transparent;
   mix-blend-mode: multiply;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .objectVideo {
+    mix-blend-mode: normal;
+    background: #fff;
+  }
+
+  .objectVideo :is(img, video) {
+    background: #fff;
+  }
 }
 
 /* ── 확대 상태 (2:1244) ─────────────────────────────────────────────────── */
