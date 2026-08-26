@@ -25,6 +25,15 @@ export const BREAKPOINT = {
 
 export type BreakpointKey = keyof typeof BREAKPOINT;
 
+/**
+ * 히스토리 물레방아를 모바일에서 켤 수 있는 세로 하한.
+ *
+ * 스티키 카드(~214) + GNB 80 + 본문 최소 ~220 + 하단 퀵바 152 ≈ 690.
+ * 720 이면 iPhone SE(667)·가로모드는 제외하고, 812+ 기기는 포함한다.
+ * CSS `history-section.module.css` 의 동일 미디어쿼리와 **숫자를 맞춰 둔다.**
+ */
+export const HISTORY_WHEEL_MIN_HEIGHT = 720;
+
 /** `(max-width: 768px)` — 이 값 "이하" */
 export const mqDown = (key: BreakpointKey) => `(max-width: ${BREAKPOINT[key]}px)`;
 /** `(min-width: 769px)` — mqDown 과 정확히 상보. 경계가 겹치지 않는다. */
@@ -37,7 +46,7 @@ export const MQ = {
    *   ① 인라인 GNB → 햄버거 전용
    *   ② 하단 고정 퀵바 노출 (PC 는 우하단 팬아웃 FAB)
    *   ③ 진료센터 hover 아코디언 → 센터모드 스와이퍼
-   *   ④ 히스토리 좌우분할 → 세로 스택
+   *   ④ 히스토리 좌우분할 → 세로 스택(짧은 화면) / 물레방아(세로 충분)
    */
   mobile: mqDown("md"),
   desktop: mqUp("md"),
@@ -56,4 +65,12 @@ export const MQ = {
   coarsePointer: "(pointer: coarse)",
 
   reduceMotion: "(prefers-reduced-motion: reduce)",
+
+  /**
+   * 모바일 + 세로가 충분한 기기에만 히스토리 책넘김(사진+카피 sticky)를 켠다.
+   * 짧으면 카드가 본문을 덮거나 하단바에 가린다 → `historyStack`.
+   */
+  historyWheel: `${mqDown("md")} and (min-height: ${HISTORY_WHEEL_MIN_HEIGHT}px) and (orientation: portrait)`,
+  /** 물레방아를 끄고 시대별 사진을 펼쳐 놓는 모바일 */
+  historyStack: `${mqDown("md")} and ((max-height: ${HISTORY_WHEEL_MIN_HEIGHT - 1}px) or (orientation: landscape))`,
 } as const;

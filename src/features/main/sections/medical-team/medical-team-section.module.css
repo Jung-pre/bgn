@@ -179,6 +179,11 @@
   transition: none;
 }
 
+/* 루프 이음매 텔레포트 프레임. 켜 둔 채면 숨은 카드가 덱을 가로질러 지나간다. */
+.stage[data-snap] .card {
+  transition: none;
+}
+
 .deck {
   position: relative;
   height: 100%;

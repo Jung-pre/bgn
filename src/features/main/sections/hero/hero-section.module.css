@@ -390,9 +390,11 @@
  * 두 장면의 카피는 같은 그리드 칸에 겹쳐 있고 opacity 로 교차한다.
  *
  * ⚠️ 세로 위치는 **장면마다 다르다.** 예전엔 둘 다 `align-self: center` 였는데
- *    시안은 구체 씬이 화면 위쪽 1/5 지점, 타워 씬이 거의 정중앙이다.
+ *    시안은 구체 씬이 화면 위쪽 1/5 지점, 타워 씬은 PC 와 모바일이 갈린다.
  *      구체 씬  top 160 / 920 = 17.4%   (2:475, 모바일 2:3793 은 124/812 = 15.3%)
- *      타워 씬  top 357 / 920 = 38.8%   (8:794, 모바일 2:3380 은 285/812 = 35.1%)
+ *      타워 씬  top 357 / 920 = 38.8%   (8:794)
+ *      모바일 타워  top 194.78 / 812 = 24.0%  (107:3771) — 의료진 2열이 생기면서
+ *      예전 285/812(35.1%) 에서 위로 올렸다.
  *    `%` 마진은 **가로 폭** 기준이라 쓸 수 없다 — vh 로 잡는다.
  */
 .copy {
@@ -728,10 +730,18 @@
     word-break: keep-all;
   }
 
+  .towerWord {
+    /* 107:3774 itemSpacing −4. BGN 줄(86) 과 한글 줄(90) 이 4px 겹친다.
+       예전엔 margin-bottom 이라 아래 의료진을 제목 안으로 끌어올렸다. */
+    margin-top: -4px;
+  }
+
   .towerWord .char {
     vertical-align: top;
-    line-height: 5.625rem;
-    height: 5.625rem;
+    /* 시안 행간 5.625rem 은 BGN↔한글 줄 간격용. 글자 상자를 그대로 두면
+       한글 글리프 아래 ~18px 빈 칸이 의료진과 벌어진다. */
+    line-height: 4.5rem;
+    height: 4.5rem;
   }
 
   .brandTower {
@@ -762,8 +772,8 @@
     );
   }
 
-  /* 시안 카피 좌측 — 아이브로우 x37 / BGN x46 / 밝은눈안과 x40.
-     우리는 21 / 36 / 24 라 게이트(20) 위에 16 을 더 준다. */
+  /* 카피 좌측 — 107:3771 프레임 x36. 거터 20 위에 16 을 더 준다.
+     아이브로우·BGN·한글·의료진이 같은 왼쪽 벽에 붙는다. */
   .copyTower {
     padding-left: 16px;
   }
@@ -778,13 +788,13 @@
     bottom: -2vh;
   }
 
-  /* 모바일 시안의 카피 세로 위치 — 2:3793(124/812) / 2:3380(285/812) */
+  /* 모바일 시안의 카피 세로 위치 — 구체 2:3793(124/812) / 타워 107:3771(194.78/812) */
   .copySphere {
     margin-top: 13.7vh;
   }
 
   .copyTower {
-    margin-top: 35.1vh;
+    margin-top: 24vh;
   }
 
   /**
@@ -876,9 +886,76 @@
     display: none;
   }
 
-  /* 모바일 시안에는 히어로 컷아웃이 없다. 의료진은 소개 섹션에서만 나온다. */
+  /**
+   * 모바일 타워 씬 의료진 — Figma `107:3780` (262×164.45, 2열×4).
+   *   카드 85.85×122.64 / 가로 스텝 61.32 / 앞줄 y +41.81
+   * PC 는 1열 8인이라 기본 `.towerTeam` 플렉스를 유지하고, 여기만 절대배치로 덮는다.
+   */
   .towerTeam {
-    display: none;
+    display: block;
+    position: relative;
+    contain: none;
+    width: 86.47%; /* 262 / 303 */
+    max-width: 262px;
+    aspect-ratio: 262 / 164.45;
+    /* 시안 107:3771 flex gap 16 — 제목 블록(205)과 의료진(y221) 사이.
+       예전 −2.75rem 은 그 간격을 메우려다 머리가 한글 제목을 덮었다. */
+    margin-top: 16px;
+    overflow: visible;
+  }
+
+  .towerTeamItem {
+    position: absolute;
+    flex: none;
+    width: 32.767%; /* 85.85 / 262 */
+    height: 74.576%; /* 122.64 / 164.45 */
+    margin-right: 0;
+  }
+
+  .towerTeamItem:nth-child(1) {
+    left: 0;
+    top: 0;
+    z-index: 1;
+  }
+  .towerTeamItem:nth-child(2) {
+    left: 23.405%; /* 61.32 / 262 */
+    top: 0;
+    z-index: 2;
+  }
+  .towerTeamItem:nth-child(3) {
+    left: 46.809%;
+    top: 0;
+    z-index: 3;
+  }
+  .towerTeamItem:nth-child(4) {
+    left: 70.214%;
+    top: 0;
+    z-index: 4;
+  }
+  .towerTeamItem:nth-child(5) {
+    left: 0;
+    top: 25.424%; /* 41.81 / 164.45 */
+    z-index: 5;
+  }
+  .towerTeamItem:nth-child(6) {
+    left: 23.405%;
+    top: 25.424%;
+    z-index: 6;
+  }
+  .towerTeamItem:nth-child(7) {
+    left: 46.809%;
+    top: 25.424%;
+    z-index: 7;
+  }
+  .towerTeamItem:nth-child(8) {
+    left: 70.214%;
+    top: 25.424%;
+    z-index: 8;
+  }
+
+  .towerTeamImg {
+    object-fit: cover;
+    object-position: center 22%;
   }
 }
 

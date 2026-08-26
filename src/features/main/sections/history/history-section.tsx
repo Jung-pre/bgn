@@ -1,7 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import type { HistorySectionMessages } from "@/shared/i18n/messages";
+import type { HistoryEraMessages, HistorySectionMessages } from "@/shared/i18n/messages";
 import { useHistoryReveal } from "./use-history-reveal";
 import styles from "./history-section.module.css";
 
@@ -37,7 +36,9 @@ import styles from "./history-section.module.css";
  *
  * ## 반응형
  * PC 좌우 3단(이미지 · 축 · 텍스트) → 모바일 세로 스택(1시대 = 1블록).
- * DOM 은 하나뿐이고 CSS 만 바뀐다.
+ * 세로가 충분하면(720px+, 세로 모드) 사진+카피를 **한 화면에서 같이** 넘긴다.
+ * 방향은 책이 넘어가듯 오른쪽 → 왼쪽. PC 물레방아(아래→위)는 1단에서
+ * 본문과 겹쳐 쓰지 않는다. 짧거나 가로면 시대별 사진을 펼친다.
  */
 export interface HistorySectionProps {
   messages: HistorySectionMessages;
@@ -137,25 +138,7 @@ export function HistorySection({ messages }: HistorySectionProps) {
                 <span className={styles.node} aria-hidden />
 
                 <div className={styles.copy}>
-                  <p className={styles.period} lang="en" data-history-line>
-                    {era.period}
-                  </p>
-                  <h3 className={styles.eraTitle} data-history-line>
-                    {era.title}
-                  </h3>
-                  {/* 시안은 인용과 발화자가 **한 줄**이고 박스가 글자 폭에 붙는다 */}
-                  <blockquote className={styles.quote} data-history-line>
-                    <p>&ldquo;{era.quote}&rdquo;</p>
-                    {" - "}
-                    <cite>{era.quoteAuthor}</cite>
-                  </blockquote>
-                  <ul className={styles.points}>
-                    {era.points.map((point) => (
-                      <li key={point} data-history-point>
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
+                  <EraBody era={era} motion />
                 </div>
               </li>
             ))}
@@ -175,21 +158,43 @@ export function HistorySection({ messages }: HistorySectionProps) {
            * 스페이서를 만들지 않아 그 사고가 구조적으로 불가능하다.
            */}
           <div className={styles.wheelColumn} aria-hidden>
-            <div className={styles.wheel} data-history-wheel>
-              {WHEEL_PHOTOS.map((photo) => (
-                <div key={photo.src} className={styles.wheelItem} data-history-spoke>
-                  <div className={styles.photoCard} data-variant={photo.variant}>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- 카드 크기에 맞춘 컷이라 리사이즈 이점이 없다 */}
-                    <img
-                      className={styles.photoFill}
-                      src={photo.src}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                    />
+            {/**
+             * PC: `.stage` 는 `display: contents` 라 바퀴만 sticky.
+             * 모바일 스테이지: 사진+카피가 **같은 sticky 프레임**에서 같이 넘어간다.
+             */}
+            <div className={styles.stage} data-history-stage>
+              <div className={styles.wheel} data-history-wheel>
+                {WHEEL_PHOTOS.map((photo) => (
+                  <div key={photo.src} className={styles.wheelItem} data-history-spoke>
+                    <div className={styles.photoCard} data-variant={photo.variant}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- 카드 크기에 맞춘 컷이라 리사이즈 이점이 없다 */}
+                      <img
+                        className={styles.photoFill}
+                        src={photo.src}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.copyStage} data-history-copy-stage data-lenis-prevent>
+                <div className={styles.copyPane} data-history-copy-pane>
+                  <div className={styles.copy}>
+                    <h2 className={styles.introTitle}>
+                      {renderTitleLines(messages.introTitle, messages.introTitleMarker)}
+                    </h2>
                   </div>
                 </div>
-              ))}
+                {eras.map((era) => (
+                  <div key={era.period} className={styles.copyPane} data-history-copy-pane>
+                    <div className={styles.copy}>
+                      <EraBody era={era} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -199,13 +204,10 @@ export function HistorySection({ messages }: HistorySectionProps) {
 }
 
 /**
- * 모바일 전용 사진 — PC 의 물레방아를 대신한다.
+ * 짧은 모바일·가로 전용 사진 — 스테이지를 대신한다.
  *
- * 물레방아(`.wheelColumn`)는 뷰포트 중앙에 `sticky` 로 붙는 100vh 컨테이너다.
- * 좌우 2단인 PC 에서는 사진이 왼쪽 절반, 카피가 오른쪽 절반이라 서로 안 겹친다.
- * 그런데 모바일은 1단이라 같은 자리를 두고 다투게 되고, 스크롤 축도 달라서
- * (사진은 화면 중앙 고정 / 카피는 그냥 흐름) 둘이 어긋난 채 겹쳐 읽힌다.
- * 그래서 **모바일에서는 바퀴를 끄고** 원래 그리드 자리에 사진을 그대로 놓는다.
+ * 세로가 충분한 모바일은 사진+카피를 한 sticky 프레임에서 책처럼 넘긴다
+ * (`MQ.historyWheel`). 짧으면 원래 그리드 자리에 사진을 그대로 놓는다.
  *
  * 같은 URL 이라 브라우저 캐시가 한 번만 받아 온다. 바퀴 쪽 `<img>` 는
  * `aria-hidden` 컨테이너 안이므로 대체 텍스트는 이쪽이 갖는다.
@@ -227,6 +229,33 @@ function SlotPhoto({
       loading="lazy"
       decoding="async"
     />
+  );
+}
+
+/** 시대 카피. `motion` 이면 흐름 레이어의 와이프/스태거 훅을 단다. */
+function EraBody({ era, motion = false }: { era: HistoryEraMessages; motion?: boolean }) {
+  return (
+    <>
+      <p className={styles.period} lang="en" data-history-line={motion || undefined}>
+        {era.period}
+      </p>
+      <h3 className={styles.eraTitle} data-history-line={motion || undefined}>
+        {era.title}
+      </h3>
+      {/* 시안은 인용과 발화자가 **한 줄**이고 박스가 글자 폭에 붙는다 */}
+      <blockquote className={styles.quote} data-history-line={motion || undefined}>
+        <p>&ldquo;{era.quote}&rdquo;</p>
+        {" - "}
+        <cite>{era.quoteAuthor}</cite>
+      </blockquote>
+      <ul className={styles.points}>
+        {era.points.map((point) => (
+          <li key={point} data-history-point={motion || undefined}>
+            {point}
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

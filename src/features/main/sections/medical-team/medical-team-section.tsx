@@ -15,7 +15,7 @@ import styles from "./medical-team-section.module.css";
  * 카드 320×400, gap 32, 홀/짝 42px 지그재그, **겹침·회전·축소 없음**.
  * 활성 카드는 파랑→보라 링 2px 로만 구분되고, 이름은 카드 하단에 얹힌다.
  * 좌우 끝 카드는 페이드가 아니라 뷰포트에 **잘려** 나간다.
- * 배치 계산은 `crossLayout()`, 실제 길이는 CSS 토큰이 정한다.
+ * 배치 계산은 훅이 칸 오프셋을 들고 `crossLayout()` 이 CSS 변수로 옮긴다.
  *
  * ## 입력
  * 도트 8개 + 좌우 셰브론 + **포인터 드래그**. 드래그 중의 x 는 state 가
@@ -68,7 +68,7 @@ function Chevron({ dir }: { dir: -1 | 1 }) {
 export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
   const sectionRef = useTeamReveal<HTMLElement>();
   const doctors = messages.doctors;
-  const { activeIndex, select, step, pause, resume, stageRef, dragProps } =
+  const { activeIndex, offsets, select, step, pause, resume, stageRef, dragProps } =
     useCrossCarousel(doctors.length);
 
   return (
@@ -108,7 +108,7 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
         <div ref={stageRef} className={styles.stage} {...dragProps}>
           <ul className={styles.deck}>
             {doctors.map((doctor, i) => {
-              const { style, hidden } = crossLayout(i, activeIndex, doctors.length);
+              const { style, hidden } = crossLayout(offsets[i] ?? 0, doctors.length);
               const label = doctor.name || `${i + 1}번째 의료진`;
               return (
                 <li

@@ -128,6 +128,16 @@
   z-index: 0;
 }
 
+/* PC: contents 라 바퀴가 컬럼의 sticky 자식으로 남는다. 모바일 스테이지에서 flex 로 덮는다. */
+.stage {
+  display: contents;
+}
+
+/* 모바일 책넘김 전용 카피. PC·스택에서는 흐름 레이어가 본문이다. */
+.copyStage {
+  display: none;
+}
+
 .wheel {
   position: sticky;
   top: 0;
@@ -150,18 +160,6 @@
   transform-style: preserve-3d;
   backface-visibility: hidden;
   will-change: transform, opacity;
-}
-
-@media (max-width: 768px) {
-  /* 좁은 화면에서는 바퀴가 텍스트를 덮는다. 열을 전체 폭으로 펴고 반지름을 줄인다
-     (반지름은 JS 가 뷰포트 높이에서 계산하므로 여기선 폭만 손댄다). */
-  .wheelColumn {
-    width: 100%;
-    opacity: 0.35;
-  }
-  .wheelItem {
-    width: min(22rem, 76%);
-  }
 }
 
 .eras {
@@ -522,9 +520,9 @@
   }
 
   /**
-   * 물레방아는 PC 전용이다 — 1단 레이아웃에서는 카피와 자리를 다투고,
-   * sticky(화면 중앙 고정)와 일반 흐름이라 스크롤 축까지 어긋난다.
-   * 모바일은 원래 그리드 자리에 사진을 그대로 놓는다.
+   * 기본 모바일은 물레방아를 끈다 — 1단에서 sticky 100vh 와 카피가 자리를 다툰다.
+   * 세로가 충분한 기기는 아래 `(min-height: 720px) and (orientation: portrait)`
+   * 가 다시 켠다. 숫자 720 은 `HISTORY_WHEEL_MIN_HEIGHT` 와 맞춰 둔다.
    */
   .wheelColumn {
     display: none;
@@ -686,6 +684,123 @@
     /* 시안은 연도 아랫부분이 제목 라인박스와 **겹친다**(연도 잉크 345~377,
        제목 잉크 373~401 — 4px 교차). -0.05em(-2.8px)로는 한참 떨어져 있었다. */
     margin-bottom: -0.52em;
+  }
+}
+
+/**
+ * 모바일 + 세로가 충분한 세로 모드 — 사진+카피를 한 sticky 프레임에서 책처럼 넘긴다.
+ *
+ * 720 은 `HISTORY_WHEEL_MIN_HEIGHT`(breakpoints.ts) 와 같다.
+ * 다음 장은 오른쪽, 지난 장은 왼쪽. PC 물레방아(아래→위)는 쓰지 않는다.
+ * iPhone SE(667)·가로는 이 쿼리에 안 걸려 위의 슬롯 스택이 유지된다.
+ */
+@media (max-width: 768px) and (min-height: 720px) and (orientation: portrait) {
+  .section {
+    --history-wheel-band: min(32vh, 240px);
+    --history-wheel-band: min(32dvh, 240px);
+    --history-stage-top: calc(var(--gnb-top-mo) + var(--gnb-height-mo));
+    --history-stage-bottom: calc(var(--mobile-bottombar-height) + 12px);
+  }
+
+  .wheelColumn {
+    display: block;
+    left: 0;
+    width: 100%;
+    top: -64px;
+    bottom: -72px;
+    z-index: 2;
+    opacity: 1;
+  }
+
+  .stage {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: var(--history-stage-top);
+    height: calc(100vh - var(--history-stage-top) - var(--history-stage-bottom));
+    height: calc(100svh - var(--history-stage-top) - var(--history-stage-bottom));
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .wheel {
+    position: relative;
+    top: auto;
+    flex: 0 0 auto;
+    height: var(--history-wheel-band);
+    overflow: hidden;
+    perspective: 900px;
+    perspective-origin: 50% 50%;
+  }
+
+  .wheelItem {
+    width: min(22rem, 72%);
+  }
+
+  /* 활성 살은 반듯해야 한다 — 일반 모바일 규칙의 rest tilt 를 되돌린다 */
+  .photoCard {
+    --tilt-rest-y: 0deg;
+    --tilt-rest-x: 0deg;
+  }
+
+  .copyStage {
+    display: block;
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    perspective: 900px;
+    pointer-events: auto;
+  }
+
+  .copyPane {
+    position: absolute;
+    inset: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-top: 4px;
+    padding-bottom: 8px;
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+
+  .slotPhoto {
+    display: none;
+  }
+
+  .photoSlot {
+    display: none;
+  }
+
+  /**
+   * 흐름 카피는 스크린리더·aria-labelledby 용으로만 남긴다.
+   * 눈에 보이는 본문은 `.copyPane` 이다.
+   */
+  .era > .copy {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .era {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .timeline > .era {
+    padding-top: 0;
+    padding-bottom: 0;
   }
 }
 

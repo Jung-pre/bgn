@@ -7,6 +7,7 @@ import "pretendard/dist/web/static/pretendard.css";
    ③ 두 폰트 모두 400 단일 웨이트라 서브셋 최적화 이점도 거의 없다 */
 import "@fontsource/belleza/400.css";
 import "@fontsource/marcellus/400.css";
+import "@fontsource/poppins/500.css";
 import "./globals.css";
 
 /**
@@ -18,6 +19,7 @@ import "./globals.css";
  *   · 영문 포인트     Belleza      (pc/eng - point/*, mo/eng - point/*)
  *     → 섹션 아이브로우, 센터 영문명 등
  *   · 마퀴 전용       Marcellus    (Figma 2:411 — Marcellus Regular 108px)
+ *   · 푸터 대표번호    Poppins Medium (Figma 107:3249 — 100px / tracking -3px)
  *
  * ⚠️ 디스플레이 폰트가 **두 개**다. 마퀴만 Marcellus 이고 나머지 영문 포인트는
  *    Belleza 다. 하나로 통일하지 말 것 — 시안이 실제로 둘을 섞어 쓴다.

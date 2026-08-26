@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { MQ } from "@/shared/config/breakpoints";
-import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
+import { gsap, ScrollTrigger, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 
 /**
@@ -86,6 +86,13 @@ export function useHistoryReveal<T extends HTMLElement>() {
             y: 0,
             z: 0,
             rotationX: 0,
+            opacity: i === 0 ? 1 : 0,
+            visibility: i === 0 ? "visible" : "hidden",
+          });
+        });
+        gsap.utils.toArray<HTMLElement>("[data-history-copy-pane]", section).forEach((el, i) => {
+          gsap.set(el, {
+            x: 0,
             opacity: i === 0 ? 1 : 0,
             visibility: i === 0 ? "visible" : "hidden",
           });
@@ -193,19 +200,24 @@ export function useHistoryReveal<T extends HTMLElement>() {
         }
       });
 
-      // ── ③ 물레방아: 사진 5장이 하나의 원에 박혀 함께 돈다 ─────────────
+      // ── ③ 물레방아 / 책넘김: 뷰포트가 버티는 곳에서만 sticky ─────────────
+      // 짧은 모바일·가로는 카드가 본문·하단바를 덮는다 → 펼쳐 둔 슬롯 사진.
+      // 쿼리는 breakpoints.ts 의 MQ.historyWheel / historyStack 과 CSS 가 같다.
+      const mm = gsap.matchMedia();
       const wheel = section.querySelector<HTMLElement>("[data-history-wheel]");
       const spokes = gsap.utils.toArray<HTMLElement>("[data-history-spoke]", section);
+      const copyPanes = gsap.utils.toArray<HTMLElement>("[data-history-copy-pane]", section);
 
-      if (wheel && spokes.length > 0) {
+      /**
+       * PC 물레방아. 진행도 p(0~1) → 활성 인덱스 a(0 ~ n-1).
+       * 살 i 의 각도는 `(i − a) · step` 이라 a = i 일 때 정면(θ=0)이 된다.
+       */
+      const bindDesktopWheel = () => {
+        if (!wheel || spokes.length === 0) return undefined;
+
         const n = spokes.length;
         const step = (Math.PI * 2) / n;
 
-        /**
-         * 진행도 p(0~1) → 활성 인덱스 a(0 ~ n-1).
-         * 살 i 의 각도는 `(i − a) · step` 이라 a = i 일 때 정면(θ=0)이 된다.
-         * 텍스트 행 수와 살 수가 같아서 a 가 곧 "지금 읽고 있는 행"이다.
-         */
         const place = (p: number) => {
           const a = p * (n - 1);
 
@@ -328,7 +340,7 @@ export function useHistoryReveal<T extends HTMLElement>() {
         };
 
         const state = { p: 0 };
-        gsap.to(state, {
+        const tween = gsap.to(state, {
           p: 1,
           ease: "none",
           onUpdate: () => place(state.p),
@@ -349,10 +361,145 @@ export function useHistoryReveal<T extends HTMLElement>() {
           },
         });
         place(0);
-      }
+
+        return () => {
+          tween.kill();
+          gsap.set(spokes, {
+            clearProps: "x,y,z,rotation,rotationX,rotationY,scale,opacity,visibility,zIndex,transform",
+          });
+        };
+      };
 
       /**
-       * ── ③-b 모바일 슬롯 사진: 들어오며 −8°, 화면 중앙에서 0° ──
+       * 모바일 책넘김.
+       *
+       * 사진은 PC 물레방아를 **옆으로 눕힌** 원 궤도(다음 장 오른쪽, 지난 장 왼쪽).
+       * 카피는 한 장씩 슬라이드. 스크롤은 장 번호만 고르고, 화면은 짧은 트윈으로 넘긴다.
+       */
+      const bindBookStage = () => {
+        if (!wheel || spokes.length === 0) return undefined;
+
+        const n = spokes.length;
+        const steps = Math.max(1, n - 1);
+        const visual = { a: 0 };
+        let page = 0;
+        let flip: gsap.core.Tween | undefined;
+
+        /**
+         * 이전 | 현재 | 다음 을 좌우 대칭으로 둔다.
+         * 예전엔 PC 물레방아의 "떠나는 살" 게인을 왼쪽에 그대로 써서
+         * 이전 장이 더 비틀리며 overflow 밖으로 잘렸다.
+         */
+        const placeSpokes = (a: number) => {
+          const span = wheel.offsetWidth || window.innerWidth;
+          const spacing = span * 0.58;
+          const neighborOpacity = 0.4;
+
+          spokes.forEach((el, i) => {
+            const dist = i - a;
+            const abs = Math.abs(dist);
+            const wrapped = abs > 1.15;
+            const opacity = wrapped
+              ? 0
+              : gsap.utils.interpolate(1, neighborOpacity, gsap.utils.clamp(0, 1, abs));
+
+            gsap.set(el, {
+              x: dist * spacing,
+              y: 0,
+              z: -abs * 36,
+              rotationY: dist * -12,
+              rotationX: 0,
+              rotation: 0,
+              scale: 1 - gsap.utils.clamp(0, 1, abs) * 0.2,
+              opacity,
+              visibility: opacity <= 0.01 ? "hidden" : "visible",
+              zIndex: Math.round((1 - abs) * 100),
+            });
+          });
+        };
+
+        const placeCopy = (a: number) => {
+          const copyTravel =
+            copyPanes[0]?.parentElement?.offsetWidth || window.innerWidth;
+
+          copyPanes.forEach((el, i) => {
+            const delta = i - a;
+            const dist = Math.abs(delta);
+            const wrapped = dist > 1.02;
+
+            gsap.set(el, {
+              x: delta * copyTravel,
+              y: 0,
+              z: 0,
+              rotationY: 0,
+              rotationX: 0,
+              rotation: 0,
+              opacity: wrapped ? 0 : 1,
+              visibility: wrapped ? "hidden" : "visible",
+              zIndex: Math.round((1 - dist) * 10),
+            });
+          });
+        };
+
+        const place = (a: number) => {
+          placeSpokes(a);
+          placeCopy(a);
+        };
+
+        const goTo = (target: number) => {
+          const next = gsap.utils.clamp(0, steps, target);
+          if (next === page) return;
+          page = next;
+          flip?.kill();
+          flip = gsap.to(visual, {
+            a: next,
+            duration: 0.4,
+            ease: "power2.inOut",
+            overwrite: true,
+            onUpdate: () => place(visual.a),
+            onComplete: () => place(next),
+          });
+        };
+
+        const st = ScrollTrigger.create({
+          trigger: section,
+          start: "top top",
+          end: "bottom bottom",
+          invalidateOnRefresh: true,
+          onUpdate: (self) => {
+            const t = self.progress * steps;
+            let target = page;
+            if (t >= page + 0.58) target = Math.round(t);
+            else if (t <= page - 0.58) target = Math.round(t);
+            goTo(target);
+          },
+          onRefresh: (self) => {
+            page = Math.round(self.progress * steps);
+            visual.a = page;
+            flip?.kill();
+            place(page);
+          },
+        });
+
+        place(0);
+
+        return () => {
+          flip?.kill();
+          st.kill();
+          gsap.set(spokes, {
+            clearProps: "x,y,z,rotation,rotationX,rotationY,scale,opacity,visibility,zIndex,transform",
+          });
+          gsap.set(copyPanes, {
+            clearProps: "x,y,z,rotation,rotationX,rotationY,opacity,visibility,zIndex,transform",
+          });
+        };
+      };
+
+      mm.add(MQ.desktop, bindDesktopWheel);
+      mm.add(MQ.historyWheel, bindBookStage);
+
+      /**
+       * ── ③-b 짧은 모바일 슬롯 사진: 들어오며 −8°, 화면 중앙에서 0° ──
        * 트리거는 회전하는 img 가 아니라 부모 칸 — 기울어진 AABB 로
        * start/end 가 밀리면 중앙을 지나도 0 이 안 된다.
        * 끝은 `center center`. 사진 중심이 화면 중앙에 닿는 순간 정면.
@@ -360,8 +507,7 @@ export function useHistoryReveal<T extends HTMLElement>() {
        */
       const slotPhotos = gsap.utils.toArray<HTMLElement>("[data-history-slot]", section);
       if (slotPhotos.length > 0) {
-        const mm = gsap.matchMedia();
-        mm.add(MQ.mobile, () => {
+        mm.add(MQ.historyStack, () => {
           slotPhotos.forEach((photo) => {
             const frame = photo.parentElement ?? photo;
             gsap.set(photo, { rotation: -8, force3D: true });

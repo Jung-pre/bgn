@@ -7,6 +7,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -44,7 +45,7 @@ export interface CrossCardLayout {
 }
 
 /**
- * 카드 한 장의 배치.
+ * 카드 한 장의 배치. `--offset` 은 훅이 칸 단위로 들고 있고, 여기는 그리기만 한다.
  *
  * ## 시안이 말하는 "교차"
  * 시안 2:995 는 **겹치지 않는 한 줄**이다. 카드 320, gap 32 로 나란히 놓이고
@@ -56,8 +57,7 @@ export interface CrossCardLayout {
  * 검수: "위 아래 위치 고정하지 않고 교차하며". 한 칸 밀릴 때마다 카드가
  * 옆 자리 높이로 부드럽게 바뀐다. 활성(offset 0)은 항상 위 레인.
  */
-export function crossLayout(index: number, activeIndex: number, count: number): CrossCardLayout {
-  const offset = signedOffset(index, activeIndex, count);
+export function crossLayout(offset: number, count: number): CrossCardLayout {
   const depth = Math.abs(offset);
   const hidden = depth > VISIBLE_DEPTH;
 
@@ -76,20 +76,28 @@ export function crossLayout(index: number, activeIndex: number, count: number): 
 
 /**
  * 순환 오프셋 — `-count/2 … +count/2`.
- * 8장을 0↔7 로 왕복시키면 마지막에서 처음으로 갈 때 카드가 화면을 가로지른다.
- * 최단 거리로 접으면 덱이 좌우 대칭으로 유지되고, 이음매는 depth > VISIBLE_DEPTH
- * 구간(투명)에서 일어나 눈에 띄지 않는다.
+ * 8장이면 슬롯이 -3…+4 (또는 한 칸 이동 후 -4…+3). 가운데 이음매 한 장은
+ * 화면 밖(`VISIBLE_DEPTH` 너머)에 두고, 그 자리에서만 반대편으로 점프한다.
  */
 function signedOffset(index: number, activeIndex: number, count: number): number {
   const raw = (((index - activeIndex) % count) + count) % count;
   return raw > count / 2 ? raw - count : raw;
 }
 
+function initialOffsets(count: number): number[] {
+  return Array.from({ length: count }, (_, i) => signedOffset(i, 0, count));
+}
+
+/** 화면 밖 한 칸 — 여기서 루프 이음매가 일어난다. */
+const EXIT_SLOT = VISIBLE_DEPTH + 1;
+
 /** 자동 롤링 간격. 카드 transition(0.62s) 이 끝난 뒤 읽을 시간을 남긴다. */
 const AUTO_MS = 3200;
 
 export interface CrossCarouselResult {
   activeIndex: number;
+  /** 카드별 칸 오프셋. 레이아웃은 이 값으로만 그린다(최단거리 재계산 금지). */
+  offsets: number[];
   select: (index: number) => void;
   step: (direction: -1 | 1) => void;
   pause: () => void;
@@ -113,26 +121,117 @@ export interface CrossCarouselResult {
  */
 export function useCrossCarousel(count: number): CrossCarouselResult {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [offsets, setOffsets] = useState(() => initialOffsets(count));
   const [paused, setPaused] = useState(false);
   /** 화면 밖에서는 롤링하지 않는다. 히어로를 지나는 동안 2번으로 넘어가는 걸 막는다. */
   const [inView, setInView] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ pointerId: -1, startX: 0, dx: 0, moved: false, raf: 0 });
+  const offsetsRef = useRef(offsets);
+  const activeRef = useRef(activeIndex);
+  const pendingRef = useRef(0);
+  const wrappingRef = useRef(false);
+  const wrapRafRef = useRef(0);
+  const flushRef = useRef<() => void>(() => {});
 
   const pause = useCallback(() => setPaused(true), []);
   const resume = useCallback(() => setPaused(false), []);
 
-  const select = useCallback(
-    (index: number) => {
-      const next = ((index % count) + count) % count;
-      setActiveIndex((prev) => (prev === next ? prev : next));
+  const commitShift = useCallback(
+    (dir: -1 | 1, from: number[]) => {
+      const shifted = from.map((o) => o - dir);
+      offsetsRef.current = shifted;
+      setOffsets(shifted);
+      const next = (activeRef.current + dir + count) % count;
+      activeRef.current = next;
+      setActiveIndex(next);
     },
     [count],
   );
 
+  /**
+   * 한 칸 이동.
+   *
+   * 최단거리 `signedOffset` 으로 매 프레임 다시 그리면, 왼쪽 끝(-3)에 있던 카드가
+   * 다음 칸에서 오른쪽(+4)으로 **화면을 가로질러** 날아간다. 사용자는 무한
+   * 롤링인데 뒤에서 한 장이 지나가는 걸로 읽힌다.
+   *
+   * 빠져나가는 칸(`-4`/`+4`, 이미 투명)에 있는 카드만 반대편 같은 칸으로
+   * 순간이동한 다음, 전체가 한 칸 미끄러지게 한다.
+   */
+  const runStep = useCallback(
+    (dir: -1 | 1) => {
+      const current = offsetsRef.current;
+      const teleported = current.map((o) => {
+        if (dir === 1 && o === -EXIT_SLOT) return o + count;
+        if (dir === -1 && o === EXIT_SLOT) return o - count;
+        return o;
+      });
+      const didTeleport = teleported.some((o, i) => o !== current[i]);
+
+      if (!didTeleport) {
+        commitShift(dir, current);
+        wrappingRef.current = false;
+        flushRef.current();
+        return;
+      }
+
+      wrappingRef.current = true;
+      const stage = stageRef.current;
+      if (stage) stage.dataset.snap = "true";
+      offsetsRef.current = teleported;
+      setOffsets(teleported);
+
+      const paintShift = () => {
+        wrapRafRef.current = 0;
+        if (stage) delete stage.dataset.snap;
+        commitShift(dir, teleported);
+        wrappingRef.current = false;
+        flushRef.current();
+      };
+
+      /* 텔레포트가 페인트된 뒤에 transition 을 다시 켠다.
+         rAF 하나로는 스타일이 커밋되기 전에 shift 가 붙어 이음매가 다시 보인다. */
+      wrapRafRef.current = requestAnimationFrame(() => {
+        wrapRafRef.current = requestAnimationFrame(paintShift);
+      });
+    },
+    [count, commitShift],
+  );
+
+  const flush = useCallback(() => {
+    if (wrappingRef.current || count < 2) return;
+    const pending = pendingRef.current;
+    if (pending === 0) return;
+    const dir: -1 | 1 = pending > 0 ? 1 : -1;
+    pendingRef.current -= dir;
+    runStep(dir);
+  }, [count, runStep]);
+
+  useLayoutEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
+
   const step = useCallback(
-    (direction: -1 | 1) => setActiveIndex((prev) => (prev + direction + count) % count),
-    [count],
+    (direction: -1 | 1) => {
+      if (count < 2) return;
+      pendingRef.current += direction;
+      flush();
+    },
+    [count, flush],
+  );
+
+  const select = useCallback(
+    (index: number) => {
+      if (count < 2) return;
+      const next = ((index % count) + count) % count;
+      const delta = offsetsRef.current[next] ?? 0;
+      if (delta === 0) return;
+      const dir: -1 | 1 = delta > 0 ? 1 : -1;
+      pendingRef.current += dir * Math.abs(delta);
+      flush();
+    },
+    [count, flush],
   );
 
   const paint = useCallback(() => {
@@ -205,6 +304,7 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
     const state = drag.current;
     return () => {
       if (state.raf) cancelAnimationFrame(state.raf);
+      if (wrapRafRef.current) cancelAnimationFrame(wrapRafRef.current);
     };
   }, []);
 
@@ -233,11 +333,12 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
 
     const tick = () => {
       if (document.hidden || drag.current.pointerId !== -1) return;
-      setActiveIndex((prev) => (prev + 1) % count);
+      pendingRef.current += 1;
+      flushRef.current();
     };
     const id = window.setInterval(tick, AUTO_MS);
     return () => window.clearInterval(id);
   }, [count, paused, inView]);
 
-  return { activeIndex, select, step, pause, resume, stageRef, dragProps };
+  return { activeIndex, offsets, select, step, pause, resume, stageRef, dragProps };
 }

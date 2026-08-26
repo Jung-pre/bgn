@@ -77,6 +77,19 @@ const COUNTS = {
 } as const;
 
 /**
+ * 세로 화면에서 구체를 가로에 맞출 때 쓰는 계수.
+ * 데스크톱은 거의 항상 `min(1, …)` 으로 1 이 된다.
+ * 모바일 히어로는 시안처럼 폭의 ~90% 가 되도록 조금 넉넉히 잡는다
+ * (1.05×0.86 ≈ 화면 폭의 74%. 1.28×0.86 ≈ 90%).
+ */
+const WIDTH_FIT = { desktop: 1.05, mobileHero: 1.28 } as const;
+
+function globeFitScale(width: number, height: number, sizeMul: number, mobileHero: boolean) {
+  const fit = mobileHero ? WIDTH_FIT.mobileHero : WIDTH_FIT.desktop;
+  return Math.min(1, (width / height) * fit) * sizeMul;
+}
+
+/**
  * 지축 Z 트위스트.
  *
  * 23.4°(0.409) 를 걸면 서울을 정면에 맞춰도 한반도+만주 덩어리가
@@ -308,10 +321,14 @@ function Globe({
    *
    * 히어로만 `GLOBE_TUNE_DEFAULTS.size`(0.86) 로 한 걸음 물린다 — 카피·마퀴 여백.
    * 클로징·푸터는 그 배율을 쓰면 안 된다. 배경 요소로 쓰던 원래 크기(1)를 유지한다.
+   * 모바일 히어로는 시안 폭(~90%)에 맞추려고 가로 계수를 더 연다.
    */
-  const fitScale =
-    Math.min(1, (size.width / size.height) * 1.05) *
-    (interactive ? GLOBE_TUNE_DEFAULTS.size : fitSize);
+  const fitScale = globeFitScale(
+    size.width,
+    size.height,
+    interactive ? GLOBE_TUNE_DEFAULTS.size : fitSize,
+    isMobile && interactive,
+  );
 
   /** demand 모드(동작 줄이기)에서는 한 번은 그려야 화면이 빈 채로 남지 않는다 */
   useEffect(() => {
@@ -332,7 +349,12 @@ function Globe({
     const yawTrim = tune ? tune.yawTrimDeg * (Math.PI / 180) : FOCUS_YAW_TRIM;
     const pitchX = tune ? tune.pitchX : FOCUS_PITCH_X;
     const sizeMul = interactive ? (tune?.size ?? GLOBE_TUNE_DEFAULTS.size) : fitSize;
-    const fitted = Math.min(1, (_state.size.width / _state.size.height) * 1.05) * sizeMul;
+    const fitted = globeFitScale(
+      _state.size.width,
+      _state.size.height,
+      sizeMul,
+      isMobile && interactive,
+    );
     const scrollNow = progressRef?.current ?? 0;
     const fadeStartNow = tune?.fadeStart ?? 0.16;
     const fadeEndNow = tune?.fadeEnd ?? 0.78;

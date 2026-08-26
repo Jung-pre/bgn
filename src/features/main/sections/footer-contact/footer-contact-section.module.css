@@ -496,20 +496,27 @@
 }
 
 .tel {
-  /* 시안 100px. Figma 는 Poppins Medium 이지만 프로젝트에 없는 폰트라
-     본문 스택의 Medium 으로 대체한다(숫자 폭이 가장 가깝다). */
+  /* 시안 107:3249 — Poppins Medium 100 / leading 160% / tracking -3px.
+     글자 상자는 text-box-trim 으로 cap 높이(~70px)까지 자른다. */
+  font-family: "Poppins", var(--font-pretendard-stack);
   font-size: clamp(40px, 5.2083vw, 100px);
-  font-weight: var(--weight-medium);
+  font-weight: 500;
   /**
-   * 시안 2:2912 는 `text-box-trim: trim-both` + `text-box-edge: cap alphabetic`
-   * 이다 — 글자 상자가 **대문자 높이(약 0.7em)** 로 잘려 있다는 뜻이다.
-   * lh 1(=100px)로 두면 상자가 30px 더 두꺼워지고, 그 아래 모든 블록이
-   * 통째로 밀린다(실측 +14~24px). 대비해서 잘라 준다.
+   * 시안은 `text-box-trim: trim-both` + `text-box-edge: cap alphabetic`.
+   * 미지원 브라우저에선 lh 0.7 로 같은 높이를 낸다.
    */
   line-height: 0.7;
-  letter-spacing: var(--tracking-default);
+  letter-spacing: -0.03em;
   color: var(--color-white);
   white-space: nowrap;
+}
+
+@supports (text-box-trim: trim-both) {
+  .tel {
+    line-height: 1.6;
+    text-box-trim: trim-both;
+    text-box-edge: cap alphabetic;
+  }
 }
 
 .closedNotice {
@@ -517,10 +524,10 @@
   align-items: center;
   gap: 1rem; /* 16 */
   margin: 0;
-  /* 시안 2:2913 — 그룹 자체가 opacity 60% 다 */
-  opacity: 0.6;
-  font-size: var(--fs-20);
-  font-weight: var(--weight-semibold);
+  /* 시안 107:3250 — Pretendard Regular 20 / 1.5 / -3%. 예전 0.6 불투명은 구 시안. */
+  opacity: 1;
+  font: var(--t-body-0);
+  letter-spacing: var(--tracking-default);
   color: var(--color-white);
 }
 
@@ -550,9 +557,9 @@
   border: 1px solid var(--color-white);
   border-radius: var(--radius-full);
   background: var(--whitebg-10);
-  font-size: var(--fs-20);
-  font-weight: var(--weight-semibold);
-  line-height: var(--leading-tight);
+  /* 시안 68:2787 — pc/headline/headline 4 */
+  font: var(--t-headline-4);
+  letter-spacing: var(--tracking-default);
   color: var(--color-white);
   cursor: pointer;
   transition:
@@ -581,17 +588,18 @@
   margin-top: 2.5rem; /* 40 */
 }
 
-/* 라벨 폭 100 / 간격 90 — 시안 2:2924 실측.
-   행이 아니라 dl 자체가 그리드다. 행마다 그리드를 만들면 열이 서로 안 맞고,
-   폰트는 clamp 로 하한이 있는데 rem 폭은 계속 줄어서 라벨이 두 줄로 깨진다.
-   → `minmax(100px, max-content)` 로 라벨이 항상 한 줄에 들어가게 둔다. */
+/* 라벨 폭 100 / 간격 90 — 시안 68:2792 실측.
+   행이 아니라 dl 자체가 그리드다. 행마다 그리드를 만들면 열이 서로 안 맞는다.
+   rem 이 아니라 px 인 이유: 진료시간 폰트가 `--t-body-0`(20px 고정)인데
+   rem 갭은 뷰포트에 비례해 줄어 열만 따로 좁아진다. */
 .hours {
   display: grid;
-  grid-template-columns: minmax(6.25rem, max-content) auto;
-  column-gap: 5.625rem;
+  grid-template-columns: 100px auto;
+  column-gap: 90px;
   row-gap: 0.5rem; /* 8 */
   margin: 0;
-  font-size: var(--fs-20);
+  font: var(--t-body-0);
+  letter-spacing: var(--tracking-default);
 }
 
 .hoursRow {
@@ -599,16 +607,20 @@
 }
 
 .hoursRow dt {
-  font-weight: var(--weight-semibold);
+  font: var(--t-title-4);
+  letter-spacing: var(--tracking-default);
 }
 
 .hoursRow dd {
   margin: 0;
+  font: var(--t-body-0);
+  letter-spacing: var(--tracking-default);
 }
 
 .hoursNote {
   margin: 0;
-  font-size: var(--fs-16);
+  font: var(--t-body-2);
+  letter-spacing: var(--tracking-default);
   color: var(--color-white);
 }
 
@@ -646,7 +658,8 @@
 }
 
 .policyLink {
-  font-size: var(--fs-16);
+  font: var(--t-body-2);
+  letter-spacing: var(--tracking-default);
   color: var(--color-white);
 }
 
@@ -659,7 +672,8 @@
   flex-wrap: wrap;
   gap: 0.5rem 2rem; /* 32 */
   margin: 0;
-  font-size: var(--fs-16);
+  font: var(--t-body-2);
+  letter-spacing: var(--tracking-default);
   color: var(--gray-200);
 }
 
@@ -810,41 +824,57 @@
     display: none;
   }
 
+  /**
+   * 모바일 선화 — Figma `68:5135` 의 **보이는 잉크**에 맞춘다.
+   *
+   * Figma 는 모바일용으로 잘라 둔 ChatGPT 컷(건물 170×128 @ -67,309 /
+   * 타워 441×331 @ 33,235)을 쓴다. 우리는 PC 원본 `wire-04`/`wire-03`
+   * (둘 다 1448×1086)이라 같은 박스에 넣으면 그림이 통째로 줄어
+   * 타워가 화면 가운데로 밀린다.
+   *
+   * 에셋 안 잉크 비율(PC 실측):
+   *   건물  31.0% ~ 83.2%
+   *   타워  58.5% ~ 66.3%
+   * 이걸 Figma 화면 좌표에 대응시킨다.
+   *   건물  left -16.27vw / top 250
+   *   타워  left 16.87vw / top 136
+   */
   .wireBuilding {
-    left: -12.4vw;
-    top: 19.6875rem; /* 315 */
+    left: -16.27vw; /* -61 / 375 */
+    top: 250px;
     bottom: auto;
-    width: 40vw;
-    /* 모바일 시안은 병원이 주인공이라 PC 의 후퇴 opacity 를 되돌린다. */
+    width: 52.53vw; /* 197 / 375 */
     opacity: 0.92;
     -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
     mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
   }
 
   .wireCityClip {
-    /* 타워 잉크가 x 316~342 (폭 26) 에 오게: 26 / 0.0786 = 331 = 88vw,
-       왼쪽 = 316 − 0.585×331 = 122.5 = 32.7vw. 첨탑 y 275 → top = 257. */
-    left: 28.8vw;
+    left: 16.87vw;
     right: auto;
-    top: 15.25rem; /* 244 */
+    top: 136px;
     bottom: auto;
-    width: 95vw;
-    opacity: 0.42;
-    /* ① 가로 — 시안은 타워 **왼쪽에 아무것도 없다**(x310 표준편차 0.7, x315 2.2).
-          타워는 박스 폭의 58.5% 지점에서 시작하므로 그 앞을 잘라낸다.
-          안 자르면 저층 도심이 '부산' 지점 버튼 위로 올라온다.
-       ② 세로 — 시안은 y440 아래가 완전히 깨끗하다. 박스가 y244~511 이라 74% 지점. */
+    width: 117.6vw; /* 441 / 375 */
+    height: 88.27vw; /* 331 / 375 */
+    opacity: 0.55;
+    /* 가로 — 타워 왼쪽의 도심을 지운다. 안 지우면 지점 버튼 위로 저층이 올라온다.
+       세로 — Figma 컷은 y566 에서 끝나 진료시간 뒤에만 남는다. 박스 하단에서 페이드. */
     mask-image:
       linear-gradient(to right, transparent 52%, #000 60%),
-      linear-gradient(to bottom, #000 58%, transparent 76%);
+      linear-gradient(to bottom, #000 78%, transparent 100%);
     -webkit-mask-image:
       linear-gradient(to right, transparent 52%, #000 60%),
-      linear-gradient(to bottom, #000 58%, transparent 76%);
+      linear-gradient(to bottom, #000 78%, transparent 100%);
     mask-composite: intersect;
     -webkit-mask-composite: source-in;
   }
 
-  /* 시안 모바일 2:5207 — SNS 가 상단 중앙, 이하 전부 중앙 정렬 */
+  .wireCityClip .wireCity {
+    height: 100%;
+    object-fit: fill;
+  }
+
+  /* 시안 모바일 `68:5135` — SNS 상단 중앙, 이하 전부 중앙. 열 gap 32 / 패딩 70 20 */
   .footer {
     min-height: 53.3125rem; /* 853 */
     /* 하단 고정 퀵바(바 60 + 마스코트 60 + gap 8 + 하단 24)에 가리지 않게 */
@@ -855,8 +885,8 @@
 
   .inner {
     min-height: 0;
-    padding-inline: var(--mobile-gutter);
-    padding-top: 2.5rem;
+    gap: 2rem; /* 32 */
+    padding: 4.375rem var(--mobile-gutter);
     text-align: center;
   }
 
@@ -866,74 +896,131 @@
 
   .info {
     width: 100%;
-    margin-top: 2.5rem;
+    margin-top: 0;
+    margin-bottom: 0;
+    gap: 2rem; /* 32 — 번호 / 지점 / 진료시간이 Figma 에서 형제 */
   }
 
-  /* 두 문장이 한 줄에 안 들어간다 — 시안도 2줄이고 구분선이 없다 */
+  .tel {
+    font-size: 40px;
+    letter-spacing: -1.2px;
+    line-height: 1.6;
+  }
+
+  /* 첨부 시안·Figma 모두 한 덩어리. `--fs-18` 은 375 에서 16 으로 줄어 쓰면 안 된다. */
   .closedNotice {
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.25rem; /* 4 */
+    font-size: 18px;
+    font-weight: var(--weight-semibold);
+    line-height: 1.5;
+    letter-spacing: -0.03em;
   }
 
   .noticeDivider {
     display: none;
   }
 
-  /* 시안 2:5207 — 지점 필은 세로 스택, 콘텐츠 335 폭을 꽉 채운다.
-     `.info` 가 shrink-wrap 이라 버튼이 273 에 묶여 하단 335 바와 안 맞았다. */
+  /* Figma `68:5156` — hug 필, 세로 스택 gap 16. 335 풀폭이 아니다. */
   .branchTabs {
     flex-direction: column;
-    align-self: stretch;
-    width: 100%;
-    gap: 0.75rem;
+    align-self: center;
+    align-items: center;
+    width: auto;
+    margin-top: 0;
+    gap: 1rem;
   }
 
   .branchTab {
-    width: 100%;
-    padding: 1rem 1.25rem;
+    width: auto;
+    padding: 1rem 2rem; /* 16 / 32 */
+    font-size: 18px;
     text-align: center;
     box-sizing: border-box;
   }
 
   .hoursBlock {
-    width: 100%;
+    width: 18.75rem; /* 300 */
+    margin-top: 0;
+    gap: 0.75rem; /* 12 */
   }
 
   .hours {
     align-self: stretch;
     width: 100%;
-    grid-template-columns: auto auto;
-    justify-content: space-between;
+    grid-template-columns: 6.25rem 1fr; /* 100 + 나머지 */
+    column-gap: 0;
+    row-gap: 0.5rem; /* 8 */
+    justify-content: stretch;
+    font-size: 18px;
+  }
+
+  .hoursRow dt {
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left;
   }
 
   .hoursRow dd {
     text-align: right;
+    font-size: 20px;
+    font-weight: 400;
+    letter-spacing: -0.03em;
+  }
+
+  .hoursNote {
+    font-size: 15px;
   }
 
   .bottom {
     flex-direction: column;
     align-items: center;
-    gap: 1.5rem;
-    margin-top: 3rem;
+    gap: 2rem; /* 32 */
+    width: 100%;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  /* Figma `68:5184` — 320×1 흰 구분선 */
+  .bottom::before {
+    content: "";
+    display: block;
+    width: 20rem; /* 320 */
+    height: 1px;
+    background: var(--color-white);
   }
 
   .bottomLeft {
     align-items: center;
+    width: 100%;
   }
 
   .policyList {
-    justify-content: center;
-    gap: 1rem;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 0;
+    width: 100%;
   }
 
-  /* 시안 모바일에는 사업자정보가 없지만 고지 의무가 있어 유지한다 */
+  .policyLink {
+    font-size: 15px;
+    letter-spacing: -0.03em;
+    line-height: 1.5;
+  }
+
+  .policyStrong {
+    font-weight: 400;
+  }
+
+  /* 시안 모바일·Figma `68:5135` 에 사업자정보 없음. PC 만 유지. */
   .business {
-    justify-content: center;
-    gap: 0.25rem 1rem;
-    font-size: var(--fs-14);
+    display: none;
   }
 
   .bottomRight {
     align-items: center;
+    gap: 1rem; /* 16 */
   }
 }

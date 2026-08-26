@@ -19,7 +19,7 @@ const SphereScene = dynamic(
 );
 
 /**
- * 컨택트 + 푸터 — 시안 PC `2:2901` (1920×792) / 모바일 `2:5207` (375×853).
+ * 컨택트 + 푸터 — 시안 PC `107:3238` (1920×792) / 모바일 `68:5135` (375×853).
  *
  * 시안 구조는 3단이다.
  *   1) 우상단 SNS 아이콘 4개 (50×50 라운드 사각 아웃라인)
@@ -120,12 +120,20 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
     { scope: footerRef, dependencies: [isMobile] },
   );
 
-  /* 시안은 "일요일 휴진 │ 공휴일 정상 진료(…)" 로 세로 구분선을 둔 두 덩어리다.
-     사전 원문이 파이프 하나로 이어져 있어 여기서 쪼갠다. */
-  const notices = messages.closedNotice
+  /* 시안은 PC `107:3250` "일요일 정기 휴진" 한 줄.
+     모바일은 `closedNoticeMobile` 을 쓰고, 파이프가 있으면 세로 구분선으로 쪼갠다. */
+  const notices = (isMobile ? (messages.closedNoticeMobile ?? messages.closedNotice) : messages.closedNotice)
     .split("|")
     .map((s) => s.trim())
     .filter(Boolean);
+
+  /* PC `68:2813` 은 개인정보처리방침이 맨 앞. 모바일 `68:5185` 은 이용약관이 맨 앞. */
+  const policyLinks = isMobile
+    ? [...messages.policyLinks].sort((a, b) => {
+        const order = ["이용약관", "개인정보처리방침", "환자권리장전", "비급여재료비"];
+        return order.indexOf(a.label) - order.indexOf(b.label);
+      })
+    : messages.policyLinks;
 
   const footer = (
     <footer className={styles.footer} ref={footerRef}>
@@ -224,7 +232,7 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
 
         <div className={styles.info}>
           <div className={styles.contact} data-reveal-item>
-            {/* 시안: Poppins Medium 100px / 자간 -3%. 대시 좌우가 벌어져 있다. */}
+            {/* 시안: Poppins Medium 100px / 자간 -3px. 대시 좌우가 벌어져 있다. */}
             <a href={`tel:${messages.tel}`} className={styles.tel}>
               {messages.tel.replace(/-/g, " - ")}
             </a>
@@ -263,7 +271,7 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
                 </div>
               ))}
             </dl>
-            {messages.hoursNote ? <p className={styles.hoursNote}>{messages.hoursNote}</p> : null}
+            {isMobile && messages.hoursNote ? <p className={styles.hoursNote}>{messages.hoursNote}</p> : null}
           </div>
         </div>
 
@@ -271,7 +279,7 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
           <div className={styles.bottomLeft}>
             <nav className={styles.policyNav} aria-label="약관 및 정책">
               <ul className={styles.policyList}>
-                {messages.policyLinks.map((l) => (
+                {policyLinks.map((l) => (
                   <li key={l.href}>
                     <Link
                       href={l.href}
@@ -285,7 +293,10 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
             </nav>
 
             <dl className={styles.business}>
-              {messages.business.map((b) => (
+              {(isMobile
+                ? messages.business
+                : messages.business.filter((b) => b.label !== "개인정보보호책임자")
+              ).map((b) => (
                 <div key={b.label} className={styles.businessRow}>
                   <dt>{b.label}</dt>
                   <dd>{b.value}</dd>
