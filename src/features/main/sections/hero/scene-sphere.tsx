@@ -79,19 +79,21 @@ const COUNTS = {
 /**
  * 세로 화면에서 구체를 가로에 맞출 때 쓰는 계수.
  * 데스크톱은 거의 항상 `min(1, …)` 으로 1 이 된다.
- * 모바일 히어로는 시안처럼 폭의 ~90% 가 되도록 조금 넉넉히 잡는다
- * (1.05×0.86 ≈ 화면 폭의 74%. 1.28×0.86 ≈ 90%).
+ * 모바일 히어로는 화면 가로의 95% 가 되도록 `globeFitScale` 이 직접 잡는다.
  */
-const WIDTH_FIT = { desktop: 1.05, mobileHero: 1.28 } as const;
+const WIDTH_FIT = { desktop: 1.05 } as const;
+const HERO_CAM_Z = 6;
+const HERO_CAM_FOV = 38;
+/** 모바일 히어로 — 젤리 원판 지름 / 화면 가로 */
+const MOBILE_HERO_WIDTH = 0.95;
 
 function globeFitScale(width: number, height: number, sizeMul: number, mobileHero: boolean) {
-  const fit = mobileHero ? WIDTH_FIT.mobileHero : WIDTH_FIT.desktop;
-  /**
-   * 모바일 히어로 캔버스는 확대 시 상단이 안 잘리게 화면 끝까지 올린다.
-   * 구 크기는 예전 `top: 10vh` 캔버스(높이 ≈ 90%)에 맞춘 값을 유지한다.
-   */
-  const h = mobileHero ? height * (0.9 / 1.02) : height;
-  return Math.min(1, (width / h) * fit) * sizeMul;
+  if (mobileHero) {
+    const halfH = Math.tan((HERO_CAM_FOV * Math.PI) / 360) * HERO_CAM_Z;
+    const bodyR = GLOBE_RADIUS * 1.02;
+    return (MOBILE_HERO_WIDTH * width * halfH) / (bodyR * Math.max(1, height));
+  }
+  return Math.min(1, (width / height) * WIDTH_FIT.desktop) * sizeMul;
 }
 
 /**
@@ -352,8 +354,8 @@ function Globe({
    * 상관없고, 앞으로 오버레이가 하나 더 생겨도 조용히 깨지지 않는다.
    *
    * 드래그도 같은 이유다. 히트는 구체 원판(NDC 원)만, 카피·버튼은 제외.
-   * 원판을 잡으면 좌우(yaw)·위아래(pitch) 둘 다 돌린다. 페이지 스크롤은
-   * 제목·스크롤 힌트·원판 밖에서.
+   * 원판을 잡으면 좌우(yaw)로 돌린다. 위아래(pitch)는 데스크톱만.
+   * 모바일은 세로 제스처를 페이지 스크롤로 넘긴다.
    *
    * 좌표만 저장한다 — `getBoundingClientRect()` 는 레이아웃 읽기라
    * pointermove 마다 하면 GSAP 이 레이아웃을 더럽힌 직후 강제 리플로가 난다.
@@ -376,15 +378,27 @@ function Globe({
       const d = dragRef.current;
       if (!interactive || reduced || !d.down || d.id !== e.pointerId) return;
 
-      /* 커밋 전 3px 에서도 네이티브 텍스트 선택이 붙지 않게. */
-      if (e.cancelable) e.preventDefault();
-
       if (!d.dragging) {
-        const dist = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
-        if (dist < (e.pointerType === "touch" ? DRAG_COMMIT_PX : 3)) return;
+        const tdx = e.clientX - d.startX;
+        const tdy = e.clientY - d.startY;
+        const dist = Math.hypot(tdx, tdy);
+        if (isMobile) {
+          /* 세로는 페이지 스크롤. 가로가 확정되기 전에는 preventDefault 하지 않는다. */
+          if (Math.abs(tdy) > Math.abs(tdx) * 1.15 && Math.abs(tdy) > DRAG_COMMIT_PX) {
+            d.down = false;
+            d.id = -1;
+            document.body.style.userSelect = "";
+            return;
+          }
+          if (Math.abs(tdx) < DRAG_COMMIT_PX) return;
+        } else if (dist < (e.pointerType === "touch" ? DRAG_COMMIT_PX : 3)) {
+          return;
+        }
         d.dragging = true;
         document.documentElement.style.cursor = "grabbing";
       }
+
+      if (e.cancelable) e.preventDefault();
       const now = performance.now();
       const dt = Math.max(0.008, (now - d.lastT) / 1000);
       const rect = gl.domElement.getBoundingClientRect();
@@ -394,13 +408,14 @@ function Globe({
       const dx = e.clientX - d.lastX;
       const dy = e.clientY - d.lastY;
       const dyaw = dx * sens;
-      /* 화면 아래(+)로 끌면 앞면이 아래로 — 손가락을 따라가게. */
-      const dpitch = dy * sens;
       d.yaw += dyaw;
-      d.pitch += dpitch;
       const kv = 1 - Math.exp(-dt * 18);
       d.velYaw += (dyaw / dt - d.velYaw) * kv;
-      d.velPitch += (dpitch / dt - d.velPitch) * kv;
+      if (!isMobile) {
+        const dpitch = dy * sens;
+        d.pitch += dpitch;
+        d.velPitch += (dpitch / dt - d.velPitch) * kv;
+      }
       d.lastX = e.clientX;
       d.lastY = e.clientY;
       d.lastT = now;
@@ -433,8 +448,8 @@ function Globe({
       d.velPitch = 0;
       document.body.style.userSelect = "none";
       window.getSelection()?.removeAllRanges();
-      /* 원판 안에서는 텍스트 선택·터치 스크롤을 막는다. */
-      if (e.cancelable) e.preventDefault();
+      /* 데스크톱은 원판에서 선택·스크롤을 막는다. 모바일은 가로 확정 뒤에만. */
+      if (!isMobile && e.cancelable) e.preventDefault();
     };
 
     const onUp = (e: PointerEvent) => {
@@ -466,7 +481,7 @@ function Globe({
       window.removeEventListener("pointerout", onOut);
       clearDragCursor();
     };
-  }, [interactive, reduced, gl, camera, progressRef]);
+  }, [interactive, reduced, gl, camera, progressRef, isMobile]);
 
   /**
    * 세로가 긴 화면에서 구체가 화면 밖으로 넘치지 않게 맞춘다.
@@ -477,7 +492,7 @@ function Globe({
    *
    * 히어로만 `GLOBE_TUNE_DEFAULTS.size`(0.86) 로 한 걸음 물린다 — 카피·마퀴 여백.
    * 클로징·푸터는 그 배율을 쓰면 안 된다. 배경 요소로 쓰던 원래 크기(1)를 유지한다.
-   * 모바일 히어로는 시안 폭(~90%)에 맞추려고 가로 계수를 더 연다.
+   * 모바일 히어로는 화면 가로의 95%.
    */
   const fitScale = globeFitScale(
     size.width,
@@ -621,10 +636,10 @@ function Globe({
         drag.hold += delta;
       } else if (drag.velYaw !== 0 || drag.velPitch !== 0) {
         drag.yaw += drag.velYaw * delta;
-        drag.pitch += drag.velPitch * delta;
+        if (!isMobile) drag.pitch += drag.velPitch * delta;
         const damp = Math.exp(-delta * DRAG_INERTIA_K);
         drag.velYaw *= damp;
-        drag.velPitch *= damp;
+        drag.velPitch = isMobile ? 0 : drag.velPitch * damp;
         if (Math.abs(drag.velYaw) < 0.02) drag.velYaw = 0;
         if (Math.abs(drag.velPitch) < 0.02) drag.velPitch = 0;
       }
@@ -646,7 +661,9 @@ function Globe({
       drag.yaw;
     // 지축 기울기를 고정으로 주고 그 위에 포인터 반응·드래그를 얹는다
     g.rotation.z = AXIAL_TILT;
-    g.rotation.x = pitchX + eased.current.y * (tune?.pointerPitch ?? 0.16) * pointerAmt + drag.pitch;
+    g.rotation.x =
+      pitchX +
+      (isMobile ? 0 : eased.current.y * (tune?.pointerPitch ?? 0.16) * pointerAmt + drag.pitch);
 
     if (interactive) {
       const aspect = _state.size.width / Math.max(1, _state.size.height);
