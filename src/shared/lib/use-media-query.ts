@@ -54,3 +54,22 @@ export function prefersReducedMotionSync(): boolean {
   if (typeof window === "undefined") return false;
   return window.matchMedia(MQ.reduceMotion).matches;
 }
+
+/**
+ * iPhone / iPad / iPod (iPadOS 데스크톱 UA 포함).
+ *
+ * iOS 는 `<video>` 를 불투명 CALayer 로 올려서 `mix-blend-mode` 가
+ * 뒤와 안 섞이고, VP9 알파 WebM 은 투명 자리를 검정으로 채운다.
+ */
+export function isAppleTouchSync(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (/iP(hone|od|ad)/.test(navigator.userAgent)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+export const useIsAppleTouch = () =>
+  useSyncExternalStore(
+    () => () => {},
+    isAppleTouchSync,
+    () => false,
+  );

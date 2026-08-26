@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import clsx from "clsx";
+import { isAppleTouchSync } from "@/shared/lib/use-media-query";
 import styles from "./video-slot.module.css";
 
 /**
@@ -50,6 +51,11 @@ export interface VideoSlotProps {
   className?: string;
   /** 화면 밖 판정 여유. 배경 영상은 넉넉히 */
   rootMargin?: string;
+  /**
+   * `<video>` 인라인 배경. iOS 는 CSS `background` 를 비디오 레이어에
+   * 안 그리는 경우가 있어, 흰 바탕 클립은 여기로 넣는다.
+   */
+  videoBackground?: string;
 }
 
 export function VideoSlot({
@@ -64,10 +70,20 @@ export function VideoSlot({
   restartOnEnter = true,
   className,
   rootMargin = "200px 0px",
+  videoBackground,
 }: VideoSlotProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [inView, setInView] = useState(false);
+  /**
+   * iOS 는 `<source type="video/webm">` 을 고른 뒤 VP9 알파를 검정으로 채운다.
+   * 폴백이 안 일어나므로 처음부터 WebM 을 넣지 않는다.
+   */
+  const allowWebm = useSyncExternalStore(
+    () => () => {},
+    () => Boolean(srcWebm) && !isAppleTouchSync(),
+    () => false,
+  );
 
   useEffect(() => {
     const el = hostRef.current;
@@ -114,7 +130,7 @@ export function VideoSlot({
   return (
     <div
       ref={hostRef}
-      className={clsx(styles.root, className)}
+      className={clsx(styles.root, videoBackground && styles.open, className)}
       aria-hidden={decorative || undefined}
     >
       {src ? (
@@ -127,9 +143,10 @@ export function VideoSlot({
           muted={muted}
           playsInline
           aria-label={decorative ? undefined : label}
+          style={videoBackground ? { backgroundColor: videoBackground } : undefined}
         >
           {/* 순서가 곧 우선순위다 — 브라우저는 위에서부터 재생 가능한 첫 항목을 고른다 */}
-          {srcWebm ? <source src={srcWebm} type="video/webm" /> : null}
+          {allowWebm && srcWebm ? <source src={srcWebm} type="video/webm" /> : null}
           <source src={src} type="video/mp4" />
         </video>
       ) : poster ? (

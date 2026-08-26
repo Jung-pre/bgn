@@ -5,6 +5,11 @@
   overflow: hidden;
 }
 
+/* iOS 는 overflow:hidden 부모가 비디오를 검정 CALayer 로 남긴다 */
+.open {
+  overflow: visible;
+}
+
 .video {
   width: 100%;
   height: 100%;

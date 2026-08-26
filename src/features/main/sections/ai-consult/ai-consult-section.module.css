@@ -304,8 +304,9 @@
   스태킹을 끊어 흰 사각형이 그대로 남는다. 호스트에 올려야 섹션 흰 배경과
   하단 메시만 눌리고, B 본체(회청)는 흰 위에서는 톤이 거의 그대로다.
 
-  iOS 는 <video> 를 불투명 CALayer 로 합성해서 multiply 가 검정 사각형이 된다.
-  블렌드만 끄면 영상 원본(흰 바탕)이 그대로 나온다. 섹션도 흰 배경이라 이음매가 거의 없다.
+  iOS 분기는 JS 클래스(`.objectVideoIos`)로만 한다.
+  `@supports (-webkit-touch-callout)` 는 맥 사파리까지 잡거나 Lightning 이
+  통째로 버려, 실기기에서 multiply 가 그대로 남아 검정 사각형이 됐다.
 */
 .objectVideo {
   border-radius: var(--radius-lg);
@@ -313,15 +314,19 @@
   mix-blend-mode: multiply;
 }
 
-@supports (-webkit-touch-callout: none) {
-  .objectVideo {
-    mix-blend-mode: normal;
-    background: #fff;
-  }
+.objectVideoIos {
+  mix-blend-mode: normal;
+  background: #fff;
+  overflow: visible;
+}
 
-  .objectVideo :is(img, video) {
-    background: #fff;
-  }
+.objectVideoIos :is(img, video) {
+  background: #fff;
+}
+
+.media.mediaIos {
+  overflow: visible;
+  background: #fff;
 }
 
 /* ── 확대 상태 (2:1244) ─────────────────────────────────────────────────── */

@@ -8,7 +8,7 @@ import { useSectionReveal } from "@/features/main/sections/common/use-section-re
 import { VideoSlot } from "@/components/video-slot/video-slot";
 import type { AiConsultSectionMessages } from "@/shared/i18n/messages";
 import { gsap } from "@/shared/lib/gsap";
-import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
+import { prefersReducedMotionSync, useIsAppleTouch, useIsMobileLayout } from "@/shared/lib/use-media-query";
 import { renderWithEmphasis } from "@/shared/lib/render-emphasis";
 import styles from "./ai-consult-section.module.css";
 
@@ -59,6 +59,7 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
   const [agreed, setAgreed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const isMobile = useIsMobileLayout();
+  const isIos = useIsAppleTouch();
 
   /**
    * 왼쪽 카피 → 중앙 확대. `position` 은 보간되지 않으니 레이아웃을 먼저 바꾼 뒤
@@ -231,19 +232,20 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
         {/* 2:1242 — 762×762 영상 슬롯. 주석: "해당 영역 클릭시 하단 상담신청 Fade in"
             모바일 시안(`2:3971`)에는 확대 상태가 없어서 클릭을 막는다. */}
         {isMobile ? (
-          <div className={styles.media} data-reveal-item>
+          <div className={clsx(styles.media, isIos && styles.mediaIos)} data-reveal-item>
             <VideoSlot
               decorative
               src={LOGO_VIDEO}
-              srcWebm={LOGO_VIDEO_WEBM}
+              srcWebm={isIos ? undefined : LOGO_VIDEO_WEBM}
               poster={LOGO_POSTER}
-              className={styles.objectVideo}
+              className={clsx(styles.objectVideo, isIos && styles.objectVideoIos)}
+              videoBackground={isIos ? "#fff" : undefined}
             />
           </div>
         ) : (
           <button
             type="button"
-            className={styles.media}
+            className={clsx(styles.media, isIos && styles.mediaIos)}
             data-reveal-item
             aria-expanded={expanded}
             aria-label={EXPAND_LABEL}
@@ -252,9 +254,10 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
             <VideoSlot
               decorative
               src={LOGO_VIDEO}
-              srcWebm={LOGO_VIDEO_WEBM}
+              srcWebm={isIos ? undefined : LOGO_VIDEO_WEBM}
               poster={LOGO_POSTER}
-              className={styles.objectVideo}
+              className={clsx(styles.objectVideo, isIos && styles.objectVideoIos)}
+              videoBackground={isIos ? "#fff" : undefined}
             />
           </button>
         )}
