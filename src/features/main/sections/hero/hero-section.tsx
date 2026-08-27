@@ -281,15 +281,15 @@ export function HeroSection({ messages }: HeroSectionProps) {
         }
 
         /**
-         * ## 축소된 구체 → 라인 **크로스페이드**
+         * ## 축소된 파티클은 걷지 않는다.
          *
-         * 파티클 은하수는 없다. 축소가 끝나기 전에 캔버스를 걷고
-         * 2번 섹션 실크 라인이 제자리 페이드인으로 받는다.
+         * 타워 하늘 위에서 축소된 구체가 천천히 떠 있는 게 2번 섹션 배경이다.
+         * 실크 라인만 페이드인하고, 캔버스는 조금 눌러 하늘·띠가 묻히지 않게 한다.
          */
         const { gxCrossStart, gxCrossEnd } = getGlobeTune();
         const cross = clamp01((t - gxCrossStart) / Math.max(0.02, gxCrossEnd - gxCrossStart));
         const crossEase = cross * cross * (3 - 2 * cross);
-        if (host) host.style.opacity = String(1 - crossEase);
+        if (host) host.style.opacity = String(1 - crossEase * 0.42);
         applyRise(glLinesRef.current, crossEase, 36);
         /* WebGL 미지원 폴백(정지 PNG 띠)도 같은 곡선을 탄다 */
         applyRise(stageClipRef.current, crossEase, 36);
@@ -631,7 +631,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
         {/* ── 카피 ───────────────────────────────────────────────────── */}
         <div className={styles.inner}>
           {/* 장면 1 — 세계를 향한 BGN의 도약
-              ExtraBold 6rem / BGN 만 타원 라디얼 (#8d79ff → #102c87) */}
+              ExtraBold 6rem / BGN 만 타원 라디얼 (#00dad8 → #009ceb) */}
           <div ref={copySphereRef} className={clsx(styles.copy, styles.copySphere)}>
             <p className={styles.line1} data-hero-fade>
               {sphereSlide?.eyebrow}
@@ -765,24 +765,34 @@ function SplitBrandTitle({
       {/* `data-font="body"` — 시안의 히어로 `BGN` 은 영문이지만 Pretendard 다.
           이게 없으면 globals.css 의 `[lang|="en"]` 규칙이 Belleza 로 바꿔 버린다.
 
-          ⚠️ **글자마다 span 을 따로 낸다.** 시안 8:797 은 B(8:798)/G(8:799)/N(8:800)
-          이 각각 독립 텍스트 노드이고 **글자마다 다른 radial 그라디언트**를 갖는다.
-          한 span 에 그라디언트 하나를 걸면 세 글자에 하나의 타원이 걸쳐서
-          가운데 글자만 하얗고 양끝이 죽는다 — 시안과 다른 그림이 된다.
-          `data-letter` 로 글자별 그라디언트를 CSS 가 골라 준다. */}
-      {Array.from(brand).map((ch, i) => (
+          장면 1 은 단어 전체에 radial 하나(좌상단 #00DAD8 → 우하단 #009CEB).
+          글자마다 나누면 `at 0% 0%` 가 글자마다 반복돼 세 글자가 같은 보라가 된다.
+          장면 2 는 시안 8:797 이 B/G/N 각각 다른 흰 radial 이라 글자 span 을 유지한다. */}
+      {mark === "hero" ? (
         <span
-          key={`brand${i}`}
-          className={clsx(styles.char, brandClassName)}
-          data-letter={ch}
+          className={clsx(!plain && styles.char, brandClassName)}
           aria-hidden
           lang="en"
           data-font="body"
           {...attr}
         >
-          {ch}
+          {brand}
         </span>
-      ))}
+      ) : (
+        Array.from(brand).map((ch, i) => (
+          <span
+            key={`brand${i}`}
+            className={clsx(styles.char, brandClassName)}
+            data-letter={ch}
+            aria-hidden
+            lang="en"
+            data-font="body"
+            {...attr}
+          >
+            {ch}
+          </span>
+        ))
+      )}
       {restBlock}
     </>
   );

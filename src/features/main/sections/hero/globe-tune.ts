@@ -61,6 +61,10 @@ export type GlobeTune = {
   /** 히어로 자전. 코드상 기본 0 — 클로징만 0.07 고정. */
   spinRate: number;
   introYaw: number;
+  /**
+   * 축소·2번 체류 때 한반도에서 돌리는 각(rad).
+   * 1.72 ≈ 99° → 정면 경도 ≈ 28E (동아프리카·지중해). 한국·일본 군집을 벗어난다.
+   */
   scrollYaw: number;
   pointerYaw: number;
   pointerPitch: number;
@@ -77,7 +81,8 @@ export type GlobeTune = {
 
   /* --- 축소 배율·라인 페이드 ----------------------------------------------
    * 파티클 은하수(구체→밴드)는 쓰지 않는다. gxShrink 만 확대 후 축소량이고,
-   * gxCross* 는 축소된 구체가 빠진 뒤 2번 섹션 실크 라인이 들어오는 구간이다.
+   * gxCross* 는 2번 섹션 실크 라인이 들어오는 구간이다. 파티클은 축소된 채
+   * 타워 하늘 위에 남는다.
    */
   gxTiltDeg: number;
   /** 깊이 회전. 0 이면 완전한 평면이라 벽에 붙은 그림이 된다 */
@@ -146,7 +151,8 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
      0.025 rad/s ≈ 4분에 한 바퀴 — 눈에 띄되 어지럽지 않은 속도. */
   spinRate: 0.025,
   introYaw: 0,
-  scrollYaw: 0.35,
+  /** 축소 때 타 대륙이 정면. 1.72 rad ≈ 99°, 정면 ≈ 28E. */
+  scrollYaw: 1.72,
   pointerYaw: 0.3,
   pointerPitch: 0.16,
   pitchX: 0.655,
@@ -167,19 +173,20 @@ export const GLOBE_TUNE_DEFAULTS: GlobeTune = {
   gxAmp: 0.62,
   gxGap: 0.14,
   gxBands: 3,
-  /** 끝까지 되돌리지 않는다. 4.45 → 약 2.4 에서 멈춘 뒤 페이드. */
-  gxShrink: 2.05,
+  /** 끝까지 되돌리지 않는다. 4.45 → 약 2.7 에서 멈춘 뒤 남긴다(페이드 없음).
+   *  2.4 는 점이 너무 촘촘해서 아주 살짝만 더 키운다. */
+  gxShrink: 1.75,
   gxStart: 0.29,
   gxEnd: 0.64,
-  /** 타워가 자리 잡은 직후 — 더 줄어들기 전에 파티클을 걷는다 */
-  gxCrossStart: 0.76,
-  gxCrossEnd: 0.94,
+  /** 실크 라인은 축소가 거의 끝난 뒤에 들어온다. */
+  gxCrossStart: 0.9,
+  gxCrossEnd: 1,
 };
 
 let current: GlobeTune = { ...GLOBE_TUNE_DEFAULTS };
 const listeners = new Set<() => void>();
 let appliedGen = 0;
-const TUNE_GEN = 7;
+const TUNE_GEN = 12;
 
 export function getGlobeTune(): GlobeTune {
   if (appliedGen !== TUNE_GEN) {

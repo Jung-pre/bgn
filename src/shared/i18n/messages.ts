@@ -280,8 +280,8 @@ const ko: Dictionary = {
       **원본 사진의 픽셀 크기로 대조**했다. Figma 에서 뽑은 파일과 병원 페이지의
       원본이 같은 소스라 크기가 그대로 일치한다:
         송윤중 577×958 = song-yunjung.webp 577×958
-        김민경 470×780 = kim-minkyung.webp 470×780
-        이연호 597×1010 → 남은 한 장(lee-yeonho.webp). 사진도 육안 대조했다.
+        doctor05 원본은 kim-minkyung.webp, doctor06 은 lee-yeonho.webp.
+        표시 이름은 김민경 ↔ 이현호 로 맞바꿨다(이미지 순서는 유지).
       앞의 5명은 시안 카드에 이름이 찍혀 있어 그대로 읽었다.
     */
     doctors: [
@@ -289,8 +289,8 @@ const ko: Dictionary = {
       { name: "김정완", title: "원장", photo: "/main/img_02_doctor02.webp" },
       { name: "한정엽", title: "원장", photo: "/main/img_02_doctor03.webp" },
       { name: "송윤중", title: "원장", photo: "/main/img_02_doctor04.webp" },
-      { name: "김민경", title: "원장", photo: "/main/img_02_doctor05.webp" },
-      { name: "이연호", title: "원장", photo: "/main/img_02_doctor06.webp" },
+      { name: "이현호", title: "원장", photo: "/main/img_02_doctor05.webp" },
+      { name: "김민경", title: "원장", photo: "/main/img_02_doctor06.webp" },
       /* 기존 1~8 순서에서 7·8만 자리 교체 → 1.2.3.4.5.6.8.7
          doctor07 = 이수민, doctor08 = 김소현. */
       { name: "김소현", title: "원장", photo: "/main/img_02_doctor08.webp" },
@@ -494,19 +494,19 @@ const ko: Dictionary = {
         tags: ["Doctor's Story", "히포크라테스의 생각"],
         title: "백내장 명의? 증세의 정도를 확인하는 판단력이 필요합니다.",
         href: "/blog/1",
-        image: "/main/img_09_post01.webp",
+        image: "/main/img_09_post02.webp",
       },
       {
         tags: ["Doctor's Story"],
         title: "스마일라식, 후기로는 알 수 없는 이야기",
         href: "/blog/2",
-        image: "/main/img_09_post02.webp",
+        image: "/main/img_09_post03.webp",
       },
       {
         tags: ["서선의 기술", "안(眼)목 있는 이야기"],
         title: "부드러운 햇살에 속지 마세요, 눈 건강에 더 위험한 이유",
         href: "/blog/3",
-        image: "/main/img_09_post03.webp",
+        image: "/main/img_09_post04.webp",
       },
     ],
   },

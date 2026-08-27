@@ -157,6 +157,7 @@
        pc title3    26 → mo title3    20
        pc body0     20 → mo body0     18
        pc body2     16 → mo body1     16 (동일)  */
+  --fs-48: clamp(36px, 2.5vw, 48px);
   --fs-42: clamp(32px, 2.1875vw, 42px);
   --fs-32: clamp(24px, 1.6667vw, 32px);
   --fs-26: clamp(20px, 1.3542vw, 26px);

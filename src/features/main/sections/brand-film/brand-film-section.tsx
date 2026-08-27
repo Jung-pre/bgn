@@ -354,6 +354,9 @@ export function BrandFilmSection() {
           </>
         )}
       </div>
+      {/* 모바일에서 <video> CALayer 가 pinShell 의사요소를 덮어 하단 이음매가
+          직선으로 남는다. 섹션 형제로 올려 다음 톤으로 녹인다. */}
+      <div className={styles.exitVeil} aria-hidden />
     </section>
   );
 }

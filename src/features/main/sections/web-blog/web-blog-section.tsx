@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type RefCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { gsap, ScrollTrigger, useGSAP } from "@/shared/lib/gsap";
@@ -89,11 +89,9 @@ const WATERMARK = "BGN AI Web blog";
 
 /**
  * 브랜드 컷(2:2457)의 사진. 게시글이 아니라 고정 배너라 messages 에 없다.
- * 시안은 이 자리에 수술 현미경 컷(post-1)을 쓰는데, 그건 messages.posts[0] 이
- * 이미 쓰고 있어 바로 옆 카드와 같은 사진이 두 번 나온다.
- * → 시안에서 마지막 카드에 쓰인 접수 사인 컷(post-4)으로 돌린다.
+ * 화면 순서 = img_09_post01 → post02 → post03 → post04 (시안 가로 트랙).
  */
-const BRAND_IMAGE = "/main/img_09_post04.webp";
+const BRAND_IMAGE = "/main/img_09_post01.webp";
 
 /**
  * 썸네일 폭 = `.thumb` 40rem. root font-size 가 뷰포트 비례(1920→16px)라
@@ -103,6 +101,24 @@ const THUMB_SIZES = "(max-width: 768px) 92vw, 33vw";
 
 /** 태그 색 팔레트 개수(`.tone0`~`.tone3`) */
 const TONE_COUNT = 4;
+
+/**
+ * 카드가 세로로 넘칠 때만 Lenis 를 막는다.
+ * 항상 prevent 를 달면 흰 카드 위에서 핀 가로 스크롤(휠)이 죽는다.
+ */
+function overflowLenisPrevent(el: HTMLElement | null) {
+  if (!el) return;
+  const sync = () => {
+    if (el.scrollHeight > el.clientHeight + 1) el.setAttribute("data-lenis-prevent", "");
+    else el.removeAttribute("data-lenis-prevent");
+  };
+  const ro = new ResizeObserver(sync);
+  ro.observe(el);
+  sync();
+  return () => ro.disconnect();
+}
+
+const bindOverflowPrevent: RefCallback<HTMLElement> = (el) => overflowLenisPrevent(el);
 
 type TrackItem =
   | { kind: "tile"; key: string; symbol: number }
@@ -305,15 +321,21 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
           if (item.kind === "brand") {
             /* 시안 2:2457 — 태그도 제목도 없는 브랜드 컷 */
             return (
-              <div key={item.key} className={`${styles.card} ${styles.brandCard}`} aria-hidden>
-                <Image
-                  src={BRAND_IMAGE}
-                  alt=""
-                  width={640}
-                  height={400}
-                  className={styles.thumb}
-                  sizes={THUMB_SIZES}
-                />
+              <div
+                key={item.key}
+                ref={bindOverflowPrevent}
+                className={`${styles.card} ${styles.brandCard}`}
+                aria-hidden
+              >
+                <div className={styles.thumbWrap}>
+                  <Image
+                    src={BRAND_IMAGE}
+                    alt=""
+                    fill
+                    className={styles.thumb}
+                    sizes={THUMB_SIZES}
+                  />
+                </div>
                 <p className={styles.watermark} lang="en">
                   {WATERMARK}
                 </p>
@@ -322,18 +344,19 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
           }
 
           return (
-            <article key={item.key} className={styles.card}>
+            <article key={item.key} ref={bindOverflowPrevent} className={styles.card}>
               <Link href={item.post.href} className={styles.cardLink}>
                 {/* 제목이 바로 아래 h3 로 나오므로 썸네일은 장식으로 넘긴다 */}
-                <Image
-                  src={item.post.image}
-                  alt=""
-                  aria-hidden
-                  width={640}
-                  height={400}
-                  className={styles.thumb}
-                  sizes={THUMB_SIZES}
-                />
+                <div className={styles.thumbWrap}>
+                  <Image
+                    src={item.post.image}
+                    alt=""
+                    aria-hidden
+                    fill
+                    className={styles.thumb}
+                    sizes={THUMB_SIZES}
+                  />
+                </div>
                 <ul className={styles.tags}>
                   {item.post.tags.map((t) => (
                     <li key={t} className={`${styles.tag} ${styles[`tone${tagTone.get(t) ?? 0}`]}`}>

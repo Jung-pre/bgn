@@ -84,7 +84,7 @@
   width: fit-content;
   margin: 0 0 0.5rem; /* 2:1207 gap 8 */
   font-family: var(--font-display-stack);
-  font-size: var(--fs-eng-24);
+  font-size: var(--fs-eng-32);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-eng);
   background: var(--gradient-2);
@@ -100,7 +100,7 @@
   align-items: center;
   gap: 0.5rem; /* 2:1214 gap 8 */
   margin: 0 0 1rem; /* 2:1209 gap 16 */
-  font-size: var(--fs-42);
+  font-size: var(--fs-48);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-default);
@@ -114,7 +114,7 @@
 
 .desc {
   margin: 0;
-  font-size: var(--fs-20);
+  font-size: var(--fs-24);
   line-height: var(--leading-normal);
   letter-spacing: var(--tracking-default);
   color: var(--gray-700); /* 2:1218 #3d3d3d */
@@ -475,7 +475,7 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0.25rem;
-    font-size: var(--fs-42);
+    font-size: var(--fs-48);
     /* 시안 타이틀 2줄 잉크 116~144 / 158~187, 본문 1줄 210.
        우리 마크 상자가 9px 더 길어 본문이 18px 밀린다 — 절반을 여기서 흡수한다. */
     margin-bottom: 0.5rem;

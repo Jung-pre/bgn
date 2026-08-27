@@ -198,7 +198,7 @@ function Panel({ onClose }: { onClose: () => void }) {
       >
         <Slider label="자전" k="spinRate" min={0} max={0.4} step={0.005} tune={tune} />
         <Slider label="등장 요" k="introYaw" min={0} max={0.8} step={0.01} tune={tune} />
-        <Slider label="스크롤 요" k="scrollYaw" min={0} max={1} step={0.01} tune={tune} />
+        <Slider label="스크롤 요" k="scrollYaw" min={0} max={2.5} step={0.01} tune={tune} />
         <Slider label="포인터 요" k="pointerYaw" min={0} max={1} step={0.01} tune={tune} />
         <Slider label="포인터 피치" k="pointerPitch" min={0} max={0.6} step={0.01} tune={tune} />
         <Slider label="피치 X" k="pitchX" min={0} max={1.2} step={0.01} tune={tune} />

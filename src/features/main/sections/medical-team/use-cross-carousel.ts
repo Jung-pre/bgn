@@ -91,8 +91,12 @@ function initialOffsets(count: number): number[] {
 /** 화면 밖 한 칸 — 여기서 루프 이음매가 일어난다. */
 const EXIT_SLOT = VISIBLE_DEPTH + 1;
 
-/** 자동 롤링 간격. 카드 transition(0.62s) 이 끝난 뒤 읽을 시간을 남긴다. */
+/** 카드 CSS transition 과 맞춘다(`.card` transform 0.62s). */
+const STEP_MS = 620;
+/** 자동 롤링 간격. 카드 transition 이 끝난 뒤 읽을 시간을 남긴다. */
 const AUTO_MS = 3200;
+/** 화살표를 연타해도 한 번에 쌓이는 칸은 이만큼만. 나머지는 모션이 끝난 뒤. */
+const MAX_QUEUE = 2;
 
 export interface CrossCarouselResult {
   activeIndex: number;
@@ -131,7 +135,9 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
   const activeRef = useRef(activeIndex);
   const pendingRef = useRef(0);
   const wrappingRef = useRef(false);
+  const busyRef = useRef(false);
   const wrapRafRef = useRef(0);
+  const settleTimerRef = useRef(0);
   const flushRef = useRef<() => void>(() => {});
 
   const pause = useCallback(() => setPaused(true), []);
@@ -149,6 +155,17 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
     [count],
   );
 
+  const armSettle = useCallback(() => {
+    if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current);
+    busyRef.current = true;
+    const wait = prefersReducedMotionSync() ? 0 : STEP_MS;
+    settleTimerRef.current = window.setTimeout(() => {
+      settleTimerRef.current = 0;
+      busyRef.current = false;
+      flushRef.current();
+    }, wait);
+  }, []);
+
   /**
    * 한 칸 이동.
    *
@@ -158,6 +175,9 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
    *
    * 빠져나가는 칸(`-4`/`+4`, 이미 투명)에 있는 카드만 반대편 같은 칸으로
    * 순간이동한 다음, 전체가 한 칸 미끄러지게 한다.
+   *
+   * 연속 클릭은 모션(0.62s)이 끝난 뒤에만 다음 칸을 보낸다. 한 틱에 여러 칸을
+   * 밀어 넣으면 transition 이 겹쳐 카드가 덱을 가로질러 지나간다.
    */
   const runStep = useCallback(
     (dir: -1 | 1) => {
@@ -172,7 +192,7 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
       if (!didTeleport) {
         commitShift(dir, current);
         wrappingRef.current = false;
-        flushRef.current();
+        armSettle();
         return;
       }
 
@@ -187,7 +207,7 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
         if (stage) delete stage.dataset.snap;
         commitShift(dir, teleported);
         wrappingRef.current = false;
-        flushRef.current();
+        armSettle();
       };
 
       /* 텔레포트가 페인트된 뒤에 transition 을 다시 켠다.
@@ -196,11 +216,11 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
         wrapRafRef.current = requestAnimationFrame(paintShift);
       });
     },
-    [count, commitShift],
+    [count, commitShift, armSettle],
   );
 
   const flush = useCallback(() => {
-    if (wrappingRef.current || count < 2) return;
+    if (wrappingRef.current || busyRef.current || count < 2) return;
     const pending = pendingRef.current;
     if (pending === 0) return;
     const dir: -1 | 1 = pending > 0 ? 1 : -1;
@@ -216,6 +236,8 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
     (direction: -1 | 1) => {
       if (count < 2) return;
       pendingRef.current += direction;
+      if (pendingRef.current > MAX_QUEUE) pendingRef.current = MAX_QUEUE;
+      if (pendingRef.current < -MAX_QUEUE) pendingRef.current = -MAX_QUEUE;
       flush();
     },
     [count, flush],
@@ -305,6 +327,7 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
     return () => {
       if (state.raf) cancelAnimationFrame(state.raf);
       if (wrapRafRef.current) cancelAnimationFrame(wrapRafRef.current);
+      if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current);
     };
   }, []);
 
@@ -333,6 +356,7 @@ export function useCrossCarousel(count: number): CrossCarouselResult {
 
     const tick = () => {
       if (document.hidden || drag.current.pointerId !== -1) return;
+      if (wrappingRef.current || busyRef.current) return;
       pendingRef.current += 1;
       flushRef.current();
     };

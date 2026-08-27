@@ -60,11 +60,16 @@
 }
 
 /* 2:1103 — "BGN AI"(#171717) + 마커 박스가 gap 8 로 나란히 선다. */
+.header :global(.eyebrow) {
+  font-size: var(--fs-eng-32);
+}
+
 .header :global(.section-title) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+  font-size: var(--fs-48);
   /* 2:1104 는 #171717(neutral gray/900). 공용 --color-text-strong(#0a2048)이 아니다. */
   color: var(--gray-900);
 }
@@ -76,7 +81,25 @@
 
 .header :global(.section-desc) {
   margin-top: 0.5rem; /* 2:1103 → 2:1107 = 16 (gap 8 + 8) */
+  font-size: var(--fs-24);
   color: var(--gray-700); /* 2:1107 #3d3d3d */
+}
+
+/**
+ * 브랜드 필름 → 이 섹션 이음매. `::before` 는 실크 웨이브라 `.blend-top` 을 못 쓴다.
+ * 모바일에서 필름 영상이 하단 베일을 덮어 직선이 남으므로, 이쪽 상단에서도
+ * 같은 톤으로 받아 준다.
+ */
+.section::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, #f8f7ff 0%, rgba(248, 247, 255, 0) 100%);
 }
 
 /* 좌→우 wipe 대상.
@@ -545,6 +568,10 @@
   .section {
     /* 카드 하단 641 → 프레임 722 = 81. 85 면 섹션이 5 길다. */
     padding-block: 81px 80px;
+  }
+
+  .section::after {
+    height: 28svh;
   }
 
   /**

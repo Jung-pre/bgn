@@ -123,8 +123,17 @@
  */
 
 /* 시안 2:995 — 타이틀 바로 아래 한 줄 설명. 공용 `.section-desc` 위에 여백만 얹는다 */
+.header :global(.eyebrow) {
+  font-size: var(--fs-eng-32);
+}
+
+.header :global(.section-title) {
+  font-size: var(--fs-48);
+}
+
 .desc {
   margin-top: 1.5rem;
+  font-size: var(--fs-24);
 }
 
 .cta {
@@ -458,7 +467,7 @@
     /* 시안 잉크 상단 169, 우리 175 → 24 에서 6 뺀다 */
     margin-top: 18px;
     max-width: 300px;
-    font-size: 20px;
+    font-size: var(--fs-24);
   }
 
   /**

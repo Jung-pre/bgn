@@ -339,6 +339,17 @@ function Globe({
     velPitch: 0,
     hold: 0,
   });
+  /** 1번 섹션 자전. 전환에 들어가면 0 으로 비워 되돌릴 때 한반도부터 다시 돈다. */
+  const idleAcc = useRef(0);
+  /** 축소가 끝난 뒤 2번 섹션에서만 쌓는 자전. 1번과 같은 속도. */
+  const floatAcc = useRef(0);
+  const zoomTPrev = useRef(0);
+  /** 1 = 1→2, -1 = 2→1. 멈추면 마지막 방향을 유지한다. */
+  const scrollDir = useRef(1);
+  /** 0 한반도, 1 타 대륙. 방향이 뒤집혀도 각이 점프하지 않게. */
+  const continentMix = useRef(0);
+  /** 스크롤 틱이 스케일에 그대로 안 붙게. */
+  const growSmooth = useRef(1);
 
   /**
    * ⚠️ R3F 의 `state.pointer` 를 쓰지 않고 window 에서 직접 받는다.
@@ -535,22 +546,24 @@ function Globe({
           Math.max(0, (scrollNow - fadeStartNow) / Math.max(0.02, fadeEndNow - fadeStartNow)),
         )
       : 0;
+    const recenter = smoothRange(zoomTNow, CUE.recenter[0], CUE.recenter[1]);
+    const floatIn = smoothRange(zoomTNow, CUE.float[0], CUE.float[1]);
     /**
-     * 히어로만: 확대 → 축소. 파티클은 구체 형태를 유지한다.
-     *
-     * 예전엔 `grow` 가 끝까지 단조 증가라 구체가 화면 밖으로 계속 커지다가
-     * 통째로 페이드아웃했다(진행도 0.6 근처가 **흰 화면 한 장**이었다).
-     * 이제 `zoomIn` 으로 화면을 채운 뒤 `zoomOut` 으로 되돌아온다.
-     * 은하수(파티클 → 라인 밴드)는 빼 둔다 — 축소 뒤 2번 섹션 실크 라인이 받는다.
+     * 히어로만. 스케일은 같은 곡선, 바라보는 대륙은 방향이 다르다.
+     * 1→2: 한반도로 확대 → 타 대륙을 보며 축소.
+     * 2→1: 타 대륙으로 다시 확대 → 한반도로 축소해 1번 구도로.
      */
     const zin = smoothRange(zoomTNow, CUE.zoomIn[0], CUE.zoomIn[1]);
     const zout = smoothRange(zoomTNow, CUE.zoomOut[0], CUE.zoomOut[1]);
     /* 곡선은 기존과 같은 모양(0.78 선형 + 0.22 제곱)을 유지한다 */
     const zoomNow = zin * 0.78 + zin * zin * 0.22;
-    const grow =
+    const growTarget =
       interactive && !reduced
         ? 1 + zoomNow * 3.45 - zout * (tune?.gxShrink ?? GLOBE_TUNE_DEFAULTS.gxShrink)
         : 1;
+    const gk = 1 - Math.exp(-delta * 6.2);
+    growSmooth.current += (growTarget - growSmooth.current) * gk;
+    const grow = growSmooth.current;
     /* 원형 평판은 확대가 끝나기 전에 걷어 파티클만 남긴다 */
     bodyCoverRef.current = 1 - smoothRange(zoomTNow, CUE.bodyOut[0], CUE.bodyOut[1]);
     g.scale.setScalar(fitted * grow);
@@ -567,12 +580,16 @@ function Globe({
       const fovDeg = cam instanceof THREE.PerspectiveCamera ? cam.fov : 38;
       const visibleH = 2 * Math.tan(((fovDeg * Math.PI) / 180) / 2) * dist;
       const yKeep = -visibleH * 0.05;
-      g.position.y = yKeep;
-      if (bodyGroupRef.current) bodyGroupRef.current.position.y = yKeep;
+      const bob =
+        interactive && !reduced ? Math.sin(_state.clock.elapsedTime * 0.32) * 0.07 * floatIn : 0;
+      g.position.y = yKeep + bob;
+      if (bodyGroupRef.current) bodyGroupRef.current.position.y = yKeep + bob;
       hitCenterYRef.current = yKeep / (visibleH * 0.5);
     } else {
-      g.position.y = 0;
-      if (bodyGroupRef.current) bodyGroupRef.current.position.y = 0;
+      const bob =
+        interactive && !reduced ? Math.sin(_state.clock.elapsedTime * 0.32) * 0.07 * floatIn : 0;
+      g.position.y = bob;
+      if (bodyGroupRef.current) bodyGroupRef.current.position.y = bob;
       hitCenterYRef.current = 0;
     }
     if (bodyMeshRef.current) bodyMeshRef.current.visible = tune ? tune.showBody : true;
@@ -644,34 +661,88 @@ function Globe({
         if (Math.abs(drag.velPitch) < 0.02) drag.velPitch = 0;
       }
     }
-    const idle = interactive
-      ? (_state.clock.elapsedTime - drag.hold) * (tune?.spinRate ?? 0)
-      : _state.clock.elapsedTime * 0.07;
-    const yawKeep = interactive ? 1 - zoomTNow * 0.85 : 1;
-    /* 진입이 끝나기 전에는 포인터로 각도를 밀지 않는다 — 첫 화면이 한반도 정면.
-       드래그 중에는 호버 추종이 각도를 뺏지 않게 끈다. */
-    const pointerAmt = drag.dragging ? 0 : introEase;
+    /* 클로징·푸터는 예전처럼 느린 자전만. 히어로만 전환 큐를 탄다. */
+    const idleRate = interactive ? (tune?.spinRate ?? 0) : 0.07;
+    if (!interactive) {
+      idleAcc.current += delta * idleRate;
+    } else if (recenter < 0.02 && floatIn < 0.02) {
+      idleAcc.current += delta * idleRate;
+    } else {
+      /* 880° 돌았어도 ±180° 안쪽 최단각으로 접은 뒤 한반도로 감는다. */
+      idleAcc.current = shortestAngle(idleAcc.current);
+      drag.yaw = shortestAngle(drag.yaw);
+      const k = 1 - Math.exp(-delta * 4.2);
+      idleAcc.current += (0 - idleAcc.current) * k;
+      drag.yaw += (0 - drag.yaw) * k;
+      drag.pitch += (0 - drag.pitch) * k;
+      drag.velYaw = 0;
+      drag.velPitch = 0;
+      if (Math.abs(idleAcc.current) < 1e-4) idleAcc.current = 0;
+      if (Math.abs(drag.yaw) < 1e-4) drag.yaw = 0;
+    }
+    if (zoomTNow > zoomTPrev.current + 0.003) scrollDir.current = 1;
+    else if (zoomTNow < zoomTPrev.current - 0.003) scrollDir.current = -1;
+    const goingBack = scrollDir.current < 0;
+    zoomTPrev.current = zoomTNow;
+    /**
+     * 1→2 는 축소(zout)에 타 대륙을 싣고,
+     * 2→1 은 확대가 풀리는 zin 구간에 한반도를 되돌린다.
+     * 그래서 되돌릴 때 먼저 타 대륙이 커지고, 그다음 한국으로 줄어든다.
+     */
+    const mixTarget = interactive ? (goingBack ? zin : zout) : 0;
+    continentMix.current += (mixTarget - continentMix.current) * (1 - Math.exp(-delta * 5.2));
+    const otherYaw = (tune?.scrollYaw ?? 0) * continentMix.current;
+    if (!interactive) {
+      floatAcc.current = 0;
+    } else if (goingBack) {
+      /* 2→1: 섹션 2에서 쌓인 자전도 최단각으로 접고 걷는다. */
+      floatAcc.current = shortestAngle(floatAcc.current);
+      const k = 1 - Math.exp(-delta * 3.8);
+      floatAcc.current += (0 - floatAcc.current) * k;
+      if (floatIn < 0.02 || Math.abs(floatAcc.current) < 1e-4) floatAcc.current = 0;
+    } else if (floatIn > 0.02) {
+      /* 2번 도착: 1번과 같은 속도로 자전. */
+      floatAcc.current += delta * idleRate;
+    }
+    if (interactive && recenter > 0.92) {
+      drag.yaw = 0;
+      drag.pitch = 0;
+      drag.velYaw = 0;
+      drag.velPitch = 0;
+    }
+    const liveKeep = 1 - recenter;
+    const pointerAmt = drag.dragging ? 0 : introEase * liveKeep;
     g.rotation.y =
       FOCUS_ROTATION_Y +
       yawTrim +
       (1 - introEase) * (tune ? tune.introYaw : 0.12) +
-      scrollNow * (tune?.scrollYaw ?? 0.35) * yawKeep +
+      idleAcc.current +
+      drag.yaw +
       eased.current.x * (tune?.pointerYaw ?? 0.3) * pointerAmt +
-      idle +
-      drag.yaw;
-    // 지축 기울기를 고정으로 주고 그 위에 포인터 반응·드래그를 얹는다
+      otherYaw +
+      floatAcc.current;
     g.rotation.z = AXIAL_TILT;
     g.rotation.x =
       pitchX +
       (isMobile ? 0 : eased.current.y * (tune?.pointerPitch ?? 0.16) * pointerAmt + drag.pitch);
 
     if (interactive) {
+      const canDrag = (progressRef?.current ?? 0) <= DRAG_SCROLL_CUTOFF;
+      if (!canDrag && (drag.dragging || drag.down)) {
+        drag.dragging = false;
+        drag.down = false;
+        drag.id = -1;
+        document.documentElement.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
       const aspect = _state.size.width / Math.max(1, _state.size.height);
       const rNdc = globeRadiusNdcY(camera, GLOBE_RADIUS * fitted * grow);
       const onDisk = inside && globeDiskHit(nx, ny, aspect, rNdc * 1.06, hitCenterYRef.current);
       const shell = gl.domElement.closest("section");
       if (shell instanceof HTMLElement && !drag.dragging) {
-        const next = onDisk ? "grab" : "";
+        /* 2번 장면은 자전만 남기고 드래그를 끈다. grab 커서가 남으면
+           돌릴 수 있는 것처럼 보인다. */
+        const next = onDisk && canDrag ? "grab" : "";
         if (shell.style.cursor !== next) shell.style.cursor = next;
       }
     }
@@ -1076,24 +1147,34 @@ const POINT_FRAGMENT = /* glsl */ `
 `;
 
 /**
- * ## 구체 확대 → 축소 → 라인
+ * ## 구체 전환 큐
  *
- * 진행도 `t`(= fadeStart~fadeEnd 를 0~1 로 편 값) 기준 큐 시트다.
- * 파티클을 라인 밴드로 모으는 은하수 모프는 쓰지 않는다.
+ * 진행도 `t`(= fadeStart~fadeEnd 를 0~1 로 편 값).
+ * 스케일은 왕복 같은 곡선. 정면 대륙만 스크롤 방향으로 갈린다.
  */
 const CUE = {
-  /** 확대 — 여기까지 최대 배율. */
-  zoomIn: [0.0, 0.4],
-  /** 원형 평판(바디) 소멸 — 확대가 끝나기 전에 걷어 파티클만 남긴다 */
-  bodyOut: [0.22, 0.4],
-  /** 다시 축소. 시작을 더 뒤로 둬 확대 화면이 1→2 전환까지 남는다. */
-  zoomOut: [0.7, 0.9],
+  /** 1→2 시작: 한반도 정면으로 되돌린 뒤 확대. */
+  recenter: [0.0, 0.2],
+  /** 확대. 1→2 는 한반도, 2→1 은 타 대륙. */
+  zoomIn: [0.16, 0.48],
+  /** 원형 평판(바디) 소멸 — 확대 구간에 맞춰 걷어 파티클만 남긴다 */
+  bodyOut: [0.28, 0.48],
+  /** 축소. 1→2 는 타 대륙으로 돌며, 2→1 은 이 구간에서 타 대륙을 확대한다. */
+  zoomOut: [0.46, 0.92],
+  /** 축소가 끝나 갈 때부터 1번과 같은 자전이 살아난다. */
+  float: [0.86, 0.98],
 } as const;
 
 /** smoothstep(a,b,x) 와 같다 */
 function smoothRange(x: number, a: number, b: number) {
   const t = Math.min(1, Math.max(0, (x - a) / Math.max(1e-4, b - a)));
   return t * t * (3 - 2 * t);
+}
+
+/** 같은 방향을 ±π 안쪽 최단각으로. 880° 를 880° 되돌리지 않는다. */
+function shortestAngle(a: number) {
+  const tau = Math.PI * 2;
+  return ((((a + Math.PI) % tau) + tau) % tau) - Math.PI;
 }
 
 const LAYER_SHOW = {

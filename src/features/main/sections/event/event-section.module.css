@@ -62,13 +62,13 @@
   (2:2841) 크기만 덮어쓴다. 색·자간은 전역 그대로.
 */
 .eyebrow {
-  font-size: var(--fs-eng-24);
+  font-size: var(--fs-eng-32);
 }
 
 .title {
   margin: 18px 0 0;
   /* 시안 2:2843 — headline 1 (Pretendard Bold 42, tracking -3%) */
-  font-size: var(--fs-42);
+  font-size: var(--fs-48);
   font-weight: var(--weight-bold);
   /* `.title-mark` 상자가 42×1.333 = 56 이라 줄상자도 같이 1.333 이어야 한다.
      --leading-tight 로 두면 마크가 줄상자 밖으로 튀어나와 제목 전체가
@@ -91,7 +91,7 @@
 .desc {
   /* 마크 상자 하단 242 → 본문 박스 246 (잉크 253). */
   margin: 4px 0 0;
-  font-size: var(--fs-20);
+  font-size: var(--fs-24);
   line-height: var(--leading-normal);
   /* 시안 2:2846 = grayscale/neutral-gray/700 */
   color: var(--gray-700);

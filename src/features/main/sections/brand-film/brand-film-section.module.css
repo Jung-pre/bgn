@@ -148,6 +148,10 @@
   display: none;
 }
 
+.exitVeil {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .section[data-composite="false"] {
     aspect-ratio: unset;
@@ -216,16 +220,40 @@
    * 앞뒤 섹션 이음매 — PC 와 같은 방식이되 **모바일 실측값**으로 맞춘다.
    * 위(의료진 바닥)는 좌 238,212,230 → 중앙 214,224,244 → 우 184,212,246 의
    * 가로 그라디언트라 섹션의 `::before` 지우개가 그대로 받는다.
-   * 아래(AI 시스템 상단)는 PC 의 248,248,249 가 아니라 **226,229,241** 이다.
-   * 세로 화면은 폭 대비 높이가 커서 160px 로는 경계가 티가 나므로 22svh 로 넓힌다.
+   * 아래(AI 시스템 상단)는 `#f8f7ff`(248,247,255). 예전 226,229,241 은
+   * AI 섹션보다 어두워 그라디언트 끝에서 또 직선이 생겼다.
+   * 세로 화면은 폭 대비 높이가 커서 160px 로는 경계가 티가 나므로 32svh 로 넓힌다.
    */
   .section[data-composite="false"] .pinShell::before,
   .section[data-composite="false"] .pinShell::after {
-    height: 22svh;
+    height: 32svh;
   }
 
   .section[data-composite="false"] .pinShell::after {
-    background: linear-gradient(0deg, rgb(226, 229, 241) 0%, rgba(226, 229, 241, 0) 100%);
+    background: linear-gradient(0deg, #f8f7ff 0%, rgba(248, 247, 255, 0) 100%);
+  }
+
+  /* 영상이 의사요소 위에 그려져도 픽셀 자체가 아래로 녹게. 마스크 밖은
+     pinShell 바닥색(= AI 상단)이 비친다. */
+  .section[data-composite="false"] .pinShell {
+    background: #f8f7ff;
+  }
+
+  .filmMo {
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%);
+  }
+
+  .exitVeil {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 32svh;
+    z-index: 6;
+    pointer-events: none;
+    background: linear-gradient(0deg, #f8f7ff 0%, rgba(248, 247, 255, 0.7) 42%, transparent 100%);
   }
 }
 

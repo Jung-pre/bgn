@@ -72,6 +72,56 @@ const CARD_STEP = 0.4;
 const CARD_AT = 0;
 /** 카드가 안착한 뒤 비주얼이 시작되기까지의 지연 */
 const VIZ_DELAY = 0.28;
+/** 1번 카드 계측 라벨 — 한 글자씩 찍히는 속도(초). */
+const TYPE_CHAR = 0.045;
+
+function typedFull(el: HTMLElement) {
+  const live = el.textContent ?? "";
+  if (live.length > 0) return live;
+  return el.dataset.typeFull ?? "";
+}
+
+/** 박스 폭·높이를 최종 문구 기준으로 잠그고 글자를 비운다. 타이핑 중 배지가 줄지 않게. */
+function prepareTypedText(el: HTMLElement) {
+  const full = typedFull(el);
+  el.dataset.typeFull = full;
+  const box = el.closest("[data-badge]");
+  const target = box instanceof HTMLElement ? box : el;
+  if (!target.dataset.typeLocked) {
+    const width = target.offsetWidth;
+    const height = target.offsetHeight;
+    if (width > 0) target.style.minWidth = `${width}px`;
+    if (height > 0) target.style.minHeight = `${height}px`;
+    target.dataset.typeLocked = "1";
+  }
+  el.textContent = "";
+}
+
+function restoreTypedText(el: HTMLElement) {
+  el.textContent = typedFull(el);
+}
+
+/** 카운트업과 같이 타임라인에 `add` 하는 타자기 트윈. DOM 텍스트만 건드린다. */
+function typeTextTween(el: HTMLElement) {
+  const full = typedFull(el);
+  const chars = Array.from(full);
+  const proxy = { n: 0 };
+  return gsap.to(proxy, {
+    n: chars.length,
+    duration: Math.max(0.36, chars.length * TYPE_CHAR),
+    ease: "none",
+    onStart: () => {
+      proxy.n = 0;
+      el.textContent = "";
+    },
+    onUpdate: () => {
+      el.textContent = chars.slice(0, Math.round(proxy.n)).join("");
+    },
+    onComplete: () => {
+      el.textContent = full;
+    },
+  });
+}
 
 export function AiSystemSection({ messages }: AiSystemSectionProps) {
   const sectionRef = useRef<HTMLElement>(null);
@@ -92,6 +142,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
       const arts = pick<HTMLImageElement>(section, "[data-art]");
       const badges = pick<HTMLElement>(section, "[data-badge]");
       const rows = pick<HTMLElement>(section, "[data-row]");
+      const typers = pick<HTMLElement>(section, "[data-type]");
 
       /** `data-draw` 값 = 그려질 길이 비율(pathLength=1 기준). */
       const drawLength = (el: Element) => Number((el as SVGElement).dataset.draw ?? 1);
@@ -115,6 +166,7 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         for (const { value, spec } of counters) {
           value.textContent = formatNumeric(spec.value, spec);
         }
+        for (const el of typers) restoreTypedText(el);
         return;
       }
 
@@ -134,6 +186,9 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
       for (const { value, spec } of counters) {
         value.textContent = formatNumeric(0, spec);
       }
+      /* 1번 카드 SPH / AXIS / OPTICAL MAPPING — 박스 폭을 고정한 뒤
+         글자를 비워 두고, 배지가 뜬 다음에 한 글자씩 찍는다. */
+      for (const el of typers) prepareTypedText(el);
 
       const grid = section.querySelector("[data-ai-grid]");
 
@@ -224,6 +279,11 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
           );
         }
 
+        const cardTypers = pick<HTMLElement>(card, "[data-type]");
+        cardTypers.forEach((el, typeIndex) => {
+          cardTl.add(typeTextTween(el), at + 0.22 + typeIndex * 0.14);
+        });
+
         const counter = counters.find((entry) => entry.card === card);
         if (counter) cardTl.add(countUpTween(counter.value, counter.spec), at + 0.2);
       });
@@ -243,8 +303,9 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         hoverTls.get(card)?.kill();
 
         const cardDraws = pick<SVGGeometryElement>(card, "[data-draw]");
+        const cardTypers = pick<HTMLElement>(card, "[data-type]");
         const counter = counters.find((entry) => entry.card === card);
-        if (cardDraws.length === 0 && !counter) return;
+        if (cardDraws.length === 0 && !counter && cardTypers.length === 0) return;
 
         const hoverTl = gsap.timeline({ defaults: { ease: "power3.out" } });
         hoverTls.set(card, hoverTl);
@@ -266,6 +327,13 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
         if (counter) {
           counter.value.textContent = formatNumeric(0, counter.spec);
           hoverTl.add(countUpTween(counter.value, counter.spec, 1.15), 0.06);
+        }
+
+        if (cardTypers.length > 0) {
+          for (const el of cardTypers) el.textContent = "";
+          cardTypers.forEach((el, typeIndex) => {
+            hoverTl.add(typeTextTween(el), typeIndex * 0.12);
+          });
         }
       };
 
@@ -408,15 +476,31 @@ function StepData({ index, step }: { index: number; step: AiStepMessages }) {
     case 0:
       return (
         <>
-          <p className={clsx(styles.badge, styles.badgeSph)} data-badge lang="en">
-            <span className={styles.badgeText}>{SPH_LABEL}</span>
+          <p className={clsx(styles.badge, styles.badgeSph)} data-badge lang="en" aria-label={SPH_LABEL}>
+            <span className={styles.badgeText} data-type aria-hidden>
+              {SPH_LABEL}
+            </span>
           </p>
-          <p className={clsx(styles.badge, styles.badgeAxis)} data-badge lang="en">
-            <span className={clsx(styles.badgeText, styles.badgeTextDeep)}>{AXIS_LABEL}</span>
+          <p
+            className={clsx(styles.badge, styles.badgeAxis)}
+            data-badge
+            lang="en"
+            aria-label={AXIS_LABEL}
+          >
+            <span className={clsx(styles.badgeText, styles.badgeTextDeep)} data-type aria-hidden>
+              {AXIS_LABEL}
+            </span>
           </p>
           {step.dataLabel ? (
-            <p className={clsx(styles.badge, styles.badgeOptical)} data-badge lang="en">
-              <span className={styles.badgeText}>{step.dataLabel}</span>
+            <p
+              className={clsx(styles.badge, styles.badgeOptical)}
+              data-badge
+              lang="en"
+              aria-label={step.dataLabel}
+            >
+              <span className={styles.badgeText} data-type aria-hidden>
+                {step.dataLabel}
+              </span>
             </p>
           ) : null}
         </>

@@ -3,7 +3,49 @@
 import { useRef } from "react";
 import { MQ } from "@/shared/config/breakpoints";
 import { gsap, ScrollTrigger, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
-import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
+import { prefersReducedMotionSync, useMediaQuery } from "@/shared/lib/use-media-query";
+
+/**
+ * `fromTo` 하나에 stagger + scrollTrigger(once) 를 같이 걸면 GSAP 이
+ * 내부 타임라인을 만든 뒤 ScrollTrigger 를 붙인다. 히스토리 **아래**에서
+ * 새로고침하면 start 를 이미 지난 상태라 `once` 가 **생성 도중에 kill**하고,
+ * 같은 콜스택에서 `undefined.end` 를 읽어 TypeError 가 난다.
+ * 트리거는 타임라인에, stagger 는 자식 트윈에 분리한다.
+ *
+ * 이미 지난 트리거는 아예 ST 를 만들지 않고 최종 상태로만 둔다.
+ */
+function hasPassedStart(el: Element, viewportPct: number) {
+  return el.getBoundingClientRect().top <= window.innerHeight * (viewportPct / 100);
+}
+
+function wipeLinesOnce(
+  lines: HTMLElement[],
+  trigger: Element,
+  startPct: number,
+  stagger: number,
+  duration: number,
+) {
+  if (lines.length === 0) return;
+  if (hasPassedStart(trigger, startPct)) {
+    gsap.set(lines, { clearProps: "clipPath" });
+    return;
+  }
+  gsap
+    .timeline({
+      scrollTrigger: { trigger, start: `top ${startPct}%`, once: true },
+    })
+    .fromTo(
+      lines,
+      { clipPath: "inset(0 100% 0 0)" },
+      {
+        clipPath: "inset(0 0% 0 0)",
+        duration,
+        ease: "power3.out",
+        stagger,
+        clearProps: "clipPath",
+      },
+    );
+}
 
 /**
  * 연혁 전용 등장 모션.
@@ -48,6 +90,13 @@ import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 
 export function useHistoryReveal<T extends HTMLElement>() {
   const sectionRef = useRef<T>(null);
+  /* gsap.matchMedia 를 쓰지 않는다. add() 가 matchMediaInit 에서
+     페이지 전체 ScrollTrigger 를 revert 한 뒤 콜백 안에서 새 트윈을 만들면,
+     refresh 루프가 `_triggers[i].end` 를 읽다 없는 인스턴스를 만난다
+     (히스토리 아래 새로고침에서 TypeError). 웹블로그와 같이 네이티브 MQ 로 가른다. */
+  const isDesktop = useMediaQuery(MQ.desktop);
+  const isHistoryWheel = useMediaQuery(MQ.historyWheel);
+  const isHistoryStack = useMediaQuery(MQ.historyStack);
 
   useGSAP(
     () => {
@@ -118,42 +167,38 @@ export function useHistoryReveal<T extends HTMLElement>() {
       // 꾸밈요소(선택 커서 마크)는 첫 줄 안에 있으므로 와이프가 지나가면서
       // 그대로 드러난다 = 주석의 "함께 배치". 따로 트윈을 걸면 오히려 두 번
       // 등장하는 것처럼 보인다.
-      if (introLines.length > 0) {
-        gsap.fromTo(
-          introLines,
-          { clipPath: "inset(0 100% 0 0)" },
-          {
-            clipPath: "inset(0 0% 0 0)",
-            duration: 0.9,
-            ease: "power3.out",
-            stagger: 0.28,
-            clearProps: "clipPath",
-            scrollTrigger: { trigger: introLines[0], start: "top 85%", once: true },
-          },
-        );
-      }
+      if (introLines[0]) wipeLinesOnce(introLines, introLines[0], 85, 0.28, 0.9);
 
       // ── ② 시대 세트: 하단 진입 시 fade-up ─────────────────────────────
       // 이미지와 텍스트가 **같은 li 안**에 있으므로 하나의 트윈으로 함께 움직인다.
       // = 기획안의 "엇갈림 없이 동시에 똑같은 속도로".
       sets.forEach((el) => {
-        gsap
-          .timeline({ scrollTrigger: { trigger: el, start: "top 88%", once: true } })
-          .fromTo(
-            el,
-            { autoAlpha: 0, y: SCROLL_ENTRANCE.y },
-            {
-              autoAlpha: 1,
-              y: 0,
-              duration: SCROLL_ENTRANCE.duration,
-              ease: SCROLL_ENTRANCE.ease,
-              // 인라인 transform 이 남으면 카드 회전(③)과 싸운다.
-              clearProps: "opacity,visibility,transform",
-            },
-          )
-          // 노드 활성화는 클래스가 아니라 속성으로 — CSS 모듈 해시 이름을
-          // JS 로 넘기지 않아도 되고, 리렌더도 없다.
-          .set(el, { attr: { "data-visible": "true" } }, 0.2);
+        if (hasPassedStart(el, 88)) {
+          gsap.set(el, {
+            autoAlpha: 1,
+            y: 0,
+            attr: { "data-visible": "true" },
+            clearProps: "opacity,visibility,transform",
+          });
+        } else {
+          gsap
+            .timeline({ scrollTrigger: { trigger: el, start: "top 88%", once: true } })
+            .fromTo(
+              el,
+              { autoAlpha: 0, y: SCROLL_ENTRANCE.y },
+              {
+                autoAlpha: 1,
+                y: 0,
+                duration: SCROLL_ENTRANCE.duration,
+                ease: SCROLL_ENTRANCE.ease,
+                // 인라인 transform 이 남으면 카드 회전(③)과 싸운다.
+                clearProps: "opacity,visibility,transform",
+              },
+            )
+            // 노드 활성화는 클래스가 아니라 속성으로 — CSS 모듈 해시 이름을
+            // JS 로 넘기지 않아도 되고, 리렌더도 없다.
+            .set(el, { attr: { "data-visible": "true" } }, 0.2);
+        }
 
         /**
          * 세트 안의 카피도 인트로와 **같은 좌→우 생성**으로 맞춘다.
@@ -165,45 +210,38 @@ export function useHistoryReveal<T extends HTMLElement>() {
          * 걸면 0.2 가 1 로 덮여 연도가 시안보다 5배 진해진다.
          */
         const lines = gsap.utils.toArray<HTMLElement>("[data-history-line]", el);
-        if (lines.length > 0) {
-          gsap.fromTo(
-            lines,
-            { clipPath: "inset(0 100% 0 0)" },
-            {
-              clipPath: "inset(0 0% 0 0)",
-              duration: 0.8,
-              ease: "power3.out",
-              stagger: 0.12,
-              clearProps: "clipPath",
-              scrollTrigger: { trigger: el, start: "top 82%", once: true },
-            },
-          );
-        }
+        wipeLinesOnce(lines, el, 82, 0.12, 0.8);
 
         /* 성과 항목은 체크가 하나씩 찍히는 리듬이라 와이프보다 낫다 */
         const points = gsap.utils.toArray<HTMLElement>("[data-history-point]", el);
         if (points.length > 0) {
-          gsap.fromTo(
-            points,
-            { autoAlpha: 0, x: -14 },
-            {
-              autoAlpha: 1,
-              x: 0,
-              duration: 0.5,
-              ease: "power2.out",
-              stagger: 0.09,
-              delay: 0.35,
-              clearProps: "opacity,visibility,transform",
-              scrollTrigger: { trigger: el, start: "top 82%", once: true },
-            },
-          );
+          if (hasPassedStart(el, 82)) {
+            gsap.set(points, { autoAlpha: 1, x: 0, clearProps: "opacity,visibility,transform" });
+          } else {
+            gsap
+              .timeline({
+                scrollTrigger: { trigger: el, start: "top 82%", once: true },
+              })
+              .fromTo(
+                points,
+                { autoAlpha: 0, x: -14 },
+                {
+                  autoAlpha: 1,
+                  x: 0,
+                  duration: 0.5,
+                  ease: "power2.out",
+                  stagger: 0.09,
+                  delay: 0.35,
+                  clearProps: "opacity,visibility,transform",
+                },
+              );
+          }
         }
       });
 
       // ── ③ 물레방아 / 책넘김: 뷰포트가 버티는 곳에서만 sticky ─────────────
       // 짧은 모바일·가로는 카드가 본문·하단바를 덮는다 → 펼쳐 둔 슬롯 사진.
       // 쿼리는 breakpoints.ts 의 MQ.historyWheel / historyStack 과 CSS 가 같다.
-      const mm = gsap.matchMedia();
       const wheel = section.querySelector<HTMLElement>("[data-history-wheel]");
       const spokes = gsap.utils.toArray<HTMLElement>("[data-history-spoke]", section);
       const copyPanes = gsap.utils.toArray<HTMLElement>("[data-history-copy-pane]", section);
@@ -495,8 +533,11 @@ export function useHistoryReveal<T extends HTMLElement>() {
         };
       };
 
-      mm.add(MQ.desktop, bindDesktopWheel);
-      mm.add(MQ.historyWheel, bindBookStage);
+      const unbindWheel = isDesktop
+        ? bindDesktopWheel()
+        : isHistoryWheel
+          ? bindBookStage()
+          : undefined;
 
       /**
        * ── ③-b 짧은 모바일 슬롯 사진: 들어오며 −8°, 화면 중앙에서 0° ──
@@ -506,24 +547,22 @@ export function useHistoryReveal<T extends HTMLElement>() {
        * scrub 은 true(지연 없음). 0.45 + Lenis 라 중앙을 넘어도 따라오지 못했다.
        */
       const slotPhotos = gsap.utils.toArray<HTMLElement>("[data-history-slot]", section);
-      if (slotPhotos.length > 0) {
-        mm.add(MQ.historyStack, () => {
-          slotPhotos.forEach((photo) => {
-            const frame = photo.parentElement ?? photo;
-            gsap.set(photo, { rotation: -8, force3D: true });
-            gsap.to(photo, {
-              rotation: 0,
-              ease: "none",
-              force3D: true,
-              overwrite: "auto",
-              scrollTrigger: {
-                trigger: frame,
-                start: "center 80%",
-                end: "center 50%",
-                scrub: true,
-                invalidateOnRefresh: true,
-              },
-            });
+      if (isHistoryStack && slotPhotos.length > 0) {
+        slotPhotos.forEach((photo) => {
+          const frame = photo.parentElement ?? photo;
+          gsap.set(photo, { rotation: -8, force3D: true });
+          gsap.to(photo, {
+            rotation: 0,
+            ease: "none",
+            force3D: true,
+            overwrite: "auto",
+            scrollTrigger: {
+              trigger: frame,
+              start: "center 80%",
+              end: "center 50%",
+              scrub: true,
+              invalidateOnRefresh: true,
+            },
           });
         });
       }
@@ -546,8 +585,12 @@ export function useHistoryReveal<T extends HTMLElement>() {
           },
         );
       }
+
+      return () => {
+        unbindWheel?.();
+      };
     },
-    { scope: sectionRef },
+    { scope: sectionRef, dependencies: [isDesktop, isHistoryWheel, isHistoryStack] },
   );
 
   return sectionRef;

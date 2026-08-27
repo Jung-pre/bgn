@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import clsx from "clsx";
+import type { FocusEvent } from "react";
 import type { MedicalTeamSectionMessages } from "@/shared/i18n/messages";
 import { renderWithEmphasis } from "@/shared/lib/render-emphasis";
 import { crossLayout, useCrossCarousel } from "./use-cross-carousel";
@@ -71,18 +72,20 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
   const { activeIndex, offsets, select, step, pause, resume, stageRef, dragProps } =
     useCrossCarousel(doctors.length);
 
+  const pauseOnHover = {
+    onPointerEnter: pause,
+    onPointerLeave: resume,
+  };
+
+  const pauseOnFocus = {
+    onFocusCapture: pause,
+    onBlurCapture: (e: FocusEvent<HTMLElement>) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) resume();
+    },
+  };
+
   return (
-    <section
-      ref={sectionRef}
-      className={styles.section}
-      aria-labelledby="team-title"
-      onPointerEnter={pause}
-      onPointerLeave={resume}
-      onFocusCapture={pause}
-      onBlurCapture={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) resume();
-      }}
-    >
+    <section ref={sectionRef} className={styles.section} aria-labelledby="team-title">
       <header className={styles.header} data-team-header>
         <div>
           <p className="eyebrow" lang="en" data-team-wipe>
@@ -104,7 +107,7 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
         </Link>
       </header>
 
-      <div className={styles.viewport}>
+      <div className={styles.viewport} {...pauseOnHover} {...pauseOnFocus}>
         <div ref={stageRef} className={styles.stage} {...dragProps}>
           <ul className={styles.deck}>
             {doctors.map((doctor, i) => {
@@ -174,6 +177,8 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
           className={styles.arrow}
           onClick={() => step(-1)}
           aria-label="이전 의료진"
+          {...pauseOnHover}
+          {...pauseOnFocus}
         >
           <Chevron dir={-1} />
         </button>
@@ -195,6 +200,8 @@ export function MedicalTeamSection({ messages }: MedicalTeamSectionProps) {
           className={styles.arrow}
           onClick={() => step(1)}
           aria-label="다음 의료진"
+          {...pauseOnHover}
+          {...pauseOnFocus}
         >
           <Chevron dir={1} />
         </button>
