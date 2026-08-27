@@ -725,11 +725,11 @@
    */
   .towerEyebrow {
     color: #fff;
-    font-size: 1.625rem;
+    font-size: 1.75rem;
     font-style: normal;
     font-weight: 700;
-    line-height: 125%;
-    letter-spacing: -0.04875rem;
+    line-height: 1.2;
+    letter-spacing: -0.0525rem;
   }
 
   .towerTitle {
@@ -740,27 +740,26 @@
     font-size: 4.5rem;
     font-style: normal;
     font-weight: 700;
-    line-height: 5.625rem;
+    line-height: 1;
     letter-spacing: -0.135rem;
     text-shadow: 0 0 5.508px rgba(0, 0, 0, 0.08);
     word-break: keep-all;
+    /* BGN 을 숨긴 뒤 아이브로우와 바로 붙지 않게 */
+    margin-top: 0.35rem;
   }
 
   .towerWord {
-    /* 107:3774 itemSpacing −4. BGN 줄(86) 과 한글 줄(90) 이 4px 겹친다.
-       예전엔 margin-bottom 이라 아래 의료진을 제목 안으로 끌어올렸다. */
-    margin-top: -4px;
+    margin-top: 0;
   }
 
   .towerWord .char {
     vertical-align: top;
-    /* 시안 행간 5.625rem 은 BGN↔한글 줄 간격용. 글자 상자를 그대로 두면
-       한글 글리프 아래 ~18px 빈 칸이 의료진과 벌어진다. */
     line-height: 4.5rem;
     height: 4.5rem;
   }
 
   .brandTower {
+    display: none;
     font-size: 6rem;
     font-style: normal;
     font-weight: 700;
