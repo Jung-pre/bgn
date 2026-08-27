@@ -79,13 +79,13 @@ const COUNTS = {
 /**
  * 세로 화면에서 구체를 가로에 맞출 때 쓰는 계수.
  * 데스크톱은 거의 항상 `min(1, …)` 으로 1 이 된다.
- * 모바일 히어로는 화면 가로의 95% 가 되도록 `globeFitScale` 이 직접 잡는다.
+ * 모바일 히어로는 화면 가로의 85% 가 되도록 `globeFitScale` 이 직접 잡는다.
  */
 const WIDTH_FIT = { desktop: 1.05 } as const;
 const HERO_CAM_Z = 6;
 const HERO_CAM_FOV = 38;
 /** 모바일 히어로 — 젤리 원판 지름 / 화면 가로 */
-const MOBILE_HERO_WIDTH = 0.95;
+const MOBILE_HERO_WIDTH = 0.85;
 
 function globeFitScale(width: number, height: number, sizeMul: number, mobileHero: boolean) {
   if (mobileHero) {
@@ -503,7 +503,7 @@ function Globe({
    *
    * 히어로만 `GLOBE_TUNE_DEFAULTS.size`(0.86) 로 한 걸음 물린다 — 카피·마퀴 여백.
    * 클로징·푸터는 그 배율을 쓰면 안 된다. 배경 요소로 쓰던 원래 크기(1)를 유지한다.
-   * 모바일 히어로는 화면 가로의 95%.
+   * 모바일 히어로는 화면 가로의 85%.
    */
   const fitScale = globeFitScale(
     size.width,
