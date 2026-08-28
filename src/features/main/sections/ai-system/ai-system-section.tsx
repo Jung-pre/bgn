@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import clsx from "clsx";
 import { MQ } from "@/shared/config/breakpoints";
-import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
+import { gsap, ScrollTrigger, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 import { Marquee } from "@/components/marquee/marquee";
 import type { AiStepMessages, AiSystemSectionMessages } from "@/shared/i18n/messages";
@@ -191,103 +191,128 @@ export function AiSystemSection({ messages }: AiSystemSectionProps) {
       for (const el of typers) prepareTypedText(el);
 
       const grid = section.querySelector("[data-ai-grid]");
+      const gridEl = grid ?? section;
+      const headerPassed = section.getBoundingClientRect().top <= window.innerHeight * 0.78 + 2;
+      const cardsPassed = gridEl.getBoundingClientRect().top <= window.innerHeight * 0.82 + 2;
 
-      const tl = gsap.timeline({
-        defaults: { ease: "power3.out" },
-        scrollTrigger: { trigger: section, start: "top 78%", once: true },
-      });
-
-      tl.to(
-        wipes,
-        { clipPath: "inset(0 0% 0 0)", duration: 0.8, stagger: 0.14, clearProps: "clipPath" },
-        0,
-      )
-        // 주석 "함께 꾸밈요소 배치" — 마커 박스도 헤드라인과 같은 좌→우로 열린다.
-        // scaleX 로 키우면 안에 든 글자까지 눌려 보이므로 wipe 로 연다.
-        .to(decos, { clipPath: "inset(0 0% 0 0)", duration: 0.7, clearProps: "clipPath" }, 0.25);
+      /* 빈 tl+scrollTrigger 는 start/end=0 delayed refresh → 아래 섹션에서
+         undefined.end. 트윈을 채운 뒤 create 하고, 지난 구간은 ST 생략. */
+      if (headerPassed) {
+        gsap.set([...wipes, ...decos], { clipPath: "none", clearProps: "clipPath" });
+      } else {
+        const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+        tl.to(
+          wipes,
+          { clipPath: "inset(0 0% 0 0)", duration: 0.8, stagger: 0.14, clearProps: "clipPath" },
+          0,
+        )
+          // 주석 "함께 꾸밈요소 배치" — 마커 박스도 헤드라인과 같은 좌→우로 열린다.
+          // scaleX 로 키우면 안에 든 글자까지 눌려 보이므로 wipe 로 연다.
+          .to(decos, { clipPath: "inset(0 0% 0 0)", duration: 0.7, clearProps: "clipPath" }, 0.25);
+        ScrollTrigger.create({
+          trigger: section,
+          start: "top 78%",
+          once: true,
+          animation: tl,
+        });
+      }
 
       /* 카드는 섹션 전체가 아니라 **그리드가 보일 때** 시작한다.
          예전엔 섹션 top 78% 에서 이미 끝나, 카드 구간에 도착하면 4장이 다 떠 있었다. */
-      const cardTl = gsap.timeline({
-        defaults: { ease: "power3.out" },
-        scrollTrigger: { trigger: grid ?? section, start: "top 82%", once: true },
-      });
+      const cardTl = gsap.timeline({ defaults: { ease: "power3.out" } });
 
-      cardTl.to(
-        cards,
-        {
-          autoAlpha: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.7,
-          stagger: CARD_STEP,
-          clearProps: "opacity,visibility,transform",
-        },
-        CARD_AT,
-      );
-
-      cards.forEach((card, index) => {
-        const at = CARD_AT + index * CARD_STEP + VIZ_DELAY;
-
-        const cardDraws = pick<SVGGeometryElement>(card, "[data-draw]");
-        if (cardDraws.length > 0) {
-          cardTl.to(
-            cardDraws,
-            { strokeDashoffset: 0, duration: 1.1, ease: "power2.inOut", stagger: 0.08 },
-            at,
-          );
+      if (cardsPassed) {
+        settleReducedMotion([...cards, ...arts, ...badges, ...rows]);
+        gsap.set(draws, { strokeDashoffset: 0 });
+        for (const { value, spec } of counters) {
+          value.textContent = formatNumeric(spec.value, spec);
         }
+        for (const el of typers) restoreTypedText(el);
+        /* 빈 tl 은 progress 0 이라 호버 리플레이가 영영 막힌다 → 완료로 표시 */
+        cardTl.progress(1);
+      } else {
+        cardTl.to(
+          cards,
+          {
+            autoAlpha: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.7,
+            stagger: CARD_STEP,
+            clearProps: "opacity,visibility,transform",
+          },
+          CARD_AT,
+        );
 
-        const cardArts = pick<HTMLImageElement>(card, "[data-art]");
-        if (cardArts.length > 0) {
-          cardTl.to(
-            cardArts,
-            {
-              autoAlpha: 1,
-              scale: 1,
-              duration: 0.9,
-              ease: "power2.out",
-              clearProps: "opacity,visibility,transform",
-            },
-            at - 0.2,
-          );
-        }
+        cards.forEach((card, index) => {
+          const at = CARD_AT + index * CARD_STEP + VIZ_DELAY;
 
-        const cardRows = pick<HTMLElement>(card, "[data-row]");
-        if (cardRows.length > 0) {
-          cardTl.to(
-            cardRows,
-            { autoAlpha: 1, x: 0, duration: 0.5, stagger: 0.08, clearProps: "opacity,transform" },
-            at + 0.15,
-          );
-        }
+          const cardDraws = pick<SVGGeometryElement>(card, "[data-draw]");
+          if (cardDraws.length > 0) {
+            cardTl.to(
+              cardDraws,
+              { strokeDashoffset: 0, duration: 1.1, ease: "power2.inOut", stagger: 0.08 },
+              at,
+            );
+          }
 
-        const cardBadges = pick<HTMLElement>(card, "[data-badge]");
-        if (cardBadges.length > 0) {
-          cardTl.to(
-            cardBadges,
-            {
-              autoAlpha: 1,
-              y: 0,
-              scale: 1,
-              duration: 0.55,
-              ease: "back.out(1.6)",
-              stagger: 0.1,
-              clearProps: "opacity,visibility,transform",
-            },
-            at + 0.1,
-          );
-        }
+          const cardArts = pick<HTMLImageElement>(card, "[data-art]");
+          if (cardArts.length > 0) {
+            cardTl.to(
+              cardArts,
+              {
+                autoAlpha: 1,
+                scale: 1,
+                duration: 0.9,
+                ease: "power2.out",
+                clearProps: "opacity,visibility,transform",
+              },
+              at - 0.2,
+            );
+          }
 
-        const cardTypers = pick<HTMLElement>(card, "[data-type]");
-        cardTypers.forEach((el, typeIndex) => {
-          cardTl.add(typeTextTween(el), at + 0.22 + typeIndex * 0.14);
+          const cardRows = pick<HTMLElement>(card, "[data-row]");
+          if (cardRows.length > 0) {
+            cardTl.to(
+              cardRows,
+              { autoAlpha: 1, x: 0, duration: 0.5, stagger: 0.08, clearProps: "opacity,transform" },
+              at + 0.15,
+            );
+          }
+
+          const cardBadges = pick<HTMLElement>(card, "[data-badge]");
+          if (cardBadges.length > 0) {
+            cardTl.to(
+              cardBadges,
+              {
+                autoAlpha: 1,
+                y: 0,
+                scale: 1,
+                duration: 0.55,
+                ease: "back.out(1.6)",
+                stagger: 0.1,
+                clearProps: "opacity,visibility,transform",
+              },
+              at + 0.1,
+            );
+          }
+
+          const cardTypers = pick<HTMLElement>(card, "[data-type]");
+          cardTypers.forEach((el, typeIndex) => {
+            cardTl.add(typeTextTween(el), at + 0.22 + typeIndex * 0.14);
+          });
+
+          const counter = counters.find((entry) => entry.card === card);
+          if (counter) cardTl.add(countUpTween(counter.value, counter.spec), at + 0.2);
         });
 
-        const counter = counters.find((entry) => entry.card === card);
-        if (counter) cardTl.add(countUpTween(counter.value, counter.spec), at + 0.2);
-      });
-
+        ScrollTrigger.create({
+          trigger: gridEl,
+          start: "top 82%",
+          once: true,
+          animation: cardTl,
+        });
+      }
       /**
        * 등장 때 쓰던 그래프 드로잉·카운트업을 호버마다 한 번 더 그린다.
        * 카드 이동(translate)은 CSS hover 가 맡고, GSAP 는 stroke/숫자만 건드린다.

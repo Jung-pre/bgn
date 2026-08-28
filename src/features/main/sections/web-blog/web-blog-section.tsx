@@ -188,37 +188,36 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
       /** 인트로 비율만큼 스크롤 예산을 더 준다 */
       const total = () => Math.max(1, distance() / (1 - INTRO_RATIO));
 
-      // ── 진입 fade in — pin 이 시작되기 전 구간에서 처리한다 ────────────
-      const fadeIn = gsap.fromTo(
-        stage,
-        { autoAlpha: 0 },
-        {
-          autoAlpha: 1,
-          ease: "none",
-          scrollTrigger: {
-            trigger: section,
-            start: "top bottom",
-            end: "top top",
-            scrub: true,
-            invalidateOnRefresh: true,
+      /**
+       * 히스토리 등 **위쪽**에서 새로고침하면 위 섹션 once ST 가 생성·kill 직후
+       * 여기 fadeIn/pin 이 refreshAll 에 끼어 `undefined.end` 가 난다.
+       * · fade end(`top top`) 를 이미 지났으면 ST 없이 최종값만
+       * · pin 타임라인은 **트윈을 먼저 채운 뒤** ScrollTrigger.create
+       *   (빈 tl + scrollTrigger 는 start/end=0 delayed refresh 레이스)
+       */
+      let fadeIn: gsap.core.Tween | undefined;
+      if (section.getBoundingClientRect().top <= 0) {
+        gsap.set(stage, { autoAlpha: 1 });
+      } else {
+        fadeIn = gsap.fromTo(
+          stage,
+          { autoAlpha: 0 },
+          {
+            autoAlpha: 1,
+            ease: "none",
+            scrollTrigger: {
+              trigger: section,
+              start: "top bottom",
+              end: "top top",
+              scrub: true,
+              invalidateOnRefresh: true,
+            },
           },
-        },
-      );
+        );
+      }
 
       // ── pin: 앞 INTRO_RATIO 는 fade out, 나머지는 가로 이동 ────────────
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: section,
-          start: "top top",
-          // 함수형 end — refresh 마다 트랙 실측을 다시 한다
-          end: () => `+=${total()}`,
-          pin: true,
-          pinSpacing: true,
-          anticipatePin: 1,
-          scrub: 1,
-          invalidateOnRefresh: true,
-        },
-      });
+      const tl = gsap.timeline();
 
       /* 주석 원문이 "fade in-**out**" 이고, 시안 2:2457 이후 프레임에는 이 글자가
          전혀 남아 있지 않다. 예전 구현처럼 0.4 로 남겨 두면 가로 트랙 위에
@@ -237,15 +236,28 @@ export function WebBlogSection({ messages }: WebBlogSectionProps) {
         )
         .to(track, { x: () => -distance(), ease: "none", duration: 1 - INTRO_RATIO }, INTRO_RATIO);
 
+      const pin = ScrollTrigger.create({
+        animation: tl,
+        trigger: section,
+        start: "top top",
+        // 함수형 end — refresh 마다 트랙 실측을 다시 한다
+        end: () => `+=${total()}`,
+        pin: true,
+        pinSpacing: true,
+        anticipatePin: 1,
+        scrub: 1,
+        invalidateOnRefresh: true,
+      });
+
       return () => {
         /* `kill()` 이 아니라 `revert()` 다.
            kill 은 트윈을 멈추기만 하고 **마지막에 적용된 인라인 스타일을 남긴다.**
            scrub 트윈은 진행도 0 에서 from 값(autoAlpha 0)이 박혀 있으므로,
            kill 로 끝내면 요소가 안 보이는 채로 굳는다. revert 는 원래 상태로 되돌린다.
            ScrollTrigger 도 `kill(true)` 로 revert 해야 pin-spacer 가 DOM 에서 빠진다. */
-        fadeIn.scrollTrigger?.kill(true);
-        fadeIn.revert();
-        tl.scrollTrigger?.kill(true);
+        fadeIn?.scrollTrigger?.kill(true);
+        fadeIn?.revert();
+        pin.kill(true);
         tl.revert();
       };
     },

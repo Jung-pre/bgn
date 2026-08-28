@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { gsap, useGSAP, settleReducedMotion } from "@/shared/lib/gsap";
+import { gsap, ScrollTrigger, useGSAP, settleReducedMotion } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 import {
   queryTitleMarks,
@@ -42,6 +42,15 @@ export function useTeamReveal<T extends HTMLElement>() {
         return;
       }
 
+      /* 히스토리·웹블로그 중간 새로고침: 이미 지난 once ST 를 빈 tl 에 붙이면
+         refresh 레이스로 `undefined.end` 가 난다. 지난 구간은 최종 상태만. */
+      if (section.getBoundingClientRect().top <= window.innerHeight * 0.7 + 2) {
+        settleReducedMotion([...wipes, ...fades, ...cards, controls].filter(Boolean));
+        gsap.set(wipes, { clipPath: "none" });
+        settleTitleMarks(marks);
+        return;
+      }
+
       gsap.set(wipes, { clipPath: "inset(0 100% 0 0)" });
       if (marks.length > 0) gsap.set(marks, { clipPath: TITLE_MARK_WIPE.from });
       gsap.set(fades, { autoAlpha: 0, y: 16 });
@@ -57,19 +66,6 @@ export function useTeamReveal<T extends HTMLElement>() {
 
       const tl = gsap.timeline({
         defaults: { ease: "power3.out" },
-        scrollTrigger: {
-          trigger: section,
-          /**
-           * 히어로 pin 이 풀린 뒤에 걸리도록 기본(82%)보다는 늦게 — 단, 50% 는
-           * 너무 늦었다. pin 해제(스크롤 920)부터 발화(1380)까지 뷰포트 절반이
-           * 빈 섹션으로 지나가서 "칸이 안 나타난다"로 읽혔다(2차 수정 5p).
-           * 70% 면 헤더가 갓 들어온 시점(스크롤 1196)에 시작해 카드 스태거가
-           * 화면 안에서 **보이면서** 진행된다. 접근 캡처로 확인.
-           */
-          start: "top 70%",
-          once: true,
-          invalidateOnRefresh: true,
-        },
       });
 
       if (wipes.length > 0) {
@@ -148,6 +144,21 @@ export function useTeamReveal<T extends HTMLElement>() {
           0.55,
         );
       }
+
+      ScrollTrigger.create({
+        trigger: section,
+        /**
+         * 히어로 pin 이 풀린 뒤에 걸리도록 기본(82%)보다는 늦게 — 단, 50% 는
+         * 너무 늦었다. pin 해제(스크롤 920)부터 발화(1380)까지 뷰포트 절반이
+         * 빈 섹션으로 지나가서 "칸이 안 나타난다"로 읽혔다(2차 수정 5p).
+         * 70% 면 헤더가 갓 들어온 시점(스크롤 1196)에 시작해 카드 스태거가
+         * 화면 안에서 **보이면서** 진행된다. 접근 캡처로 확인.
+         */
+        start: "top 70%",
+        once: true,
+        invalidateOnRefresh: true,
+        animation: tl,
+      });
     },
     { scope: sectionRef },
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { gsap, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
+import { gsap, ScrollTrigger, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
 
 export interface SectionRevealOptions {
@@ -32,6 +32,13 @@ export function settleTitleMarks(marks: HTMLElement[]) {
   gsap.set(marks, { clipPath: "none", clearProps: "clipPath" });
 }
 
+/** `start: "top 82%"` 형태에서 뷰포트 % 를 뽑아 이미 지났는지 본다. */
+function hasPassedStart(el: Element, start: string) {
+  const match = /top\s+(\d+(?:\.\d+)?)%/.exec(start);
+  const pct = match ? Number(match[1]) : 82;
+  return el.getBoundingClientRect().top <= window.innerHeight * (pct / 100) + 2;
+}
+
 /**
  * 섹션 진입 reveal — 이 프로젝트의 기본 등장 모션.
  *
@@ -48,6 +55,12 @@ export function settleTitleMarks(marks: HTMLElement[]) {
  * `filter: blur(8px) → 0` 페이드가 시각적으로는 예쁘지만, 여러 섹션이 동시에
  * 뷰포트에 들어오면 브라우저가 GPU 레이어를 계속 재합성해서 스크롤이 끊긴다.
  * opacity + translateY + 미세 scale 조합으로 거의 같은 인상을 낸다.
+ *
+ * ## 중간 새로고침과 ScrollTrigger
+ * `timeline({ scrollTrigger })` 를 빈 채로 만들면 ST 가 start/end=0 으로
+ * delayed refresh 에 들어가고, 아래 섹션(웹블로그 등)이 같은 틱에 ST 를
+ * 만들다 `undefined.end` TypeError 가 난다. 트윈을 채운 뒤 create 하고,
+ * 이미 지난 구간은 ST 없이 최종 상태만 둔다.
  */
 export function useSectionReveal<T extends HTMLElement>(options: SectionRevealOptions = {}) {
   const { start = SCROLL_ENTRANCE.start, stagger = SCROLL_ENTRANCE.stagger, disabled } = options;
@@ -68,6 +81,12 @@ export function useSectionReveal<T extends HTMLElement>(options: SectionRevealOp
         return;
       }
 
+      if (hasPassedStart(section, start)) {
+        settleReducedMotion(targets as unknown as gsap.TweenTarget);
+        settleTitleMarks(marks);
+        return;
+      }
+
       gsap.set(targets, {
         autoAlpha: 0,
         y: SCROLL_ENTRANCE.y,
@@ -76,9 +95,7 @@ export function useSectionReveal<T extends HTMLElement>(options: SectionRevealOp
       });
       if (marks.length > 0) gsap.set(marks, { clipPath: TITLE_MARK_WIPE.from });
 
-      const tl = gsap.timeline({
-        scrollTrigger: { trigger: section, start, once: true },
-      });
+      const tl = gsap.timeline();
 
       tl.to(targets, {
         autoAlpha: 1,
@@ -105,6 +122,13 @@ export function useSectionReveal<T extends HTMLElement>(options: SectionRevealOp
           TITLE_MARK_WIPE.at,
         );
       }
+
+      ScrollTrigger.create({
+        trigger: section,
+        start,
+        once: true,
+        animation: tl,
+      });
     },
     { scope: sectionRef, dependencies: [start, stagger, disabled] },
   );
