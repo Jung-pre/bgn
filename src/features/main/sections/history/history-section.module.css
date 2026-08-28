@@ -730,19 +730,26 @@
     top: auto;
     flex: 0 0 auto;
     height: var(--history-wheel-band);
+    /* 이웃 살 가로 유출 차단. 그림자는 아래 `.photoCard` 에서 끄므로 잘릴 게 없다. */
     overflow: hidden;
     perspective: 900px;
     perspective-origin: 50% 50%;
   }
 
   .wheelItem {
-    width: min(22rem, 72%);
+    /* 띠 안에서 최대한 크게 — 그림자 잘림을 없앤 뒤 남는 여백을 사진이 먹는다 */
+    width: min(22rem, 88%);
   }
 
   /* 활성 살은 반듯해야 한다 — 일반 모바일 규칙의 rest tilt 를 되돌린다 */
   .photoCard {
     --tilt-rest-y: 0deg;
     --tilt-rest-x: 0deg;
+    /**
+     * `.wheel` 이 세로로 타이트해서 `--shadow-card`(blur 40) 아랫변이 항상 잘렸다.
+     * 잘린 그림자가 연도 위에 하드 엣지로 남으니 모바일 물레방아에선 끈다.
+     */
+    box-shadow: none;
   }
 
   .copyStage {
@@ -760,6 +767,7 @@
     inset: 0;
     overflow-x: hidden;
     overflow-y: auto;
+    /* 사진 띠와 연도 사이 — 그림자 여유를 빼니 4px 로 충분하다 */
     padding-top: 4px;
     padding-bottom: 8px;
     transform-style: preserve-3d;
@@ -798,7 +806,7 @@
      * 60% 까지 내렸더니 사진이 눈에 띄게 작아졌다 — 잘리지 않는 선에서 최대로.
      */
     .wheelItem {
-      width: min(22rem, 70%);
+      width: min(22rem, 82%);
     }
 
     .period {

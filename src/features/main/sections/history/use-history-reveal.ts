@@ -6,16 +6,21 @@ import { gsap, ScrollTrigger, useGSAP, SCROLL_ENTRANCE, settleReducedMotion } fr
 import { prefersReducedMotionSync, useMediaQuery } from "@/shared/lib/use-media-query";
 
 /**
- * `fromTo` 하나에 stagger + scrollTrigger(once) 를 같이 걸면 GSAP 이
- * 내부 타임라인을 만든 뒤 ScrollTrigger 를 붙인다. 히스토리 **아래**에서
- * 새로고침하면 start 를 이미 지난 상태라 `once` 가 **생성 도중에 kill**하고,
- * 같은 콜스택에서 `undefined.end` 를 읽어 TypeError 가 난다.
- * 트리거는 타임라인에, stagger 는 자식 트윈에 분리한다.
+ * 히스토리 중간·아래 새로고침에서 `undefined.end` 가 나던 두 함정:
  *
- * 이미 지난 트리거는 아예 ST 를 만들지 않고 최종 상태로만 둔다.
+ * 1) `fromTo` + stagger + `scrollTrigger.once` 를 **한 트윈**에 걸면
+ *    GSAP 이 내부 타임라인을 만들다 once 가 생성 중 kill → `.end` 읽기 실패.
+ * 2) `timeline({ scrollTrigger })` 를 **먼저** 만들고 자식을 나중에 넣으면
+ *    ST 가 `start/end = 0` 인 채 delayed refresh 를 예약한다. 그 직후
+ *    축·물레방아 scrub ST 가 refreshAll 을 돌리면 미초기화 인스턴스의
+ *    `.end` 를 읽어 TypeError.
+ *
+ * 해결: 트윈을 먼저 채운 뒤 `ScrollTrigger.create({ animation: tl })`,
+ * 이미 지난 구간은 ST 없이 최종 상태만.
  */
 function hasPassedStart(el: Element, viewportPct: number) {
-  return el.getBoundingClientRect().top <= window.innerHeight * (viewportPct / 100);
+  /* +2px: 서브픽셀·Lenis 복원과 ST 실측 start 사이 경계 오차 */
+  return el.getBoundingClientRect().top <= window.innerHeight * (viewportPct / 100) + 2;
 }
 
 function wipeLinesOnce(
@@ -30,21 +35,24 @@ function wipeLinesOnce(
     gsap.set(lines, { clearProps: "clipPath" });
     return;
   }
-  gsap
-    .timeline({
-      scrollTrigger: { trigger, start: `top ${startPct}%`, once: true },
-    })
-    .fromTo(
-      lines,
-      { clipPath: "inset(0 100% 0 0)" },
-      {
-        clipPath: "inset(0 0% 0 0)",
-        duration,
-        ease: "power3.out",
-        stagger,
-        clearProps: "clipPath",
-      },
-    );
+  const tl = gsap.timeline();
+  tl.fromTo(
+    lines,
+    { clipPath: "inset(0 100% 0 0)" },
+    {
+      clipPath: "inset(0 0% 0 0)",
+      duration,
+      ease: "power3.out",
+      stagger,
+      clearProps: "clipPath",
+    },
+  );
+  ScrollTrigger.create({
+    trigger,
+    start: `top ${startPct}%`,
+    once: true,
+    animation: tl,
+  });
 }
 
 /**
@@ -181,23 +189,28 @@ export function useHistoryReveal<T extends HTMLElement>() {
             clearProps: "opacity,visibility,transform",
           });
         } else {
-          gsap
-            .timeline({ scrollTrigger: { trigger: el, start: "top 88%", once: true } })
-            .fromTo(
-              el,
-              { autoAlpha: 0, y: SCROLL_ENTRANCE.y },
-              {
-                autoAlpha: 1,
-                y: 0,
-                duration: SCROLL_ENTRANCE.duration,
-                ease: SCROLL_ENTRANCE.ease,
-                // 인라인 transform 이 남으면 카드 회전(③)과 싸운다.
-                clearProps: "opacity,visibility,transform",
-              },
-            )
+          const tl = gsap.timeline();
+          tl.fromTo(
+            el,
+            { autoAlpha: 0, y: SCROLL_ENTRANCE.y },
+            {
+              autoAlpha: 1,
+              y: 0,
+              duration: SCROLL_ENTRANCE.duration,
+              ease: SCROLL_ENTRANCE.ease,
+              // 인라인 transform 이 남으면 카드 회전(③)과 싸운다.
+              clearProps: "opacity,visibility,transform",
+            },
+          )
             // 노드 활성화는 클래스가 아니라 속성으로 — CSS 모듈 해시 이름을
             // JS 로 넘기지 않아도 되고, 리렌더도 없다.
             .set(el, { attr: { "data-visible": "true" } }, 0.2);
+          ScrollTrigger.create({
+            trigger: el,
+            start: "top 88%",
+            once: true,
+            animation: tl,
+          });
         }
 
         /**
@@ -218,23 +231,26 @@ export function useHistoryReveal<T extends HTMLElement>() {
           if (hasPassedStart(el, 82)) {
             gsap.set(points, { autoAlpha: 1, x: 0, clearProps: "opacity,visibility,transform" });
           } else {
-            gsap
-              .timeline({
-                scrollTrigger: { trigger: el, start: "top 82%", once: true },
-              })
-              .fromTo(
-                points,
-                { autoAlpha: 0, x: -14 },
-                {
-                  autoAlpha: 1,
-                  x: 0,
-                  duration: 0.5,
-                  ease: "power2.out",
-                  stagger: 0.09,
-                  delay: 0.35,
-                  clearProps: "opacity,visibility,transform",
-                },
-              );
+            const tl = gsap.timeline();
+            tl.fromTo(
+              points,
+              { autoAlpha: 0, x: -14 },
+              {
+                autoAlpha: 1,
+                x: 0,
+                duration: 0.5,
+                ease: "power2.out",
+                stagger: 0.09,
+                delay: 0.35,
+                clearProps: "opacity,visibility,transform",
+              },
+            );
+            ScrollTrigger.create({
+              trigger: el,
+              start: "top 82%",
+              once: true,
+              animation: tl,
+            });
           }
         }
       });
@@ -708,22 +724,29 @@ export function useHistoryReveal<T extends HTMLElement>() {
       }
 
       // ── ④ 중앙 축이 스크롤을 따라 그려진다 ────────────────────────────
-      if (axisFill && axisHost) {
-        gsap.fromTo(
-          axisFill,
-          { scaleY: 0 },
-          {
-            scaleY: 1,
-            ease: "none",
-            scrollTrigger: {
-              trigger: axisHost,
-              start: "top 75%",
-              end: "bottom 65%",
-              scrub: 0.6,
-              invalidateOnRefresh: true,
+      // 모바일은 CSS 로 `.axis` 를 display:none — ST 를 걸 이유가 없다.
+      // 이미 end 를 지난 채 새로고침이면 scrub 없이 최종 scaleY 만 둔다.
+      if (axisFill && axisHost && isDesktop) {
+        const axisEndLine = window.innerHeight * 0.65;
+        if (axisHost.getBoundingClientRect().bottom <= axisEndLine) {
+          gsap.set(axisFill, { scaleY: 1 });
+        } else {
+          gsap.fromTo(
+            axisFill,
+            { scaleY: 0 },
+            {
+              scaleY: 1,
+              ease: "none",
+              scrollTrigger: {
+                trigger: axisHost,
+                start: "top 75%",
+                end: "bottom 65%",
+                scrub: 0.6,
+                invalidateOnRefresh: true,
+              },
             },
-          },
-        );
+          );
+        }
       }
 
       return () => {
