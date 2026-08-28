@@ -1,0 +1,89 @@
+/* ==========================================================================
+   가로 스크롤 인디케이터 — 시안 `124:3420`
+   ==========================================================================
+   행      flex · gap 8 · align center · padding-inline 20 · 높이 24
+   트랙    flex 1 · 높이 2 · #e4e4e4 · 안쪽 padding 1
+   썸      길이 고정(비례 아님, 아래 참고) · #0072ec
+   라벨    "SCROLL" Pretendard SemiBold 16 / 1.5 / -0.48px / #0a2048
+   아이콘  24×24, 라벨과 gap 4
+     20 + 트랙 240 + 8 + (59 + 4 + 24) + 20 = 375 ✔
+
+   **모바일 전용**이다. PC 시안에는 이 줄이 없다(카드가 한 화면에 다 들어간다).
+   ========================================================================== */
+.root {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .root {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 24px;
+    padding-inline: var(--mobile-gutter);
+  }
+
+  .track {
+    display: flex;
+    align-items: center;
+    flex: 1 0 0;
+    min-width: 1px;
+    height: 2px;
+    padding-inline: 1px;
+    background: #e4e4e4;
+    overflow: hidden;
+  }
+
+  .thumb {
+    height: 2px;
+    background: #0072ec;
+    /* 스크롤 위치는 translate 로만 옮긴다 — 폭을 건드리면 리플로가 난다 */
+    transition: translate 0.12s linear;
+  }
+
+  .label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+    /* 시안 주석: "움직이는 모션 있으면 좋을듯합니다! 텍스트포함" */
+    animation: hintNudge 1.9s ease-in-out infinite;
+  }
+
+  .text {
+    font-size: 16px;
+    font-weight: var(--weight-semibold);
+    line-height: 1.5;
+    letter-spacing: -0.48px;
+    color: #0a2048;
+    white-space: nowrap;
+  }
+
+  .icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    color: #0a2048;
+  }
+}
+
+@keyframes hintNudge {
+  0%,
+  62%,
+  100% {
+    translate: 0 0;
+  }
+  31% {
+    translate: 5px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .label {
+    animation: none;
+  }
+
+  .thumb {
+    transition: none;
+  }
+}

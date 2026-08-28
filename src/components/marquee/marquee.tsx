@@ -29,7 +29,13 @@ export interface MarqueeProps {
   duration?: number;
   /** -1 이면 오른쪽으로 흐른다 */
   direction?: 1 | -1;
-  /** 반복 사이에 넣을 구분자. 시안은 `*` */
+  /**
+   * 반복 사이에 넣을 구분자.
+   *
+   * 기본값은 **없음**이다 — 6차 수정 문서 2p 가 롤링 텍스트의 `*` 삭제를 지시했다.
+   * (시안 `124:3075` 에는 `*` 벡터가 아직 남아 있지만 문서가 우선이다.)
+   * 구분자가 비면 반복 사이 간격은 `.item` 의 뒤 여백이 대신 만든다.
+   */
   separator?: string;
   className?: string;
   /** 시안의 아웃라인(속 빈) 스타일 */
@@ -43,7 +49,7 @@ export function Marquee({
   text,
   duration = 24,
   direction = -1,
-  separator = "*",
+  separator = "",
   className,
   outline = false,
 }: MarqueeProps) {
@@ -73,9 +79,11 @@ export function Marquee({
   const items = Array.from({ length: REPEAT }, (_, i) => (
     <span key={i} className={styles.item}>
       {text}
-      <span className={styles.sep} aria-hidden>
-        {separator}
-      </span>
+      {separator ? (
+        <span className={styles.sep} aria-hidden>
+          {separator}
+        </span>
+      ) : null}
     </span>
   ));
 

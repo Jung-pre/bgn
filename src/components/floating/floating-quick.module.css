@@ -58,6 +58,14 @@
   pointer-events: none;
 }
 
+/* AI 상담 모달이 열려 있는 동안에도 같이 사라진다 — 수정요청 6차 8p.
+   모바일 확대는 딤이 화면을 덮는데 퀵바·마스코트가 그 위에 남아 있었다. */
+:global(body[data-modal-open="true"]) .fanRoot,
+:global(body[data-modal-open="true"]) .bottomDock {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /**
  * 푸터에 닿으면 데스크톱 FAB 은 물러난다.
  *
@@ -203,8 +211,17 @@
  * 시안 95:3916 — 120×120.
  * 안쪽 배치 실측(원 좌상단 기준): 워드마크 (25.5,32) 70×42 / "퀵메뉴" (40,78) 41×24.
  * 두 요소 중심이 모두 x=60.5 라 세로 스택 + 가운데 정렬로 재현된다(간격 78−74=4).
- * 그라디언트도 바뀌었다 — 예전 보라(#8D79FF)→파랑이 아니라 **시안(cyan)→파랑**이다
- * (실측 좌상 #00C4DE → 본색 #009BEB).
+ * ## 그라디언트 — 6차 수정(문서 2p) 로 **다시 퍼플** 이다
+ * 최신 시안 `124:4854` 의 원 채움은 SVG radial 이고 스톱이 6개인데
+ * 전부 한 직선 위에 있다(40% 지점 rgb(110,102,225) 를 20%/100% 두 끝으로
+ * 역산하면 오차 0.25 미만). 그래서 두 스톱으로 줄여 적었다.
+ *   #8D79FF 20%  →  #102C87 100%
+ * 끝값이 `--primary-500`(#0072EC) 이 **아니라** 네이비 #102C87 이므로
+ * 팬 항목이 쓰는 `--quick-brand-gradient` 토큰을 재사용하면 안 된다.
+ *
+ * 모양: 시안은 `matrix(6,6,-6.0768,11.352)` 로 기울어진 타원이라 CSS 로는
+ * 각도를 못 준다. 역행렬로 t=1 이 되는 지점을 찍으면 가로 81.5 / 세로 122 /
+ * 대각 84.9(px, 120 기준) 라 `70% 102%` 가 가장 가깝다.
  */
 .fanBrand {
   position: absolute;
@@ -220,7 +237,7 @@
   margin: 0;
   padding-top: 6px;
   border-radius: var(--radius-full);
-  background-image: radial-gradient(120% 120% at 0% 0%, #00cfe0 14%, #009beb 72%);
+  background-image: radial-gradient(70% 102% at 0% 0%, #8d79ff 20%, #102c87 100%);
   color: var(--color-white);
   /* 시안 실측: 2px 2px 12px rgba(126,156,190,0.2) */
   box-shadow: 2px 2px 12px rgba(126, 156, 190, 0.2);
@@ -290,6 +307,38 @@
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
+}
+
+/**
+ * 타이핑 커서 — 수정요청 6차 11p.
+ * 알약이 오른쪽(`right: 108px`)에 고정돼 있어 글자가 늘면 **왼쪽으로** 자란다.
+ * 타이핑 방향과 같아서 따로 폭을 잡아 둘 필요가 없다.
+ */
+.bubbleCaret {
+  display: inline-block;
+  width: 1px;
+  height: 0.95em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: var(--primary-500);
+  animation: bubbleCaretBlink 1s steps(1, end) infinite;
+}
+
+@keyframes bubbleCaretBlink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 글자가 없는 순간에도 알약이 찌그러지지 않게 최소 폭을 준다 */
+.bubble {
+  min-width: 84px;
+  text-align: right;
 }
 
 .bubbleHidden {

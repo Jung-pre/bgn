@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import clsx from "clsx";
+import { ScrollHint } from "@/components/scroll-hint/scroll-hint";
 import { useSectionReveal } from "@/features/main/sections/common/use-section-reveal";
 import { usePrefersReducedMotion } from "@/shared/lib/use-media-query";
 import type { AiStorySectionMessages } from "@/shared/i18n/messages";
@@ -165,6 +166,9 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
 
   return (
     <section ref={sectionRef} className={styles.section} aria-label="BGN AI 브랜드 스토리">
+      {/* 탭 3개의 폭 합이 560 이라 375 에서 잘린다 — 시안 `124:3420` 이 탭 줄
+          **위에** 가로 스크롤 인디케이터를 둔 이유다(썸 209/240 = 0.871). */}
+      <ScrollHint scrollerRef={tabStripRef} thumbRatio={0.871} />
       <div
         ref={tabStripRef}
         className={styles.tabs}

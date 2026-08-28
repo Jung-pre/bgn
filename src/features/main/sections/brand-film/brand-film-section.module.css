@@ -128,7 +128,22 @@
 }
 .section[data-composite="false"] .pinShell::after {
   bottom: 0;
-  background: linear-gradient(0deg, rgb(248, 248, 249) 0%, rgba(248, 248, 249, 0) 100%);
+  height: 240px;
+  background: linear-gradient(90deg, #f5e6f0 0%, #f8f7ff 48%, #e4eefb 100%);
+  -webkit-mask-image: linear-gradient(
+    0deg,
+    #000 0%,
+    rgba(0, 0, 0, 0.7) 30%,
+    rgba(0, 0, 0, 0.25) 60%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    0deg,
+    #000 0%,
+    rgba(0, 0, 0, 0.7) 30%,
+    rgba(0, 0, 0, 0.25) 60%,
+    transparent 100%
+  );
 }
 
 /**
@@ -222,15 +237,22 @@
    * 가로 그라디언트라 섹션의 `::before` 지우개가 그대로 받는다.
    * 아래(AI 시스템 상단)는 `#f8f7ff`(248,247,255). 예전 226,229,241 은
    * AI 섹션보다 어두워 그라디언트 끝에서 또 직선이 생겼다.
-   * 세로 화면은 폭 대비 높이가 커서 160px 로는 경계가 티가 나므로 32svh 로 넓힌다.
+   * 세로 화면은 폭 대비 높이가 커서 160px 로는 경계가 티가 난다.
+   *
+   * ⚠️ 32svh 는 **너무 넓었다** — 수정요청 6차 5p "Mo에서 영상 밑에 간격
+   * 줄여주세요". 아래 `.filmMo` 마스크(58%)까지 겹쳐서 영상이 화면 위 110px 만
+   * 남고 그 아래 350px 이 빈 회색 띠였다. 최신 시안 `124:3337` 은 영상 프레임이
+   * 375×833 로 **화면을 꽉 채우고**, 다음 섹션(`124:3160`)이 그 끝에서 40px
+   * 겹쳐 시작한다 — 빈 띠가 아예 없다. 14svh 로 줄인다.
    */
-  .section[data-composite="false"] .pinShell::before,
-  .section[data-composite="false"] .pinShell::after {
-    height: 32svh;
+  .section[data-composite="false"] .pinShell::before {
+    height: 10svh;
   }
 
+  /* 아래 이음매는 `.exitVeil`(가로 파스텔 + 세로 마스크)이 담당.
+     여기서 또 덮으면 짧은 흰 뚜껑이 되어 직선 경계가 되살아난다. */
   .section[data-composite="false"] .pinShell::after {
-    background: linear-gradient(0deg, #f8f7ff 0%, rgba(248, 247, 255, 0) 100%);
+    display: none;
   }
 
   /* 영상이 의사요소 위에 그려져도 픽셀 자체가 아래로 녹게. 마스크 밖은
@@ -239,21 +261,49 @@
     background: #f8f7ff;
   }
 
+  /**
+   * 아래로 녹아드는 마스크 — 끝만 살짝게. 긴 소프트는 `.exitVeil` 오버레이가 담당한다.
+   * (마스크를 일찍 열면 pinShell 바닥색 빈 띠가 다시 생긴다 — 수정요청 6차 5p)
+   */
   .filmMo {
-    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%);
-    mask-image: linear-gradient(180deg, #000 0%, #000 58%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 90%, rgba(0, 0, 0, 0.35) 97%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 90%, rgba(0, 0, 0, 0.35) 97%, transparent 100%);
   }
 
+  /**
+   * 브랜드 필름 → AI 이음매 — 참조(하늘·구름 위 파스텔 페이드)와 같은 방식.
+   * 영상을 마스크로 잘라내지 않고, **가로 파스텔 + 세로 마스크** 를 영상 위에
+   * 길게 덮어 아래로 갈수록 AI 톤(#f8f7ff)에 녹인다. 직선 경계가 없어야 한다.
+   */
   .exitVeil {
     display: block;
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    height: 32svh;
+    height: 42svh;
     z-index: 6;
     pointer-events: none;
-    background: linear-gradient(0deg, #f8f7ff 0%, rgba(248, 247, 255, 0.7) 42%, transparent 100%);
+    /* 입구 베일(의료진→필름)과 같은 가로 파스텔 언어, 도착색은 AI 상단 */
+    background: linear-gradient(90deg, #f5e6f0 0%, #f8f7ff 48%, #e4eefb 100%);
+    -webkit-mask-image: linear-gradient(
+      0deg,
+      #000 0%,
+      #000 12%,
+      rgba(0, 0, 0, 0.72) 32%,
+      rgba(0, 0, 0, 0.32) 58%,
+      rgba(0, 0, 0, 0.08) 78%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      0deg,
+      #000 0%,
+      #000 12%,
+      rgba(0, 0, 0, 0.72) 32%,
+      rgba(0, 0, 0, 0.32) 58%,
+      rgba(0, 0, 0, 0.08) 78%,
+      transparent 100%
+    );
   }
 }
 

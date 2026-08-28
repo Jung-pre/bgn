@@ -40,6 +40,12 @@
   pointer-events: none;
 }
 
+/* AI 상담 모달 확대 중에도 숨는다 — 수정요청 6차 8p */
+:global(body[data-modal-open="true"]) .header {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /**
  * ⚠️ 불투명 흰색이 아니다. whitebg-90 + backdrop-blur(25px) + 1px 흰 보더.
  *    배경이 비쳐 보이는 게 의도이므로 solid 로 바꾸면 안 된다.

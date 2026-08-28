@@ -419,61 +419,128 @@ export function useHistoryReveal<T extends HTMLElement>() {
 
         const n = spokes.length;
         const steps = Math.max(1, n - 1);
-        const visual = { a: 0 };
-        let page = 0;
-        let flip: gsap.core.Tween | undefined;
 
         /**
          * 이전 | 현재 | 다음 을 좌우 대칭으로 둔다.
          * 예전엔 PC 물레방아의 "떠나는 살" 게인을 왼쪽에 그대로 써서
          * 이전 장이 더 비틀리며 overflow 밖으로 잘렸다.
          */
+        /**
+         * ## 모바일 = PC 물레방아를 **옆으로 눕힌 것**
+         *
+         * 수정요청: "현재 물레방아를 옆으로 돌리듯이".
+         *
+         * 앞 구현은 카드를 가로로 나란히 미는 **평면 슬라이드**였다. 바퀴가 아니라
+         * 그냥 캐러셀이라 PC 와 언어가 달랐다. 여기서는 PC 와 **같은 원·같은 게인**을
+         * 쓰고 위상만 90° 돌린다.
+         *
+         * PC 는 활성 살이 원의 **왼쪽**(206.5°)에 앉아 접선이 세로 → 세로로 흐른다.
+         * 여기서는 원의 **아래쪽**에 앉혀 접선을 가로로 만든다.
+         *
+         * ## ⚠️ 정원(正圓)이 아니라 **납작한 타원**이다
+         *
+         * 수정요청: "각도를 낮춰서 사이드에서 나와서 사이드로 가는 느낌".
+         * 처음엔 PC 와 같은 정원에 위상만 116.5° 로 돌렸는데, 그러면 빠지는 살의
+         * 세로 이동이 −1.04R 이라 **옆으로 가는 게 아니라 위로 날아갔다.**
+         *
+         * 가로 반지름은 크게, 세로 반지름은 작게 잡아 궤도를 눕힌다. 위상도
+         * 26.5° → 10° 로 줄여 좌우 비대칭만 남긴다:
+         *   다음 살 → 오른쪽에서 들어온다 (Δx ≈ +1.06Rx, Δy ≈ −0.52Ry)
+         *   지난 살 → 왼쪽으로 빠진다     (Δx ≈ −0.82Rx, Δy ≈ −0.85Ry)
+         * Ry 가 Rx 의 27% 라 세로 이동은 가로의 1/5 수준 — 완전히 옆으로 흐른다.
+         *
+         * 반지름 기준축도 바뀐다. PC 는 세로로 흐르니 vh 였지만, 눕히면 가로가
+         * 병목이라 **스테이지 폭** 기준이다.
+         */
+        const PHASE_MO = (100 * Math.PI) / 180;
+        const P_COS_MO = Math.cos(PHASE_MO);
+        const P_SIN_MO = Math.sin(PHASE_MO);
+        const stepAngle = (Math.PI * 2) / n;
+
         const placeSpokes = (a: number) => {
           const span = wheel.offsetWidth || window.innerWidth;
-          const spacing = span * 0.58;
-          const neighborOpacity = 0.4;
+          /* 가로는 넉넉히(이웃이 화면 밖으로 나가야 "사이드에서" 들어온다),
+             세로는 얕게 — 이 비율이 곧 "눕힌 정도"다. */
+          const RX = span * 0.95;
+          const RY = span * 0.26;
+          const DEPTH = span * 0.18;
 
           spokes.forEach((el, i) => {
-            const dist = i - a;
-            const abs = Math.abs(dist);
-            const wrapped = abs > 1.15;
-            const opacity = wrapped
+            /* 부호는 PC 와 같다 — (a − i) 여야 바퀴가 진행 방향으로 돈다 */
+            const psi = (a - i) * stepAngle;
+            const ang = PHASE_MO + psi;
+
+            const lead = Math.sin(psi);
+            /* 0 근처를 눌러 활성 살이 **반듯하게 한 박자 머문다** (PC 와 같은 이유) */
+            const swing = Math.sign(lead) * Math.abs(lead) ** 1.6;
+            const depth = (Math.cos(psi) + 1) / 2;
+
+            /* 떠나는 살만 격하게 비틀린다 — 들어오는 살은 얌전해야 "물레방아"가 된다 */
+            const leaving = lead > 0;
+            const g = leaving ? 1 : 0.45;
+
+            const wrapped = Math.abs(a - i) > 1.25;
+            const fade = wrapped
               ? 0
-              : gsap.utils.interpolate(1, neighborOpacity, gsap.utils.clamp(0, 1, abs));
+              : gsap.utils.clamp(0, 1, (depth - (leaving ? 0.7 : 0.45)) / (leaving ? 0.18 : 0.2));
+
+            /* 정원 궤도만으로는 지난 장이 활성과 겹친다 — 빠질수록 왼쪽으로 더 민다.
+               PC 는 같은 이유로 위(y)로 밀었다. 눕혔으니 여기서는 가로다. */
+            const xOrbit = RX * (Math.cos(ang) - P_COS_MO);
+            /* 궤도가 눕었으니 밀기도 줄인다 — 예전 0.5 는 정원 기준의 겹침 보정이었다 */
+            const push = leaving ? span * 0.18 * Math.abs(swing) : 0;
 
             gsap.set(el, {
-              x: dist * spacing,
-              y: 0,
-              z: -abs * 36,
-              rotationY: dist * -12,
-              rotationX: 0,
-              rotation: 0,
-              scale: 1 - gsap.utils.clamp(0, 1, abs) * 0.2,
-              opacity,
-              visibility: opacity <= 0.01 ? "hidden" : "visible",
-              zIndex: Math.round((1 - abs) * 100),
+              x: xOrbit - push,
+              y: RY * (Math.sin(ang) - P_SIN_MO),
+              z: DEPTH * (Math.cos(psi) - 1) * g,
+              /**
+               * 각도를 낮춘다 (수정요청). PC 값(42/6/13.5)은 세로로 크게 휘어
+               * 나가는 궤도에 맞춘 것이라, 옆으로 흐르는 지금은 과하게 비틀린다.
+               * 절반 이하로 내려 "판이 살짝 돌아 나간다" 정도만 남긴다.
+               */
+              rotationY: swing * 20 * g,
+              rotationX: -swing * 3 * g,
+              rotation: swing * 5 * g,
+              scale: 1 - (1 - depth) * (leaving ? 0.62 : 0.2),
+              opacity: fade * (1 - (1 - depth) * (leaving ? 1.6 : 0.35)),
+              visibility: fade <= 0.01 ? "hidden" : "visible",
+              zIndex: Math.round(depth * 100),
             });
           });
         };
 
-        const placeCopy = (a: number) => {
-          const copyTravel =
-            copyPanes[0]?.parentElement?.offsetWidth || window.innerWidth;
+        /**
+         * ## 카피는 **가로로 밀지 않는다** — 잘려 보이면 안 된다
+         *
+         * 수정요청: "텍스트는 짤려보이면 안 되고".
+         *
+         * 예전에는 사진과 같이 화면 폭만큼 밀었다. 그러면 전환 내내 문장이
+         * 스테이지 오른쪽 경계에 **반쯤 걸려 잘린 채로** 읽힌다 — 사진은 판이라
+         * 잘려도 그림이지만, 글자는 잘리는 순간 그냥 오류로 보인다.
+         *
+         * 그래서 자리는 그대로 두고 **크로스페이드**만 한다. 살짝만 흘려(24px)
+         * 방향감은 남기되 어떤 순간에도 문장이 프레임을 벗어나지 않는다.
+         */
+        const COPY_DRIFT = 24;
 
+        const placeCopy = (a: number) => {
           copyPanes.forEach((el, i) => {
             const delta = i - a;
             const dist = Math.abs(delta);
             const wrapped = dist > 1.02;
+            /* 나가는 장이 먼저 사라져야 두 문장이 겹쳐 읽히지 않는다 */
+            const fade = wrapped ? 0 : gsap.utils.clamp(0, 1, 1 - dist * 1.7);
 
             gsap.set(el, {
-              x: delta * copyTravel,
+              x: delta * COPY_DRIFT,
               y: 0,
               z: 0,
               rotationY: 0,
               rotationX: 0,
               rotation: 0,
-              opacity: wrapped ? 0 : 1,
-              visibility: wrapped ? "hidden" : "visible",
+              opacity: fade,
+              visibility: fade <= 0.01 ? "hidden" : "visible",
               zIndex: Math.round((1 - dist) * 10),
             });
           });
@@ -484,6 +551,25 @@ export function useHistoryReveal<T extends HTMLElement>() {
           placeCopy(a);
         };
 
+        /**
+         * ## 연속 추종이 아니라 **장 단위로 머문다** (수정요청 26.08.28-2)
+         *
+         * 진행도를 그대로 위치에 물렸더니(scrub) 스크롤 내내 두 장이 반반씩
+         * 걸쳐 있어서, **어느 순간에도 완성된 화면이 없었다** — 사진도 글도
+         * 늘 좌우가 잘린 중간 상태다.
+         *
+         * 그래서 임계를 넘을 때만 다음 장으로 넘기고 **거기서 멈춘다.**
+         * 넘어가는 0.45초 동안만 물레방아가 돌고, 나머지 구간은 그 장이 반듯하게
+         * 서 있는다. 스크롤은 "몇 번째 장인가"만 고르고, 화면은 트윈이 그린다.
+         *
+         * 임계는 **중간점(±0.5)**. 반올림과 같은 지점이라 왕복해도 히스테리시스가
+         * 어긋나지 않는다. 빠르게 굴려 여러 장을 건너뛰면 `Math.round` 가 그만큼
+         * 한 번에 따라간다.
+         */
+        const visual = { a: 0 };
+        let page = 0;
+        let flip: gsap.core.Tween | undefined;
+
         const goTo = (target: number) => {
           const next = gsap.utils.clamp(0, steps, target);
           if (next === page) return;
@@ -491,7 +577,7 @@ export function useHistoryReveal<T extends HTMLElement>() {
           flip?.kill();
           flip = gsap.to(visual, {
             a: next,
-            duration: 0.4,
+            duration: 0.45,
             ease: "power2.inOut",
             overwrite: true,
             onUpdate: () => place(visual.a),
@@ -506,10 +592,7 @@ export function useHistoryReveal<T extends HTMLElement>() {
           invalidateOnRefresh: true,
           onUpdate: (self) => {
             const t = self.progress * steps;
-            let target = page;
-            if (t >= page + 0.58) target = Math.round(t);
-            else if (t <= page - 0.58) target = Math.round(t);
-            goTo(target);
+            if (Math.abs(t - page) > 0.5) goTo(Math.round(t));
           },
           onRefresh: (self) => {
             page = Math.round(self.progress * steps);
@@ -519,11 +602,68 @@ export function useHistoryReveal<T extends HTMLElement>() {
           },
         });
 
+        /**
+         * ## 손가락 좌우 스와이프
+         *
+         * 세로 스크롤이 장을 고르는 구조라, 가로로 밀면 **그 장의 스크롤 위치로
+         * 페이지를 옮긴다.** 진행도가 유일한 진실이므로 스와이프와 스크롤이
+         * 절대 어긋나지 않는다(스와이프가 따로 상태를 들고 있으면 곧 틀어진다).
+         *
+         * ⚠️ Lenis 를 거쳐야 한다. `window.scrollTo` 를 직접 부르면 Lenis 가
+         *    자기 목표값으로 즉시 되돌린다.
+         */
+        const SWIPE_MIN = 44;
+        let sx = 0;
+        let sy = 0;
+        let tracking = false;
+        let horizontal = false;
+
+        const onDown = (e: PointerEvent) => {
+          if (e.pointerType === "mouse") return;
+          sx = e.clientX;
+          sy = e.clientY;
+          tracking = true;
+          horizontal = false;
+        };
+        const onMove = (e: PointerEvent) => {
+          if (!tracking) return;
+          const dx = e.clientX - sx;
+          const dy = e.clientY - sy;
+          /* 세로 의도가 조금이라도 크면 스크롤에 양보한다 — 가로로 확실할 때만 잡는다 */
+          if (!horizontal && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+            horizontal = true;
+          }
+        };
+        const onUp = (e: PointerEvent) => {
+          if (!tracking) return;
+          tracking = false;
+          if (!horizontal || !st) return;
+          const dx = e.clientX - sx;
+          if (Math.abs(dx) < SWIPE_MIN) return;
+          const cur = Math.round(st.progress * steps);
+          const next = gsap.utils.clamp(0, steps, cur + (dx < 0 ? 1 : -1));
+          if (next === cur) return;
+          const top = st.start + ((st.end - st.start) * next) / steps;
+          window.dispatchEvent(
+            new CustomEvent("app:scroll-to", { detail: { top, duration: 0.45 } }),
+          );
+        };
+
+        const stage = section.querySelector<HTMLElement>("[data-history-stage]");
+        stage?.addEventListener("pointerdown", onDown, { passive: true });
+        stage?.addEventListener("pointermove", onMove, { passive: true });
+        stage?.addEventListener("pointerup", onUp, { passive: true });
+        stage?.addEventListener("pointercancel", onUp, { passive: true });
+
         place(0);
 
         return () => {
+          stage?.removeEventListener("pointerdown", onDown);
+          stage?.removeEventListener("pointermove", onMove);
+          stage?.removeEventListener("pointerup", onUp);
+          stage?.removeEventListener("pointercancel", onUp);
           flip?.kill();
-          st.kill();
+          st.kill(true);
           gsap.set(spokes, {
             clearProps: "x,y,z,rotation,rotationX,rotationY,scale,opacity,visibility,zIndex,transform",
           });

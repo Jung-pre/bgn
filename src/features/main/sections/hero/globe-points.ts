@@ -60,6 +60,279 @@ const LAND_MASK: Uint8Array = (() => {
   return out;
 })();
 
+/* ==========================================================================
+   한반도 확대(돋보기) — 수정요청 6차 1p
+   ==========================================================================
+   지구본 위에 잠실·부산 마커를 얹으려면 한반도가 손가락으로 누를 만해야 한다.
+   실제 축척이면 한반도는 구체 지름의 3% 도 안 돼서 두 점이 붙어 버린다.
+   기획안 원문도 "한반도가 조금 작아서 건물을 표현하기 어려울것같아서
+   한반도를 지구상에서 조금 확대해서" 라고 적고 있다.
+
+   ## 왜 "한반도만 크게 그리기"가 아니라 돋보기인가
+   한반도 폴리곤만 키우면 일본·중국과 **겹친다**. 대신 초점(서울) 둘레
+   `ZOOM_RADIUS_DEG` 원판 안에서 각거리를 다시 매핑한다.
+     · 중심 가까이(한반도)  → 밖으로 밀려나며 커진다
+     · 원판 바깥쪽(일본)    → 그만큼 눌리면서 옆으로 밀린다
+     · 원판 경계            → 그대로 (바깥 세계와 이음매가 없다)
+   덕분에 일본을 지우지 않아도 자리가 비고, 대륙 실루엣도 안 깨진다.
+
+   ## 매핑 함수 — 3차 에르미트
+   t = d / R 에 대해  f(t) = (M−1)t³ + (2−2M)t² + M·t,  d' = R·f(t)
+     f(0)=0, f(1)=1, f'(0)=M, **f'(1)=1**
+
+   ⚠️ 마지막 조건이 핵심이다. 처음엔 뫼비우스형 `M·t/(1+(M−1)t)` 를 썼는데
+   그건 f'(1)=1/M 이라 원판 **경계에 점이 M 배로 몰려** 지구본에 밝은 고리가
+   하나 생겼다(캡처로 확인). 경계에서 미분이 1 이면 바깥 세계와 밀도가
+   이어져서 고리가 안 생긴다.
+
+   단조성 조건은 f'(t)=3(M−1)t²+2(2−2M)t+M ≥ 0 → **M ≤ 4**.
+   4 를 넘기면 중간에서 접혀(fold) 대륙이 뒤집힌다.
+
+   ## 왜 벡터로 푸는가
+   경위도로 하면 고위도에서 경도 간격이 좁아져 원판이 타원으로 찌그러진다.
+   초점 F 에서 목표점 쪽 접선 u 를 구해 `F·cos d' + u·sin d'` 로 다시 세우면
+   큰 원(great circle)을 따라 정확히 각거리만 늘린다.
+   ========================================================================== */
+
+/** 돋보기 반경(도). 이 밖은 손대지 않는다. 28° ≈ 서울에서 상하이·삿포로. */
+export const ZOOM_RADIUS_DEG = 28;
+/** 중심 배율. 단조성 한계가 **정확히 4** 다. 3.9 면 한반도 세로가 약 3 배가 된다. */
+export const ZOOM_POWER = 3.9;
+
+const ZOOM_R = ZOOM_RADIUS_DEG * (Math.PI / 180);
+
+/** 돋보기 중심 — 초점(서울)에서 부산 쪽으로 조금 내린다. 두 마커가 함께 커진다. */
+const ZOOM_CENTER: [number, number, number] = (() => {
+  const la = 36.4 * (Math.PI / 180);
+  const lo = 127.9 * (Math.PI / 180);
+  const c = Math.cos(la);
+  return [c * Math.sin(lo), Math.sin(la), c * Math.cos(lo)];
+})();
+
+/** f(t) = (M−1)t³ + (2−2M)t² + M·t */
+function zoomF(t: number): number {
+  const a = ZOOM_POWER - 1;
+  const b = 2 - 2 * ZOOM_POWER;
+  return ((a * t + b) * t + ZOOM_POWER) * t;
+}
+
+/** f'(t). 단조 구간에서 최솟값 0.2 정도라 뉴턴법이 안정적이다. */
+function zoomFPrime(t: number): number {
+  const a = ZOOM_POWER - 1;
+  const b = 2 - 2 * ZOOM_POWER;
+  return 3 * a * t * t + 2 * b * t + ZOOM_POWER;
+}
+
+/**
+ * f 의 역함수. 뉴턴법 10회.
+ *
+ * f 가 [0,1] 에서 단조 증가하고 f(t) ≥ t 이므로 시작점 t=y 가 항상 해의
+ * 오른쪽이다. f' 이 0.2 아래로 안 내려가서 발산하지 않는다.
+ */
+function zoomFInverse(y: number): number {
+  if (y <= 0) return 0;
+  if (y >= 1) return 1;
+  let t = y;
+  for (let i = 0; i < 10; i += 1) {
+    const e = zoomF(t) - y;
+    if (e > -1e-7 && e < 1e-7) break;
+    t -= e / zoomFPrime(t);
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+  }
+  return t;
+}
+
+/** 초점 F 를 기준으로 각거리를 `remap` 으로 갈아 끼운다. 원판 밖이면 그대로. */
+function warpAroundCenter(
+  x: number,
+  y: number,
+  z: number,
+  remap: (t: number) => number,
+): [number, number, number] {
+  const [fx, fy, fz] = ZOOM_CENTER;
+  let dot = x * fx + y * fy + z * fz;
+  dot = dot < -1 ? -1 : dot > 1 ? 1 : dot;
+  const d = Math.acos(dot);
+  if (d >= ZOOM_R || d < 1e-6) return [x, y, z];
+
+  const nd = ZOOM_R * remap(d / ZOOM_R);
+
+  /* F 에 수직인 성분 = 초점에서 목표점으로 향하는 접선 */
+  let ux = x - fx * dot;
+  let uy = y - fy * dot;
+  let uz = z - fz * dot;
+  const ul = Math.hypot(ux, uy, uz);
+  if (ul < 1e-9) return [x, y, z];
+  ux /= ul;
+  uy /= ul;
+  uz /= ul;
+
+  const c = Math.cos(nd);
+  const sn = Math.sin(nd);
+  return [fx * c + ux * sn, fy * c + uy * sn, fz * c + uz * sn];
+}
+
+/**
+ * 확대: 원래 좌표 → 화면에 그릴 좌표.
+ * **마커 좌표도 반드시 이걸 거쳐야** 지도와 어긋나지 않는다.
+ */
+export function magnifyKorea(x: number, y: number, z: number): [number, number, number] {
+  return warpAroundCenter(x, y, z, zoomF);
+}
+
+/**
+ * 축소: 화면 좌표 → 원래 좌표. **점을 뿌릴 때 쓰는 건 이쪽이다.**
+ *
+ * ## 왜 역함수로 뿌리나 — 중국이 원형으로 파이던 이유
+ * 처음엔 "균일하게 뽑아서 → 확대" 순서였다. 그러면 **모양만 커지는 게 아니라
+ * 밀도까지 같이 늘어난다.** 면적 배율 J = (f/t)·f' 을 실제로 찍어 보면
+ *   중심 t=0.05 → J 9.3 (밀도 0.11배, 텅 빔)
+ *   t≈0.70    → J 0.25 (밀도 3.95배, 밝은 고리)
+ * 이 고리가 지구본에 동그란 테두리로 보이고, 그 안쪽이 성겨서 중국이 원형으로
+ * 파인 것처럼 읽혔다.
+ *
+ * 그래서 순서를 뒤집는다. **출력 공간에서 균일하게 뽑고, 역변환한 자리가
+ * 육지인지 묻는다.** 밀도는 어디서나 1 로 유지되고 모양만 늘어난다.
+ */
+export function unmagnifyKorea(x: number, y: number, z: number): [number, number, number] {
+  return warpAroundCenter(x, y, z, zoomFInverse);
+}
+
+
+/* ==========================================================================
+   일본 축소·이동 — "일본 작게 해서 더 밀어버려"
+   ==========================================================================
+   돋보기만으로는 일본이 같이 커진다. 후쿠오카가 돋보기 중심에서 2.5° 밖에
+   안 떨어져 있어서(부산이 1.6°) **핵심 확대 구간 안**이기 때문이다.
+   중심을 옮기거나 반경을 줄여도 둘을 갈라놓을 수 없다 — 실제로 붙어 있다.
+
+   그래서 일본은 렌즈가 아니라 **따로 떼어 닮음변환**한다.
+     1) 자기 중심 `JAPAN_FROM` 둘레로 각거리를 `JAPAN_SCALE` 배 (제자리 축소)
+     2) 중심을 `JAPAN_TO` 로 옮기는 고정 회전 (동쪽으로 밀기)
+     3) 그 결과를 한국 돋보기에 통과 (렌즈가 한 번 더 바깥으로 밀어 준다)
+   섬이라 사방이 바다다 — 줄이고 밀어도 대륙과 찢어질 이음매가 없다.
+
+   원래 자리의 일본은 세계 마스크에서 **빼고**(`isJapanSource`), 새 자리에만
+   그린다. 둘 다 같은 표집 루프에서 처리하므로 밀도는 저절로 맞는다.
+   ========================================================================== */
+
+/**
+ * 제자리 축소 배율.
+ *
+ * ⚠️ 이 값이 곧 화면 배율은 아니다. 줄인 뒤 **한국 돋보기를 한 번 더 통과**하는데
+ * 일본이 앉는 자리가 아직 확대 구간이라 되레 커진다. 실측하면
+ *   0.60 → 화면상 ×0.82 · 0.50 → ×0.61 · **0.45 → ×0.55** · 0.38 → ×0.46
+ * 규슈↔홋카이도 14.1° 기준이다. 0.45 로 두면 열도가 확실히 작아 보인다.
+ */
+export const JAPAN_SCALE = 0.45;
+const JAPAN_FROM: [number, number] = [137.5, 37.5];
+/** 동남쪽으로 민다. 렌즈까지 합쳐 일본 중심이 한국 중심에서 24.6° 로 물러난다. */
+const JAPAN_TO: [number, number] = [148.0, 34.0];
+
+const JAPAN_FROM_V = (() => {
+  const la = JAPAN_FROM[1] * (Math.PI / 180);
+  const lo = JAPAN_FROM[0] * (Math.PI / 180);
+  const c = Math.cos(la);
+  return [c * Math.sin(lo), Math.sin(la), c * Math.cos(lo)] as [number, number, number];
+})();
+
+/** `JAPAN_FROM` → `JAPAN_TO` 회전축(정규화)과 각도 */
+const JAPAN_PUSH = (() => {
+  const la = JAPAN_TO[1] * (Math.PI / 180);
+  const lo = JAPAN_TO[0] * (Math.PI / 180);
+  const c = Math.cos(la);
+  const to: [number, number, number] = [c * Math.sin(lo), Math.sin(la), c * Math.cos(lo)];
+  const [ax, ay, az] = JAPAN_FROM_V;
+  let kx = ay * to[2] - az * to[1];
+  let ky = az * to[0] - ax * to[2];
+  let kz = ax * to[1] - ay * to[0];
+  const kl = Math.hypot(kx, ky, kz);
+  kx /= kl;
+  ky /= kl;
+  kz /= kl;
+  const dot = ax * to[0] + ay * to[1] + az * to[2];
+  return { kx, ky, kz, angle: Math.acos(dot < -1 ? -1 : dot > 1 ? 1 : dot) };
+})();
+
+/** 로드리게스 회전. `sign` 이 −1 이면 역회전. */
+function rotateAroundAxis(
+  x: number,
+  y: number,
+  z: number,
+  sign: number,
+): [number, number, number] {
+  const { kx, ky, kz, angle } = JAPAN_PUSH;
+  const a = angle * sign;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  const dot = kx * x + ky * y + kz * z;
+  const cx = ky * z - kz * y;
+  const cy = kz * x - kx * z;
+  const cz = kx * y - ky * x;
+  return [
+    x * c + cx * s + kx * dot * (1 - c),
+    y * c + cy * s + ky * dot * (1 - c),
+    z * c + cz * s + kz * dot * (1 - c),
+  ];
+}
+
+/** `JAPAN_FROM` 둘레로 각거리에 `k` 를 곱한다. k<1 이면 축소. */
+function scaleAboutJapan(
+  x: number,
+  y: number,
+  z: number,
+  k: number,
+): [number, number, number] {
+  const [fx, fy, fz] = JAPAN_FROM_V;
+  let dot = x * fx + y * fy + z * fz;
+  dot = dot < -1 ? -1 : dot > 1 ? 1 : dot;
+  const d = Math.acos(dot);
+  if (d < 1e-6) return [x, y, z];
+  let ux = x - fx * dot;
+  let uy = y - fy * dot;
+  let uz = z - fz * dot;
+  const ul = Math.hypot(ux, uy, uz);
+  if (ul < 1e-9) return [x, y, z];
+  ux /= ul;
+  uy /= ul;
+  uz /= ul;
+  const nd = d * k;
+  const c = Math.cos(nd);
+  const sn = Math.sin(nd);
+  return [fx * c + ux * sn, fy * c + uy * sn, fz * c + uz * sn];
+}
+
+/** 원래 좌표 → 줄이고 민 좌표 (돋보기 통과 전) */
+export function shrinkJapan(x: number, y: number, z: number): [number, number, number] {
+  const [sx, sy, sz] = scaleAboutJapan(x, y, z, JAPAN_SCALE);
+  return rotateAroundAxis(sx, sy, sz, 1);
+}
+
+/** 줄이고 민 좌표 → 원래 좌표 */
+function unshrinkJapan(x: number, y: number, z: number): [number, number, number] {
+  const [rx, ry, rz] = rotateAroundAxis(x, y, z, -1);
+  return scaleAboutJapan(rx, ry, rz, 1 / JAPAN_SCALE);
+}
+
+/**
+ * 원래 좌표가 일본 열도인가.
+ *
+ * 캡(중심 9°)만으로는 부산(7.2°)이 걸린다. 동해를 가르는 사선을 하나 더 둔다.
+ *   경도 > 129.6 + 0.35·(위도 − 33)
+ * 부산 129.06 / 두만강 130.4(문턱 132.9) / 블라디보스토크 131.9(문턱 133.1) 는
+ * 빠지고, 규슈 서안 129.7(문턱 129.6) 과 홋카이도 142.5(문턱 133.2) 는 들어온다.
+ */
+function isJapanSource(x: number, y: number, z: number): boolean {
+  const [fx, fy, fz] = JAPAN_FROM_V;
+  let dot = x * fx + y * fy + z * fz;
+  dot = dot < -1 ? -1 : dot > 1 ? 1 : dot;
+  if (Math.acos(dot) > 9 * DEG) return false;
+  const lat = Math.asin(y < -1 ? -1 : y > 1 ? 1 : y) / DEG;
+  const lon = Math.atan2(x, z) / DEG;
+  return lon > 129.6 + 0.35 * (lat - 33);
+}
+
 /** 단위 방향벡터가 육지인가 */
 function isLand(x: number, y: number, z: number): boolean {
   if (LAND_MASK.length === 0) return true; // 마스크가 없으면 균일 분포로 폴백
@@ -192,8 +465,25 @@ export function makeLandPoints(count: number, seed: number): PointCloud {
 
   while (written < count && tries < maxTries) {
     tries += 1;
+    /**
+     * ⚠️ 순서가 중요하다. `dir` 은 **화면에 그릴 자리**이고, 육지인지 묻는 건
+     * 그 자리를 되돌린 좌표다. 반대로 하면(뽑고 나서 확대) 밀도까지 같이
+     * 늘어나 원형 고리가 생긴다 — `unmagnifyKorea` 주석 참고.
+     */
     randomDirection(rand, dir);
-    if (!isLand(dir[0], dir[1], dir[2])) continue;
+    const [sx, sy, sz] = unmagnifyKorea(dir[0], dir[1], dir[2]);
+
+    /**
+     * 두 갈래를 한 루프에서 본다 — 그래야 세계와 일본의 밀도가 자동으로 맞는다.
+     *   1) 원래 자리 육지. 단 **일본은 뺀다**(자기 자리엔 안 그린다).
+     *   2) 일본 변환을 되돌린 자리가 일본 육지라면 여기에 그린다.
+     */
+    let ok = isLand(sx, sy, sz) && !isJapanSource(sx, sy, sz);
+    if (!ok) {
+      const [jx, jy, jz] = unshrinkJapan(sx, sy, sz);
+      ok = isJapanSource(jx, jy, jz) && isLand(jx, jy, jz);
+    }
+    if (!ok) continue;
 
     // 껍질에 두께를 준다. 완전히 같은 반지름이면 실루엣 가장자리가 칼같이 잘려
     // 시안의 "흩어지는" 느낌이 안 난다.
@@ -207,8 +497,15 @@ export function makeLandPoints(count: number, seed: number): PointCloud {
 
   const worldPos = positions.subarray(0, written * 3);
   const worldScale = scales.subarray(0, written);
-  /* 세계 마스크 한국(~370점)의 약 1.2배만 더한다. 2.8%는 가운데가 타버렸다. */
-  const korea = makeKoreaPoints(Math.max(80, Math.round(count * 0.0035)), seed ^ 0x51ed);
+  /**
+   * 세계 마스크 한국(~370점)에 더할 보강 점.
+   *
+   * 예전엔 0.35% 였다. 돋보기(`magnifyKorea`)가 중심부를 배율의 제곱만큼
+   * **성기게** 만들기 때문에(면적이 M² 로 늘어난다) 같은 밀도로 보이려면
+   * 그만큼 더 심어야 한다. 2.6² ≈ 6.8 배지만 세계 마스크 점도 같이 늘어나
+   * 오므로 1.2% 로 둔다. 더 올리면 가운데가 타 버린다.
+   */
+  const korea = makeKoreaPoints(Math.max(260, Math.round(count * 0.012)), seed ^ 0x51ed);
   const mergedPos = new Float32Array(worldPos.length + korea.positions.length);
   const mergedScale = new Float32Array(worldScale.length + korea.scales.length);
   mergedPos.set(worldPos);
@@ -218,11 +515,52 @@ export function makeLandPoints(count: number, seed: number): PointCloud {
   return { positions: mergedPos, scales: mergedScale };
 }
 
-/** 해안선 안 흰 가루. 육지와 같은 크기·밝기. */
+/**
+ * 돋보기 중심 둘레 `capDeg` 안에서 **균일하게** 방향 하나를 뽑는다.
+ *
+ * `cos θ` 를 균등하게 뽑아야 구면에서 균일하다(θ 를 균등하게 뽑으면 중심에 몰린다).
+ * 로컬 프레임(t1, t2, F)에서 만든 뒤 그대로 월드로 쓴다.
+ */
+function randomInZoomCap(rand: () => number, capDeg: number, out: [number, number, number]) {
+  const [fx, fy, fz] = ZOOM_CENTER;
+  /* 접선 기저 — 보조축은 F 와 가장 덜 나란한 좌표축으로 고른다 */
+  const hx = Math.abs(fy) < 0.9 ? 0 : 1;
+  const hy = Math.abs(fy) < 0.9 ? 1 : 0;
+  const hz = 0;
+  let t1x = hy * fz - hz * fy;
+  let t1y = hz * fx - hx * fz;
+  let t1z = hx * fy - hy * fx;
+  const l1 = Math.hypot(t1x, t1y, t1z);
+  t1x /= l1;
+  t1y /= l1;
+  t1z /= l1;
+  const t2x = fy * t1z - fz * t1y;
+  const t2y = fz * t1x - fx * t1z;
+  const t2z = fx * t1y - fy * t1x;
+
+  const cosCap = Math.cos(capDeg * DEG);
+  const cosT = cosCap + (1 - cosCap) * rand();
+  const sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT));
+  const phi = 2 * Math.PI * rand();
+  const cp = Math.cos(phi) * sinT;
+  const sp = Math.sin(phi) * sinT;
+  out[0] = fx * cosT + t1x * cp + t2x * sp;
+  out[1] = fy * cosT + t1y * cp + t2y * sp;
+  out[2] = fz * cosT + t1z * cp + t2z * sp;
+}
+
+/**
+ * 해안선 안 흰 가루. 육지와 같은 크기·밝기.
+ *
+ * 세계 육지와 **같은 방식**으로 뽑는다 — 확대된 한반도를 덮는 캡(16°)에서
+ * 균일하게 뽑고, 역변환한 자리가 해안선 안인지 묻는다. 예전처럼 경위도 상자에서
+ * 뽑아 확대하면 중심이 성겨져 가운데가 비어 보인다.
+ */
 function makeKoreaPoints(count: number, seed: number): PointCloud {
   const rand = mulberry32(seed);
   const positions = new Float32Array(count * 3);
   const scales = new Float32Array(count);
+  const dir: [number, number, number] = [0, 0, 0];
 
   let written = 0;
   let tries = 0;
@@ -230,14 +568,16 @@ function makeKoreaPoints(count: number, seed: number): PointCloud {
 
   while (written < count && tries < maxTries) {
     tries += 1;
-    const lon = 124.2 + rand() * 6.5;
-    const lat = 33.05 + rand() * 9.6;
+    /* 신의주가 중심에서 5.6° → 확대 후 14.9°. 16 이면 제주까지 다 덮는다. */
+    randomInZoomCap(rand, 16, dir);
+    const [sx, sy, sz] = unmagnifyKorea(dir[0], dir[1], dir[2]);
+    const lat = Math.asin(sy < -1 ? -1 : sy > 1 ? 1 : sy) / DEG;
+    const lon = Math.atan2(sx, sz) / DEG;
     if (!isKoreaLonLat(lon, lat)) continue;
-    const [x, y, z] = lonLatToVector(lon, lat);
     const r = GLOBE_RADIUS * (1 + (rand() - 0.35) * 0.018);
-    positions[written * 3] = x * r;
-    positions[written * 3 + 1] = y * r;
-    positions[written * 3 + 2] = z * r;
+    positions[written * 3] = dir[0] * r;
+    positions[written * 3 + 1] = dir[1] * r;
+    positions[written * 3 + 2] = dir[2] * r;
     scales[written] = 0.55 + rand() * 0.45;
     written += 1;
   }

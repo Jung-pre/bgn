@@ -28,11 +28,23 @@ export type BreakpointKey = keyof typeof BREAKPOINT;
 /**
  * 히스토리 물레방아를 모바일에서 켤 수 있는 세로 하한.
  *
- * 스티키 카드(~214) + GNB 80 + 본문 최소 ~220 + 하단 퀵바 152 ≈ 690.
- * 720 이면 iPhone SE(667)·가로모드는 제외하고, 812+ 기기는 포함한다.
+ * ## ⚠️ 720 은 너무 높았다 — 실기기 대부분이 여기서 탈락했다
+ *
+ * 720 은 기기 스펙 높이(812, 844…) 기준으로 잡은 값이다. 그런데 모바일
+ * 브라우저는 **주소창이 뷰포트를 먹어서** `innerHeight` 가 스펙보다 한참 작다:
+ *   iPhone X(812) Safari ≈ 635 / Android Chrome(800) ≈ 730 / iPhone SE ≈ 553
+ * 그래서 실제 폰에서는 물레방아가 거의 안 켜지고 슬롯 스택만 보였다
+ * ("전혀 반영이 안 된다"의 원인).
+ *
+ * 게다가 지금 모바일 물레방아는 **가로로 눕혀** 돈다. 카드가 세로로 쌓이지
+ * 않으므로 세로 여유가 예전만큼 필요하지 않다. 스테이지 자체도
+ * `100svh − 상단 − 하단` 이라 짧으면 알아서 줄어든다.
+ *
+ * 600 이면 iPhone SE 세로(553)만 스택으로 남고 나머지 세로 기기는 전부 켜진다.
+ * 가로모드는 `orientation: portrait` 가 따로 막는다.
  * CSS `history-section.module.css` 의 동일 미디어쿼리와 **숫자를 맞춰 둔다.**
  */
-export const HISTORY_WHEEL_MIN_HEIGHT = 720;
+export const HISTORY_WHEEL_MIN_HEIGHT = 600;
 
 /** `(max-width: 768px)` — 이 값 "이하" */
 export const mqDown = (key: BreakpointKey) => `(max-width: ${BREAKPOINT[key]}px)`;

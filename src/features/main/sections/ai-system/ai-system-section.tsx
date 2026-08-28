@@ -9,7 +9,7 @@ import { Marquee } from "@/components/marquee/marquee";
 import type { AiStepMessages, AiSystemSectionMessages } from "@/shared/i18n/messages";
 import { renderWithEmphasis } from "@/shared/lib/render-emphasis";
 import { countUpTween, formatNumeric, parseNumericLabel } from "./count-up";
-import { ScrollHint } from "./scroll-hint";
+import { ScrollHint } from "@/components/scroll-hint/scroll-hint";
 import styles from "./ai-system-section.module.css";
 
 /**

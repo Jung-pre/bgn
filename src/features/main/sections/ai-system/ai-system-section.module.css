@@ -15,8 +15,9 @@
 .section {
   position: relative;
   /* 시안 2:1088(1920×1007) 세로 배분: 130 + 헤더 166 + 61 + 카드 520 + 130.
-     --gap-section(120) 이면 헤더 잉크가 125 로 시안(135)보다 10 높다. */
-  padding-block: 8.125rem;
+     --gap-section(120) 이면 헤더 잉크가 125 로 시안(135)보다 10 높다.
+     상단만 130→90(−40): `::after` 이음매를 120→160 으로 늘린 상쇄. */
+  padding-block: 5.625rem 8.125rem;
   /**
    * ⚠️ 아래로 갈수록 파래지는 그라데이션이 **아니다.**
    * 시안 2:1088 배경 픽셀(x20 / x1900, 40px 간격):
@@ -87,8 +88,9 @@
 
 /**
  * 브랜드 필름 → 이 섹션 이음매. `::before` 는 실크 웨이브라 `.blend-top` 을 못 쓴다.
- * 모바일에서 필름 영상이 하단 베일을 덮어 직선이 남으므로, 이쪽 상단에서도
- * 같은 톤으로 받아 준다.
+ *
+ * 필름 쪽 `.exitVeil` 과 같은 방식 — 가로 파스텔을 깔고 세로 마스크로 길게 녹인다.
+ * 불투명 흰 뚜껑(#f8f7ff 0% → transparent)만 쓰면 경계가 직선으로 끊긴다.
  */
 .section::after {
   content: "";
@@ -96,10 +98,24 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 120px;
+  height: 220px;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(180deg, #f8f7ff 0%, rgba(248, 247, 255, 0) 100%);
+  background: linear-gradient(90deg, #f5e6f0 0%, #f8f7ff 48%, #e4eefb 100%);
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    rgba(0, 0, 0, 0.75) 28%,
+    rgba(0, 0, 0, 0.28) 62%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    rgba(0, 0, 0, 0.75) 28%,
+    rgba(0, 0, 0, 0.28) 62%,
+    transparent 100%
+  );
 }
 
 /* 좌→우 wipe 대상.
@@ -554,11 +570,10 @@
 }
 
 /* 모바일 — 가로 스와이프, 우측 카드가 peek 되게 (시안 p4_06) */
-/* --- 모바일 스크롤 인디케이터 ------------------------------------------------
-   시안 68:3850. PC 에는 없다 — 가로 캐러셀 자체가 모바일 전용이다. */
-.scrollHint {
-  display: none;
-}
+
+/* 가로 스크롤 인디케이터는 공용 컴포넌트로 옮겼다 —
+   `src/components/scroll-hint/`. 최신 시안 `124:3420` 은 AI 스토리 탭 줄에도
+   같은 걸 쓰고, 문구 `SCROLL` 이 붙는다(수정요청 6차 7p). */
 
 @media (max-width: 768px) {
   /* 시안 실측(엣지/잉크 프로파일) — 위 81 / 아래 85.
@@ -566,12 +581,18 @@
      81 은 아이브로우 **잉크** 상단이 시안과 같은 y 86 에 오는 값이다
      (Belleza 20/22 의 라인박스 여백 5px 만큼 패딩이 잉크보다 위에 있다). */
   .section {
-    /* 카드 하단 641 → 프레임 722 = 81. 85 면 섹션이 5 길다. */
-    padding-block: 81px 80px;
+    /**
+     * 카드 하단 641 → 프레임 722 = 81. 85 면 섹션이 5 길다.
+     *
+     * 상단 56 → 32(−24): 필름 `.exitVeil`(42svh) 과 맞물리는 이음매를
+     * 키운 만큼 패딩에서 빼 아이브로우 위치는 현재와 같다.
+     */
+    padding-block: 32px 80px;
   }
 
   .section::after {
-    height: 28svh;
+    /* 필름 exitVeil(42svh) 과 겹쳐 읽히도록 길게 — 스톱은 PC 와 동일 마스크 */
+    height: 36svh;
   }
 
   /**
@@ -657,41 +678,45 @@
   }
 
   /**
-   * 스크롤 인디케이터 — 시안 68:3850 실측.
-   *   카드 밑변 y646 → 행 윗변 y674 = 28 · 행 높이 24(아이콘 박스)
-   *   20(거터) + 303(트랙) + 8 + 24(아이콘) + 20(거터) = 375 ✔
+   * 통계 카운팅 숫자 확대 — 수정요청 6차 7p.
+   * "스크롤 시 숫자가 올라가는 통계 카운팅 인터랙션을 극대화하기 위해
+   *  숫자 폰트 크기 확대".
+   *
+   * `--fs-18` 은 clamp(16, 0.9375vw, 18) 이라 768px 이하에서 **16px 로 바닥**을
+   * 친다. 카운트업이 이 사이즈에서 돌면 눈에 띄지 않는다. 24 로 올린다 —
+   * 카드 폭 277 에서 좌우 패딩 24 를 빼면 229 이고 "760,000+" 8글자가
+   * 24px 에서 약 118px 이라 알약 안에 여유 있게 들어간다.
+   * 캡션(13)과의 대비가 커져 숫자가 먼저 읽힌다.
    */
-  .scrollHint {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 28px;
-    padding-inline: var(--mobile-gutter);
+  .badgeValue {
+    font-size: 24px;
+    line-height: 1.25;
   }
 
-  .hintTrack {
-    position: relative;
-    flex: 1 1 auto;
-    height: 2px;
-    background: #e4e4e4;
-    overflow: hidden;
+  /* 숫자가 커진 만큼 알약 세로 여백을 줄여 배지 높이를 유지한다 */
+  .badge {
+    padding: 6px 14px;
   }
 
-  .hintThumb {
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    /* 시안 x20~230 / 트랙 303 = 69.6% */
-    width: 69.6%;
-    background: #0072ec;
-    /* rAF 로 직접 쓰므로 transition 은 손끝을 따라오는 감만 준다 */
-    transition: translate 0.12s linear;
+  /**
+   * 1번 카드 배지 — PC `top: 85.96%` 는 카드 높이 520 기준이라
+   * 모바일(350)에선 OPTICAL MAPPING 하단이 overflow:hidden 에 잘린다.
+   * 눈 하단 안쪽에 남기도록 올린다.
+   */
+  .badgeSph {
+    top: 42%;
   }
 
-  .hintIcon {
-    flex: 0 0 24px;
-    width: 24px;
-    height: 24px;
-    color: #0a2048;
+  .badgeAxis {
+    top: 32%;
+  }
+
+  .badgeOptical {
+    top: auto;
+    bottom: 10%;
+  }
+
+  .badgeCases {
+    top: 68%;
   }
 }

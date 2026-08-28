@@ -350,6 +350,41 @@
   cursor: pointer;
 }
 
+/**
+ * 확대 오버레이 스택.
+ *
+ * 예전엔 섹션 전체에 `z-index: --z-modal` 을 줬다. 그러면 섹션의 **흰 배경**까지
+ * 같이 올라가고, `isolation: isolate` 때문에 fixed 딤의 containing block 이
+ * 섹션으로 잡혀 `inset:0` 이 섹션 박스만 덮는다 → 뷰포트 위쪽에 흰 띠가 남았다.
+ *
+ * 해결: 확대 중 isolation 을 풀고, 딤·폼·닫기만 `--z-modal` 로 올려 루트
+ * 스택에서 뒤 섹션을 덮게 한다. 섹션 배경은 투명.
+ */
+.sectionExpanded {
+  isolation: auto;
+  background: transparent;
+  overflow: visible;
+}
+
+.sectionExpanded.blend-top::before,
+.sectionExpanded .mesh {
+  opacity: 0;
+}
+
+.sectionExpanded .dim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+}
+
+.sectionExpanded .copyExpanded {
+  z-index: calc(var(--z-modal) + 1);
+}
+
+.sectionExpanded .close {
+  z-index: calc(var(--z-modal) + 2);
+}
+
 /* 폼 인스턴스를 복제하지 않는다 — 같은 DOM 을 중앙 오버레이 자리로 옮긴다.
    복제하면 입력값·체크 상태가 두 벌이 되어 갈라진다. */
 .copyExpanded {
@@ -375,10 +410,6 @@
    있다(딤 뒤로 흐릿하게) → 남은 아이템을 오른쪽에 고정한다. */
 .sectionExpanded .media {
   margin-left: auto;
-}
-
-.copyExpanded .copyStage {
-  width: 37.5rem;
 }
 
 .copyExpanded .eyebrow,
@@ -408,8 +439,89 @@
 }
 
 .copyExpanded .form {
-  width: 37.5rem;
+  width: 45rem;
   align-items: center;
+}
+
+/* ==========================================================================
+   확대 상태 확대 타이포 — 수정요청 6차 6p / 시안 `124:888` 실측
+   ==========================================================================
+   "Pc에서 해당 모달 폰트 더 키워주시고 신청하기 버튼도 더 키워주시면"
+
+   시안 값(1920 프레임):
+     제목      Pretendard Bold 64 / 1.25 / -1.92px      (기본 48)
+     설명      26 / 1.5 / -0.78px                        (기본 24)
+     폼 폭     720                                       (기본 600)
+     입력칸    padding 24 · gap 12 · 아이콘 40 · 글자 26  (기본 16 / 8 / 24 / 18)
+     체크박스  40 · radius 8 · 보더 2                     (기본 24 / 4 / 1.2)
+     버튼      padding 24/40 · 글자 26 · 화살표 40        (기본 16/24 · 18 · 24)
+   아이브로우(Belleza 32)와 폼 세로 간격(48/32/20)은 이미 같아서 손대지 않았다.
+
+   전부 `.copyExpanded` 스코프다 — 섹션 안에 박혀 있는 기본 상태는 시안
+   `124:849` 그대로 둬야 한다.
+   ========================================================================== */
+.copyExpanded .copyStage {
+  width: 45rem;
+}
+
+.copyExpanded .title {
+  font-size: 4rem; /* 64 */
+  line-height: 1.25;
+  letter-spacing: -0.12rem; /* -1.92 */
+}
+
+.copyExpanded .desc {
+  font-size: 1.625rem; /* 26 */
+  line-height: 1.5;
+}
+
+.copyExpanded .fields {
+  gap: 1.25rem; /* 20 */
+}
+
+.copyExpanded .field {
+  gap: 0.75rem; /* 12 */
+  padding: 1.5rem; /* 24 */
+}
+
+.copyExpanded .field:focus-within {
+  padding: calc(1.5rem - 0.5px);
+}
+
+.copyExpanded .fieldIcon {
+  width: 2.5rem; /* 40 */
+  height: 2.5rem;
+}
+
+.copyExpanded .field input,
+.copyExpanded .agree {
+  font-size: 1.625rem; /* 26 */
+}
+
+.copyExpanded .agree {
+  gap: 0.75rem; /* 12 */
+}
+
+.copyExpanded .checkbox {
+  width: 2.5rem; /* 40 */
+  height: 2.5rem;
+  border-width: 2px;
+  border-radius: 0.5rem; /* 8 */
+}
+
+.copyExpanded .checkbox svg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.copyExpanded .submit {
+  padding: 1.5rem 2.5rem; /* 24 / 40 */
+  font-size: 1.625rem; /* 26 */
+}
+
+.copyExpanded .submit svg {
+  width: 2.5rem; /* 40 */
+  height: 2.5rem;
 }
 
 .close {
@@ -534,8 +646,150 @@
     object-position: center bottom;
   }
 
+  /* ========================================================================
+     모바일 확대 상태 — 수정요청 6차 8p / 시안 `124:3379`(375×941) 실측
+     ========================================================================
+     예전에는 모바일에 확대 상태가 아예 없어서(구 시안 `2:3971`) 클릭을 막고
+     닫기 버튼도 숨겨 뒀다. 최신 시안에 생겼으므로 되살린다.
+
+     시안 값(375 기준, 전부 x20 **좌측 정렬** — PC 처럼 가운데 정렬이 아니다):
+       아이브로우  y175        20
+       타이틀      y222 / 272  32 (2줄, 둘째 줄에 마크 박스)
+       본문 3줄    y352~440    16 / 1.55
+       입력칸      y483 h58 · y567 h58 · 폭 335(풀폭) · 간격 26
+       동의        y650        체크 24 · 글자 14
+       버튼        y710 h62 · **폭 335 풀폭** · 글자 18 · 화살표 24
+     ======================================================================== */
+  /**
+   * ⚠️ 모바일에서는 **뷰포트 고정**이어야 한다.
+   * PC 는 섹션 높이가 920 = 화면 높이라 `absolute; inset:0` 이 곧 화면이었다.
+   * 모바일 섹션은 941 + 스크롤 위치가 제각각이라 그대로 두면 딤이 섹션만
+   * 덮고 모달 상단이 화면 밖으로 잘린다(아이브로우 y −12 로 측정됐다).
+   * `.copyExpanded` 자신이 리빌 트랜스폼을 갖고 있을 수 있어 같이 지운다 —
+   * 자기 transform 은 자기 `fixed` 위치를 시각적으로 밀어낸다.
+   */
+  /* `.section` 의 `overflow: hidden`(풀블리드 영상용)이 fixed 딤까지 잘라
+     화면 위쪽 412px 만 덮였다. 확대 중에만 푼다 — 영상은 딤 뒤라 상관없다. */
+  .sectionExpanded {
+    overflow: visible;
+  }
+
+  .sectionExpanded .dim {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+  }
+
+  .copyExpanded {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-modal) + 1);
+    transform: none;
+    /* safe: 내용이 뷰포트보다 길면 start 로 붙어 위가 잘리지 않는다 */
+    justify-content: safe center;
+    align-items: stretch;
+    padding-inline: var(--mobile-gutter);
+    padding-block: 3.5rem 2rem; /* 닫기 버튼·홈 인디케이터 여유 */
+    /* 시안 프레임 941 > 일반 모바일 812 — 제출 버튼이 뷰포트 밖으로 나간다.
+       페이지 스크롤은 잠그고, 폼 패널만 안에서 스크롤한다. */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* body touch-action:none 락 중에도 폼 패널 안 세로 스크롤은 살린다 */
+    touch-action: pan-y;
+    text-align: left;
+  }
+
+  .copyExpanded .copyStage,
+  .copyExpanded .form,
+  .copyExpanded .eyebrow,
+  .copyExpanded .title {
+    width: 100%;
+    max-width: none;
+    /* PC 확대는 가운데 정렬이라 `margin-inline: auto` 인데, 모바일 시안은
+       전부 x20 좌측 정렬이다(`124:3379`). */
+    margin-inline: 0;
+    align-items: stretch;
+  }
+
+  .copyExpanded .eyebrow {
+    font-size: 1.25rem; /* 20 */
+    text-align: left;
+  }
+
+  .copyExpanded .title {
+    font-size: 2rem; /* 32 */
+    line-height: 1.25;
+    letter-spacing: -0.06rem;
+    justify-content: flex-start;
+  }
+
+  .copyExpanded .desc {
+    font-size: 1rem; /* 16 */
+    line-height: 1.55;
+    text-align: left;
+  }
+
+  .copyExpanded .fields {
+    gap: 1.625rem; /* 26 — 시안 483+58 → 567 */
+  }
+
+  .copyExpanded .field {
+    padding: 1rem 1.25rem; /* 높이 58 */
+  }
+
+  .copyExpanded .field:focus-within {
+    padding: calc(1rem - 0.5px) calc(1.25rem - 0.5px);
+  }
+
+  .copyExpanded .fieldIcon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .copyExpanded .field input {
+    font-size: 1rem;
+  }
+
+  .copyExpanded .agree {
+    font-size: 0.875rem; /* 14 */
+    gap: 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .copyExpanded .checkbox {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-width: 1.2px;
+    border-radius: 0.25rem;
+  }
+
+  /* 시안 버튼은 좌우 거터를 뺀 **풀폭**이다(155 짜리 알약이 아니다) */
+  .copyExpanded .submit {
+    width: 100%;
+    padding: 1.125rem 1.5rem; /* 높이 62 */
+    font-size: 1.125rem; /* 18 */
+  }
+
+  .copyExpanded .submit svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  /* 확대 중에는 뒤 콘텐츠(영상 슬롯)가 딤 뒤로 가야 한다 */
+  .sectionExpanded .media {
+    pointer-events: none;
+  }
+
+  /* 확대일 때만 닫기 버튼을 보인다 — 모바일엔 Esc 가 없다 */
   .close {
     display: none;
+  }
+
+  .sectionExpanded .close {
+    display: grid;
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
   }
 }
 

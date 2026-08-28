@@ -33,9 +33,8 @@ export const HERO_ASSETS = {
   sky: "/main/img_01_bg01.webp",
   /**
    * 타워 씬 뒤판 — 하늘·구름·타워·워터마크를 한 장으로 구운 플레이트.
-   * 납품본은 `img_02_bg01.png` 3840×1840(시안 2배). 의료진이 이미
-   * `img_02_bg01.webp` 를 쓰므로 히어로 네이밍으로 바꿔 넣었다.
-   * 모바일은 375×812(2x 750×1624) 전용판 — PC 플레이트를 cover 하면 4배 확대된다.
+   * PC 1920×920 / 모바일 375×812(@2x 750×1624).
+   * 모바일도 BGn 이 뒤판에 구워져 있어 별도 워터마크 레이어는 없다.
    */
   backdrop: "/main/img_01_bg02.webp",
   backdropMo: "/main/img_01_bg02_mo.webp",

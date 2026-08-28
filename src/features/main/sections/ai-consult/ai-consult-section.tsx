@@ -8,7 +8,8 @@ import { useSectionReveal } from "@/features/main/sections/common/use-section-re
 import { VideoSlot } from "@/components/video-slot/video-slot";
 import type { AiConsultSectionMessages } from "@/shared/i18n/messages";
 import { gsap } from "@/shared/lib/gsap";
-import { prefersReducedMotionSync, useIsAppleTouch, useIsMobileLayout } from "@/shared/lib/use-media-query";
+import { prefersReducedMotionSync, useIsAppleTouch } from "@/shared/lib/use-media-query";
+import { useScrollLock } from "@/shared/lib/use-scroll-lock";
 import { renderWithEmphasis } from "@/shared/lib/render-emphasis";
 import styles from "./ai-consult-section.module.css";
 
@@ -58,7 +59,6 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
 
   const [agreed, setAgreed] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const isMobile = useIsMobileLayout();
   const isIos = useIsAppleTouch();
 
   /**
@@ -66,10 +66,30 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
    * 이전 자리로 되돌린 다음, 스케일과 함께 제자리로 보낸다(FLIP).
    * 시작 스케일을 한 단 더 작게 잡아 카메라 쪽으로 다가오는 느낌을 만든다.
    */
+  /**
+   * 확대하는 동안 섹션 높이를 붙잡아 둔다.
+   *
+   * 모바일 확대(수정요청 6차 8p)에서 `.copyExpanded` 는 `position: fixed` 라
+   * 흐름에서 빠진다. 그러면 섹션이 950 → 412 로 접히면서 그 아래 문서가 통째로
+   * 올라온다. 딤이 덮고 있어 열 때는 안 보이지만 닫을 때 튄다.
+   * PC 는 섹션이 `aspect-ratio` 로 920 고정이라 이 문제가 없다.
+   */
+  const holdSectionHeight = useCallback(
+    (hold: boolean) => {
+      const el = sectionRef.current;
+      if (!el) return;
+      el.style.minHeight = hold ? `${el.offsetHeight}px` : "";
+    },
+    [sectionRef],
+  );
+
   const animateStage = useCallback((next: boolean) => {
     const stage = stageRef.current;
+    if (next) holdSectionHeight(true);
+
     if (!stage || prefersReducedMotionSync()) {
       setExpanded(next);
+      if (!next) holdSectionHeight(false);
       return;
     }
 
@@ -93,14 +113,20 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
         ease: next ? "power3.out" : "power2.inOut",
         overwrite: true,
         clearProps: "transform",
+        onComplete: next ? undefined : () => holdSectionHeight(false),
       },
     );
-  }, []);
+  }, [holdSectionHeight]);
 
+  /**
+   * 수정요청 6차 8p — "모바일에서도 영상 클릭하면 상담신청 모달 커질 수 있게".
+   * 예전에는 `isMobile` 이면 열지 않았다(구 시안 `2:3971` 에 확대 상태가 없었다).
+   * 최신 시안 `124:3379` 에 모바일 확대 상태가 생겨서 가드를 없앤다.
+   */
   const open = useCallback(() => {
-    if (expanded || isMobile) return;
+    if (expanded) return;
     animateStage(true);
-  }, [animateStage, expanded, isMobile]);
+  }, [animateStage, expanded]);
 
   const close = useCallback(() => {
     if (!expanded) return;
@@ -113,10 +139,27 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
     };
   }, []);
 
-  /* 모바일 시안에는 확대 상태가 없다. 폭이 넘어오면 닫아 둔다. */
+  /**
+   * 확대 중에는 배경을 잠근다 — 수정요청 6차 8p 로 모바일에도 확대가 생겼다.
+   * PC 는 딤이 뷰포트를 덮어도 휠이 뒤로 먹혀 섹션이 흘러가고, 모바일은
+   * 터치 스크롤이 그대로 통과해서 모달만 남고 배경이 딴 데로 가 버린다.
+   */
+  useScrollLock(expanded);
+
+  /**
+   * 확대 중에는 GNB·퀵바·마스코트를 숨긴다.
+   * 시안 `124:3379` 는 모달만 있는 화면이고, 안 숨기면 딤 **위에** 떠 있는
+   * 플로팅 요소들이 그대로 남아 모달이 반쯤 가려진 것처럼 보인다.
+   * 브랜드 필름이 쓰는 `data-gnb-hide` 와 같은 방식이되 속성은 따로 둔다 —
+   * 두 구간이 겹칠 때 한쪽이 끄면 다른 쪽 상태까지 지워지기 때문이다.
+   */
   useEffect(() => {
-    if (isMobile && expanded) close();
-  }, [close, expanded, isMobile]);
+    if (!expanded) return;
+    document.body.dataset.modalOpen = "true";
+    return () => {
+      delete document.body.dataset.modalOpen;
+    };
+  }, [expanded]);
 
   // 확대 상태는 딤이 화면을 덮으므로 Esc 탈출구가 없으면 갇힌다.
   useEffect(() => {
@@ -230,37 +273,24 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
         </div>
 
         {/* 2:1242 — 762×762 영상 슬롯. 주석: "해당 영역 클릭시 하단 상담신청 Fade in"
-            모바일 시안(`2:3971`)에는 확대 상태가 없어서 클릭을 막는다. */}
-        {isMobile ? (
-          <div className={clsx(styles.media, isIos && styles.mediaIos)} data-reveal-item>
-            <VideoSlot
-              decorative
-              src={LOGO_VIDEO}
-              srcWebm={isIos ? undefined : LOGO_VIDEO_WEBM}
-              poster={LOGO_POSTER}
-              className={clsx(styles.objectVideo, isIos && styles.objectVideoIos)}
-              videoBackground={isIos ? "#fff" : undefined}
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            className={clsx(styles.media, isIos && styles.mediaIos)}
-            data-reveal-item
-            aria-expanded={expanded}
-            aria-label={EXPAND_LABEL}
-            onClick={open}
-          >
-            <VideoSlot
-              decorative
-              src={LOGO_VIDEO}
-              srcWebm={isIos ? undefined : LOGO_VIDEO_WEBM}
-              poster={LOGO_POSTER}
-              className={clsx(styles.objectVideo, isIos && styles.objectVideoIos)}
-              videoBackground={isIos ? "#fff" : undefined}
-            />
-          </button>
-        )}
+            모바일도 같다 — 시안 `124:3379`(수정요청 6차 8p). */}
+        <button
+          type="button"
+          className={clsx(styles.media, isIos && styles.mediaIos)}
+          data-reveal-item
+          aria-expanded={expanded}
+          aria-label={EXPAND_LABEL}
+          onClick={open}
+        >
+          <VideoSlot
+            decorative
+            src={LOGO_VIDEO}
+            srcWebm={isIos ? undefined : LOGO_VIDEO_WEBM}
+            poster={LOGO_POSTER}
+            className={clsx(styles.objectVideo, isIos && styles.objectVideoIos)}
+            videoBackground={isIos ? "#fff" : undefined}
+          />
+        </button>
       </div>
 
       <button

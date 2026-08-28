@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ComponentType } from "react";
 import clsx from "clsx";
-import { useIsMobileLayout } from "@/shared/lib/use-media-query";
+import { prefersReducedMotionSync, useIsMobileLayout } from "@/shared/lib/use-media-query";
 import type { GnbMessages } from "@/shared/i18n/messages";
 import {
   BgnMarkIcon,
@@ -13,6 +13,76 @@ import {
   WebBlogIcon,
 } from "./quick-icons";
 import styles from "./floating-quick.module.css";
+
+/**
+ * 말풍선 타이핑 — 수정요청 6차 11p / 시안 `124:4929` 주석
+ * ("+타이핑 애니매이션 추가", "+랜덤 안내문구", 문구 3개).
+ *
+ * ## SSR
+ * 첫 페인트는 **항상 0번 문구 전체**다. 마운트 뒤에야 타이핑이 시작하므로
+ * 서버·클라이언트 HTML 이 어긋나지 않는다(`Math.random()` 을 렌더 중에 부르면
+ * 하이드레이션이 깨진다).
+ *
+ * ## 순서
+ * 순환이 아니라 **랜덤**이되 직전 문구는 다시 뽑지 않는다. 두 번 연속 같은
+ * 문구가 나오면 지웠다 그대로 다시 쓰는 것처럼 보인다.
+ *
+ * ## 동작 줄이기
+ * `prefers-reduced-motion` 이면 0번 문구를 고정해 둔다.
+ */
+const TYPE_MS = 55;
+const ERASE_MS = 26;
+const HOLD_MS = 2800;
+
+function useTypingBubble(list: string[]): string {
+  const [text, setText] = useState(list[0] ?? "");
+
+  useEffect(() => {
+    if (list.length < 2 || prefersReducedMotionSync()) return;
+
+    let cancelled = false;
+    let timer = 0;
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        timer = window.setTimeout(resolve, ms);
+      });
+
+    let current = 0;
+
+    const run = async () => {
+      while (!cancelled) {
+        await wait(HOLD_MS);
+        if (cancelled) return;
+
+        const from = list[current] ?? "";
+        for (let i = from.length; i >= 0; i -= 1) {
+          setText(from.slice(0, i));
+          await wait(ERASE_MS);
+          if (cancelled) return;
+        }
+
+        let next = current;
+        while (next === current) next = Math.floor(Math.random() * list.length);
+        current = next;
+
+        const to = list[current] ?? "";
+        for (let i = 1; i <= to.length; i += 1) {
+          setText(to.slice(0, i));
+          await wait(TYPE_MS);
+          if (cancelled) return;
+        }
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [list]);
+
+  return text;
+}
 
 /**
  * 상시 노출 퀵 액션.
@@ -73,6 +143,7 @@ const BAR_ORDER: QuickId[] = ["map", "kakao", "naver", "event", "blog"];
 
 export function FloatingQuick({ messages }: FloatingQuickProps) {
   const isMobile = useIsMobileLayout();
+  const bubbleText = useTypingBubble(messages.chatbotBubbles);
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -237,9 +308,11 @@ export function FloatingQuick({ messages }: FloatingQuickProps) {
       </div>
 
       {/* 평상시 노출되는 말풍선 — 팬 오픈 시 숨긴다 */}
-      <p className={clsx(styles.bubble, isOpen && styles.bubbleHidden)} aria-hidden={isOpen}>
+      <p className={clsx(styles.bubble, isOpen && styles.bubbleHidden)} aria-hidden>
         {/* 그라데이션 글자는 별도 span — 알약 배경까지 clip 되면 안 된다 */}
-        <span className={styles.bubbleText}>{messages.chatbotBubble}</span>
+        <span className={styles.bubbleText}>{bubbleText}</span>
+        {/* 커서. 글자가 지워지는 동안에도 남아 있어야 "쓰는 중"으로 읽힌다 */}
+        <span className={styles.bubbleCaret} aria-hidden />
       </p>
 
       <button type="button" className={styles.mascotButton} aria-label={messages.chatbotBubble}>

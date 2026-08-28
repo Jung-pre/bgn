@@ -33,7 +33,18 @@
   color: var(--color-white);
 }
 
+/**
+ * 반복 사이 간격. `*` 를 뺀 자리(문서 2p)를 이 여백이 대신한다.
+ * 시안 `124:3075` 실측: 글자 폭 449 뒤 다음 글자 시작 495 → 46px.
+ * 그 프레임의 글자 크기가 50px 이므로 46/50 = 0.92em.
+ */
+.item {
+  padding-inline-end: 0.92em;
+}
+
 .sep {
+  /* 구분자를 넣는 호출부가 생기면 좌우로 조금 더 벌린다 */
+  margin-inline-start: -0.22em;
   padding-inline: 0.35em;
   opacity: 0.7;
 }

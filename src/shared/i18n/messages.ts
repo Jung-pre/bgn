@@ -205,7 +205,13 @@ export interface GnbMessages {
   /** 우하단 퀵메뉴 토글 원 안에 들어가는 라벨 (시안 `2:2403`) */
   quickMenu: string;
   quickActions: { id: string; label: string }[];
+  /** 마스코트 버튼의 접근성 라벨 */
   chatbotBubble: string;
+  /**
+   * 말풍선에 **랜덤으로 돌아가는** 안내 문구 — 수정요청 6차 11p.
+   * 시안 `124:4929` 주석 원문: "+타이핑 애니매이션 추가 / +랜덤 안내문구".
+   */
+  chatbotBubbles: string[];
 }
 
 /* ── 사전 ───────────────────────────────────────────────────────────────── */
@@ -241,6 +247,12 @@ const ko: Dictionary = {
       { id: "blog", label: "웹블로그" },
     ],
     chatbotBubble: "무엇이든 물어보세요!",
+    /* 시안 `124:4929` 주석에 적힌 3개 문구 그대로 */
+    chatbotBubbles: [
+      "AI 챗봇에게 물어보세요",
+      "안녕하세요 지엔이에요",
+      "AI 챗봇, 무엇이든 물어보세요",
+    ],
   },
 
   heroSection: {

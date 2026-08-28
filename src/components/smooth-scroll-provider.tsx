@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 import { gsap, ScrollTrigger } from "@/shared/lib/gsap";
 import { MQ } from "@/shared/config/breakpoints";
+import { SCROLL_LOCK_EVENT, isScrollLocked } from "@/shared/lib/use-scroll-lock";
 
 /**
  * Lenis 스무스 스크롤 + GSAP ScrollTrigger 통합.
@@ -64,6 +65,9 @@ export function SmoothScrollProvider() {
       allowNestedScroll: true,
     });
     lenisRef.current = lenis;
+
+    /* 메가메뉴 등이 Lenis 생성 전에 락을 걸었을 수 있다 */
+    if (isScrollLocked()) lenis.stop();
 
     const handleScroll = () => ScrollTrigger.update();
     lenis.on("scroll", handleScroll);
@@ -185,7 +189,29 @@ export function SmoothScrollProvider() {
       else window.scrollTo({ top: 0, behavior: "smooth" });
     };
     window.addEventListener("app:scroll-to-top", onScrollToTop);
-    return () => window.removeEventListener("app:scroll-to-top", onScrollToTop);
+
+    /**
+     * 임의 위치로 스크롤 — `app:scroll-to` (detail: { top, duration }).
+     *
+     * 히스토리 모바일 스와이프처럼 **콘텐츠가 페이지 스크롤을 움직여야 하는**
+     * 경우에 쓴다. `window.scrollTo` 를 직접 부르면 Lenis 가 자기 목표값과
+     * 어긋나 곧바로 되돌려 버리므로 반드시 Lenis 를 거쳐야 한다.
+     */
+    const onScrollTo = (e: Event) => {
+      const detail = (e as CustomEvent<{ top?: number; duration?: number }>).detail;
+      const top = detail?.top;
+      if (typeof top !== "number" || !Number.isFinite(top)) return;
+      const duration = detail?.duration ?? 0.5;
+      const lenis = lenisRef.current;
+      if (lenis) lenis.scrollTo(top, { duration });
+      else window.scrollTo({ top, behavior: "smooth" });
+    };
+    window.addEventListener("app:scroll-to", onScrollTo);
+
+    return () => {
+      window.removeEventListener("app:scroll-to-top", onScrollToTop);
+      window.removeEventListener("app:scroll-to", onScrollTo);
+    };
   }, []);
 
   /**
@@ -194,18 +220,41 @@ export function SmoothScrollProvider() {
    * normalizeScroll 은 브라우저 주소창 show/hide 로 인한 vh 점프를 흡수해
    * 모바일 pin 이 튀는 걸 막는다. 다만 데스크톱에서는 Lenis 와 이중으로
    * 스크롤을 가로채므로 coarse pointer 에서만 켠다.
+   *
+   * 모달/메가메뉴 락(`app:scroll-lock`) 중에는 반드시 끈다. normalizeScroll 은
+   * touch 를 preventDefault 한 뒤 페이지를 직접 움직이므로 body overflow:hidden
+   * 만으로는 배경이 계속 스크롤된다.
    */
   useEffect(() => {
     const shouldNormalize =
       window.matchMedia(MQ.coarsePointer).matches || window.matchMedia(MQ.mobile).matches;
 
-    if (shouldNormalize) {
-      ScrollTrigger.normalizeScroll({ allowNestedScroll: true });
-      ScrollTrigger.refresh();
-    } else {
-      ScrollTrigger.normalizeScroll(false);
-    }
+    let locked = isScrollLocked();
+
+    const applyNormalize = () => {
+      if (shouldNormalize && !locked) {
+        ScrollTrigger.normalizeScroll({ allowNestedScroll: true });
+        ScrollTrigger.refresh();
+      } else {
+        ScrollTrigger.normalizeScroll(false);
+      }
+    };
+
+    if (locked) lenisRef.current?.stop();
+    applyNormalize();
+
+    const onLock = (e: Event) => {
+      locked = Boolean((e as CustomEvent<{ locked?: boolean }>).detail?.locked);
+      const lenis = lenisRef.current;
+      if (locked) lenis?.stop();
+      else lenis?.start();
+      applyNormalize();
+    };
+    window.addEventListener(SCROLL_LOCK_EVENT, onLock);
+
     return () => {
+      window.removeEventListener(SCROLL_LOCK_EVENT, onLock);
+      lenisRef.current?.start();
       ScrollTrigger.normalizeScroll(false);
     };
   }, [pathname]);

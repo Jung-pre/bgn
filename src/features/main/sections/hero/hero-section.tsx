@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import clsx from "clsx";
 import { gsap, useGSAP } from "@/shared/lib/gsap";
 import { prefersReducedMotionSync } from "@/shared/lib/use-media-query";
@@ -143,6 +143,26 @@ export function HeroSection({ messages }: HeroSectionProps) {
    */
   const [towerMounted, setTowerMounted] = useState(false);
   const [zoomedDoctor, setZoomedDoctor] = useState<number | null>(null);
+
+  /**
+   * 모바일에서는 타워 씬 의료진을 **아예 렌더하지 않는다** — 수정요청 6차 4p
+   * ("Mo에서만 의료진 삭제"). 최신 시안 `124:2780` 에도 없다.
+   *
+   * `display:none` 이 아니라 언마운트인 이유: 컷아웃 8장이 전부 2x WebP 라
+   * 숨겨 놔도 내려받는 값이 그대로 나간다.
+   *
+   * SSR 스냅샷은 false(=데스크톱)이고 실제 블록은 `towerMounted`(진행도 0.12)
+   * 뒤에 있어서 하이드레이션 이후에만 존재한다. 위 ScrollTrigger 의 의존성
+   * 배열(⚠️ 주석)은 건드리지 않으므로 pin-spacer 문제와도 무관하다.
+   */
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia(MQ.mobile);
+    const sync = () => setIsMobileViewport(mql.matches);
+    sync();
+    mql.addEventListener("change", sync);
+    return () => mql.removeEventListener("change", sync);
+  }, []);
   const towerMountedRef = useRef(false);
   const towerIntroOn = useRef(false);
   const playTowerIntroRef = useRef(() => {});
@@ -575,8 +595,9 @@ export function HeroSection({ messages }: HeroSectionProps) {
               </div>
 
               <div className={styles.towerStage}>
-                {/* 워터마크 SVG·구름·타워 스프라이트는 쓰지 않는다.
-                    뒤판(`img_01_bg02`) 한 장에 이미 들어 있다. */}
+                {/* 구름·타워·워터마크는 뒤판 한 장에 들어 있다.
+                    모바일도 새 `img_01_bg02_mo` 에 BGn 이 구워져 있어
+                    별도 워터마크 레이어는 쓰지 않는다. */}
 
                 {/* 광선/웨이브 — 8:2949. 시안에서 프레임 마스크로 잘려 있다.
                     clip 을 패럴랙스 래퍼 바깥에 둬야 잘리는 사각형이 안 움직인다.
@@ -663,7 +684,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
               />
             </p>
             {/* 카피 바로 아래, 제목과 같은 폭. 호버는 카피(.inner) 위여야 먹는다. */}
-            {towerMounted ? (
+            {towerMounted && !isMobileViewport ? (
               <div ref={towerTeamRef} className={styles.towerTeam} data-tower-fade>
                 {TOWER_DOCTORS.map((src, index) => (
                   <div

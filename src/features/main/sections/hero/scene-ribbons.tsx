@@ -184,6 +184,8 @@ const RIBBON_FRAGMENT_SHADER = /* glsl */ `
   uniform float uGradientAngle;
   uniform vec4 uRadial0;
   uniform vec4 uRadial1;
+  /* 리본 전체 투명도 배율 — 수정요청 6차 3p. 1.0 이 예전 값이다. */
+  uniform float uOpacity;
 
   varying vec2 vUv;
 
@@ -371,10 +373,10 @@ const RIBBON_FRAGMENT_SHADER = /* glsl */ `
 
     float edgeDistance = min(vUv.y, 1.0 - vUv.y);
     float edgeAlpha = smoothstep(0.0, 0.005, edgeDistance);
-    float surfaceAlpha = min(0.78, fill.a * 2.15);
+    float surfaceAlpha = min(1.0, fill.a * 2.15);
     gl_FragColor = vec4(
       clamp(color, 0.0, 1.0),
-      surfaceAlpha * edgeAlpha
+      surfaceAlpha * edgeAlpha * uOpacity
     );
   }
 `;
@@ -552,6 +554,7 @@ function createRibbonUniforms(layout: (typeof RIBBON_LAYOUTS)[number]) {
     uGradientAngle: { value: gradient.angle },
     uRadial0: { value: new THREE.Vector4(...gradient.radial0) },
     uRadial1: { value: new THREE.Vector4(...gradient.radial1) },
+    uOpacity: { value: RIBBON_TUNE.opacity },
   };
 }
 
@@ -620,6 +623,7 @@ function DynamicRibbon() {
       material.uniforms.uEnergy!.value = tune.energy;
       material.uniforms.uNoiseScale!.value = noiseScale;
       material.uniforms.uAspectRatio!.value = aspectRatio;
+      material.uniforms.uOpacity!.value = tune.opacity;
     });
   });
 
