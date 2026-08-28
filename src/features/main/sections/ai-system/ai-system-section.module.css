@@ -641,6 +641,14 @@
     display: flex;
     gap: 20px;
     padding-inline: var(--mobile-gutter);
+    /**
+     * 카드 ↔ SCROLL 인디케이터 간격.
+     * `overflow-x: auto` 는 overflow-y 도 auto 로 계산돼 카드 하단 그림자·라운드가
+     * 잘린다. 아래 패딩으로 그림자를 스크롤포트 안에 남기고, 마진으로 인디케이터와
+     * 띄운다(시안 카드 하단 637 → 프레임 여유 85 중 상단분).
+     */
+    padding-bottom: 12px;
+    margin-bottom: 20px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
@@ -670,11 +678,6 @@
     aspect-ratio: 277 / 350;
     /* 카드 상단 292 → 번호 잉크 315 = 23. PC 패딩(24)이면 32 라 9 내려간다. */
     padding: 15px 24px;
-  }
-
-  /* ul 기본 margin-block-end 16px 이 카드 아래 여백에 그대로 더해진다 */
-  .grid {
-    margin-bottom: 0;
   }
 
   /**
