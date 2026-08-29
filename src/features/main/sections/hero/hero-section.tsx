@@ -652,7 +652,7 @@ export function HeroSection({ messages }: HeroSectionProps) {
         {/* ── 카피 ───────────────────────────────────────────────────── */}
         <div className={styles.inner}>
           {/* 장면 1 — 세계를 향한 BGN의 도약
-              ExtraBold 6rem / BGN 만 타원 라디얼 (#00dad8 → #009ceb) */}
+              ExtraBold 6rem / BGN 만 타원 라디얼 (#8d79ff → #102c87) */}
           <div ref={copySphereRef} className={clsx(styles.copy, styles.copySphere)}>
             <p className={styles.line1} data-hero-fade>
               {sphereSlide?.eyebrow}
