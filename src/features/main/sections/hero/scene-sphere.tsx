@@ -343,6 +343,12 @@ function Globe({
   const idleAcc = useRef(0);
   /** 축소가 끝난 뒤 2번 섹션에서만 쌓는 자전. 1번과 같은 속도. */
   const floatAcc = useRef(0);
+  /**
+   * 전환 진입 순간의 최단각. 여러 바퀴를 한 번에 접지 않고,
+   * `recenter` 곡선에 실어 한반도로 되돌린다.
+   */
+  const spinHome = useRef({ idle: 0, dragYaw: 0, dragPitch: 0, armed: false });
+  const floatHome = useRef({ acc: 0, armed: false });
   const zoomTPrev = useRef(0);
   /** 1 = 1→2, -1 = 2→1. 멈추면 마지막 방향을 유지한다. */
   const scrollDir = useRef(1);
@@ -663,22 +669,32 @@ function Globe({
     }
     /* 클로징·푸터는 예전처럼 느린 자전만. 히어로만 전환 큐를 탄다. */
     const idleRate = interactive ? (tune?.spinRate ?? 0) : 0.07;
+    const idleSpinning = recenter < 0.02 && floatIn < 0.02;
     if (!interactive) {
       idleAcc.current += delta * idleRate;
-    } else if (recenter < 0.02 && floatIn < 0.02) {
-      idleAcc.current += delta * idleRate;
-    } else {
-      /* 880° 돌았어도 ±180° 안쪽 최단각으로 접은 뒤 한반도로 감는다. */
-      idleAcc.current = shortestAngle(idleAcc.current);
+    } else if (idleSpinning) {
+      /* ±π 안에 유지. 여러 바퀴를 쌓아 두었다가 전환 첫 프레임에 접으면 뚝 끊긴다. */
+      idleAcc.current = shortestAngle(idleAcc.current + delta * idleRate);
       drag.yaw = shortestAngle(drag.yaw);
-      const k = 1 - Math.exp(-delta * 4.2);
-      idleAcc.current += (0 - idleAcc.current) * k;
-      drag.yaw += (0 - drag.yaw) * k;
-      drag.pitch += (0 - drag.pitch) * k;
+      spinHome.current.armed = false;
+    } else {
+      /**
+       * 880° 를 880° 되돌리지 않는다. 진입 순간의 최단각만 잡고
+       * `recenter`(0→1, 스크롤 연동)로 한반도까지 감는다.
+       * 예전엔 접은 뒤 k=4.2 로 남은 180° 를 한순간에 돌려 뚝 끊겼다.
+       */
+      if (!spinHome.current.armed) {
+        spinHome.current.idle = shortestAngle(idleAcc.current);
+        spinHome.current.dragYaw = shortestAngle(drag.yaw);
+        spinHome.current.dragPitch = drag.pitch;
+        spinHome.current.armed = true;
+      }
+      const u = recenter;
+      idleAcc.current = spinHome.current.idle * (1 - u);
+      drag.yaw = spinHome.current.dragYaw * (1 - u);
+      drag.pitch = spinHome.current.dragPitch * (1 - u);
       drag.velYaw = 0;
       drag.velPitch = 0;
-      if (Math.abs(idleAcc.current) < 1e-4) idleAcc.current = 0;
-      if (Math.abs(drag.yaw) < 1e-4) drag.yaw = 0;
     }
     if (zoomTNow > zoomTPrev.current + 0.003) scrollDir.current = 1;
     else if (zoomTNow < zoomTPrev.current - 0.003) scrollDir.current = -1;
@@ -694,21 +710,20 @@ function Globe({
     const otherYaw = (tune?.scrollYaw ?? 0) * continentMix.current;
     if (!interactive) {
       floatAcc.current = 0;
+      floatHome.current.armed = false;
     } else if (goingBack) {
-      /* 2→1: 섹션 2에서 쌓인 자전도 최단각으로 접고 걷는다. */
-      floatAcc.current = shortestAngle(floatAcc.current);
-      const k = 1 - Math.exp(-delta * 3.8);
-      floatAcc.current += (0 - floatAcc.current) * k;
-      if (floatIn < 0.02 || Math.abs(floatAcc.current) < 1e-4) floatAcc.current = 0;
+      /* 2→1: 쌓인 자전의 최단각을 float 큐가 꺼지는 동안 스크롤에 실어 걷는다. */
+      if (!floatHome.current.armed) {
+        floatHome.current.acc = shortestAngle(floatAcc.current);
+        floatHome.current.armed = true;
+      }
+      floatAcc.current = floatHome.current.acc * floatIn;
     } else if (floatIn > 0.02) {
+      floatHome.current.armed = false;
       /* 2번 도착: 1번과 같은 속도로 자전. */
-      floatAcc.current += delta * idleRate;
-    }
-    if (interactive && recenter > 0.92) {
-      drag.yaw = 0;
-      drag.pitch = 0;
-      drag.velYaw = 0;
-      drag.velPitch = 0;
+      floatAcc.current = shortestAngle(floatAcc.current + delta * idleRate);
+    } else {
+      floatHome.current.armed = false;
     }
     const liveKeep = 1 - recenter;
     const pointerAmt = drag.dragging ? 0 : introEase * liveKeep;
