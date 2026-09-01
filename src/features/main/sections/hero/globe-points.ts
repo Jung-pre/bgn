@@ -201,34 +201,41 @@ export function unmagnifyKorea(x: number, y: number, z: number): [number, number
 
 
 /* ==========================================================================
-   일본 축소·이동 — "일본 작게 해서 더 밀어버려"
+   일본 — 축소해서 한반도 오른쪽 아래에 다시 놓기
    ==========================================================================
    돋보기만으로는 일본이 같이 커진다. 후쿠오카가 돋보기 중심에서 2.5° 밖에
    안 떨어져 있어서(부산이 1.6°) **핵심 확대 구간 안**이기 때문이다.
    중심을 옮기거나 반경을 줄여도 둘을 갈라놓을 수 없다 — 실제로 붙어 있다.
 
-   그래서 일본은 렌즈가 아니라 **따로 떼어 닮음변환**한다.
+   그래서 일본은 렌즈를 태우지 않고 **따로 떼어 닮음변환**한다.
      1) 자기 중심 `JAPAN_FROM` 둘레로 각거리를 `JAPAN_SCALE` 배 (제자리 축소)
-     2) 중심을 `JAPAN_TO` 로 옮기는 고정 회전 (동쪽으로 밀기)
-     3) 그 결과를 한국 돋보기에 통과 (렌즈가 한 번 더 바깥으로 밀어 준다)
-   섬이라 사방이 바다다 — 줄이고 밀어도 대륙과 찢어질 이음매가 없다.
+     2) 중심을 `JAPAN_AT` 으로 옮기는 고정 회전 (최종 자리로 이동)
+   섬이라 사방이 바다다 — 줄이고 옮겨도 대륙과 찢어질 이음매가 없다.
+
+   ## ⚠️ 렌즈 **뒤**가 아니라 렌즈를 **안 거친다**
+   예전엔 (축소 → 밀기 → 돋보기) 순서였다. 그러면 렌즈가 한 번 더 밀어내는
+   바람에 최종 위치를 값으로 못 잡는다 — 실제로 24.6° 까지 밀려나 구체
+   가장자리에서 원근으로 눌려 거의 안 보였다. 지금은 `JAPAN_AT` 이 곧
+   **화면에 찍히는 자리**다. 실제 지리 위치가 아니어도 된다는 전제다.
 
    원래 자리의 일본은 세계 마스크에서 **빼고**(`isJapanSource`), 새 자리에만
    그린다. 둘 다 같은 표집 루프에서 처리하므로 밀도는 저절로 맞는다.
    ========================================================================== */
 
 /**
- * 제자리 축소 배율.
- *
- * ⚠️ 이 값이 곧 화면 배율은 아니다. 줄인 뒤 **한국 돋보기를 한 번 더 통과**하는데
- * 일본이 앉는 자리가 아직 확대 구간이라 되레 커진다. 실측하면
- *   0.60 → 화면상 ×0.82 · 0.50 → ×0.61 · **0.45 → ×0.55** · 0.38 → ×0.46
- * 규슈↔홋카이도 14.1° 기준이다. 0.45 로 두면 열도가 확실히 작아 보인다.
+ * 축소 배율. 렌즈를 안 거치므로 **이 값이 곧 화면 배율**이다.
+ * 규슈↔홋카이도 14.10° × 0.62 = 8.7°. 확대된 한반도 남북이 18.9° 이므로
+ * 열도가 한반도의 46% 길이로 들어온다 — 확실히 작다.
  */
-export const JAPAN_SCALE = 0.45;
+export const JAPAN_SCALE = 0.62;
+/** 일본 열도의 원래 중심 — 축소 기준점 */
 const JAPAN_FROM: [number, number] = [137.5, 37.5];
-/** 동남쪽으로 민다. 렌즈까지 합쳐 일본 중심이 한국 중심에서 24.6° 로 물러난다. */
-const JAPAN_TO: [number, number] = [148.0, 34.0];
+/**
+ * 화면에 놓을 자리. **실제 지리 위치가 아니다.**
+ * 돋보기 중심(127.9E/36.4N)에서 남동쪽(방위 135°)으로 13° 떨어진 점이라
+ * 확대된 한반도(반경 ~9.5°) 바로 **오른쪽 아래**에 붙는다.
+ */
+const JAPAN_AT: [number, number] = [138.7, 27.2];
 
 const JAPAN_FROM_V = (() => {
   const la = JAPAN_FROM[1] * (Math.PI / 180);
@@ -237,10 +244,10 @@ const JAPAN_FROM_V = (() => {
   return [c * Math.sin(lo), Math.sin(la), c * Math.cos(lo)] as [number, number, number];
 })();
 
-/** `JAPAN_FROM` → `JAPAN_TO` 회전축(정규화)과 각도 */
+/** `JAPAN_FROM` → `JAPAN_AT` 회전축(정규화)과 각도 */
 const JAPAN_PUSH = (() => {
-  const la = JAPAN_TO[1] * (Math.PI / 180);
-  const lo = JAPAN_TO[0] * (Math.PI / 180);
+  const la = JAPAN_AT[1] * (Math.PI / 180);
+  const lo = JAPAN_AT[0] * (Math.PI / 180);
   const c = Math.cos(la);
   const to: [number, number, number] = [c * Math.sin(lo), Math.sin(la), c * Math.cos(lo)];
   const [ax, ay, az] = JAPAN_FROM_V;
@@ -303,13 +310,13 @@ function scaleAboutJapan(
   return [fx * c + ux * sn, fy * c + uy * sn, fz * c + uz * sn];
 }
 
-/** 원래 좌표 → 줄이고 민 좌표 (돋보기 통과 전) */
+/** 원래 좌표 → 화면에 찍을 좌표 (돋보기를 거치지 않는다) */
 export function shrinkJapan(x: number, y: number, z: number): [number, number, number] {
   const [sx, sy, sz] = scaleAboutJapan(x, y, z, JAPAN_SCALE);
   return rotateAroundAxis(sx, sy, sz, 1);
 }
 
-/** 줄이고 민 좌표 → 원래 좌표 */
+/** 화면 좌표 → 원래 좌표 */
 function unshrinkJapan(x: number, y: number, z: number): [number, number, number] {
   const [rx, ry, rz] = rotateAroundAxis(x, y, z, -1);
   return scaleAboutJapan(rx, ry, rz, 1 / JAPAN_SCALE);
@@ -480,7 +487,9 @@ export function makeLandPoints(count: number, seed: number): PointCloud {
      */
     let ok = isLand(sx, sy, sz) && !isJapanSource(sx, sy, sz);
     if (!ok) {
-      const [jx, jy, jz] = unshrinkJapan(sx, sy, sz);
+      /* ⚠️ `sx` 가 아니라 `dir` 이다 — 일본은 돋보기를 거치지 않는다.
+         렌즈를 태우면 최종 위치를 값으로 못 잡는다(위 주석 참고). */
+      const [jx, jy, jz] = unshrinkJapan(dir[0], dir[1], dir[2]);
       ok = isJapanSource(jx, jy, jz) && isLand(jx, jy, jz);
     }
     if (!ok) continue;

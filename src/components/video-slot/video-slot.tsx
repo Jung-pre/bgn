@@ -58,6 +58,10 @@ export interface VideoSlotProps {
   videoBackground?: string;
 }
 
+/** `useSyncExternalStore` 용 상수 — 렌더마다 새 함수면 커밋마다 재구독한다 */
+const subscribeNever = () => () => {};
+const returnFalse = () => false;
+
 export function VideoSlot({
   src,
   srcWebm,
@@ -79,10 +83,11 @@ export function VideoSlot({
    * iOS 는 `<source type="video/webm">` 을 고른 뒤 VP9 알파를 검정으로 채운다.
    * 폴백이 안 일어나므로 처음부터 WebM 을 넣지 않는다.
    */
+  /* subscribe·서버 스냅샷은 모듈 상수다 — 인라인이면 렌더마다 재구독한다 */
   const allowWebm = useSyncExternalStore(
-    () => () => {},
+    subscribeNever,
     () => Boolean(srcWebm) && !isAppleTouchSync(),
-    () => false,
+    returnFalse,
   );
 
   useEffect(() => {
@@ -103,6 +108,11 @@ export function VideoSlot({
     const v = videoRef.current;
     if (!v || !src || !autoPlayInView) return;
 
+    /* `{ once: true }` 라도 **메타데이터가 오기 전에 화면 밖으로 나가면**
+       리스너가 그대로 남는다. 들락날락할 때마다 한 겹씩 쌓이고, 한참 뒤에
+       메타데이터가 도착하면 보고 있던 영상을 0초로 되감아 버린다. */
+    let rewindOnMeta: (() => void) | undefined;
+
     // 동작 줄이기: 재생하지 않는다. poster 가 그대로 남는다.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
@@ -117,7 +127,10 @@ export function VideoSlot({
         if (v.readyState > 0 && v.currentTime > 0) v.currentTime = 0;
         else if (v.readyState === 0) {
           // 메타데이터가 도착한 뒤 한 번만 0 으로 맞춘다(두 번째 진입 이후 대비)
-          v.addEventListener("loadedmetadata", () => (v.currentTime = 0), { once: true });
+          rewindOnMeta = () => {
+            v.currentTime = 0;
+          };
+          v.addEventListener("loadedmetadata", rewindOnMeta, { once: true });
         }
       }
       // 자동재생이 막히는 경우가 있다(저전력 모드 등). 실패해도 poster 가 있으니 조용히 넘긴다.
@@ -125,6 +138,10 @@ export function VideoSlot({
     } else {
       v.pause();
     }
+
+    return () => {
+      if (rewindOnMeta) v.removeEventListener("loadedmetadata", rewindOnMeta);
+    };
   }, [inView, src, autoPlayInView, restartOnEnter]);
 
   return (

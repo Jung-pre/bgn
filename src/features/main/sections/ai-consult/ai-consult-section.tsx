@@ -134,8 +134,12 @@ export function AiConsultSection({ messages }: AiConsultSectionProps) {
   }, [animateStage, expanded]);
 
   useEffect(() => {
+    /* 클린업이 도는 시점엔 React 가 ref 를 이미 비운다. 그때 `stageRef.current`
+       를 읽으면 `null` 이 넘어가 확대 FLIP 트윈이 안 죽고, 떨어져 나간 노드에
+       계속 transform 을 쓴다. 이펙트 본문에서 노드를 붙잡아 둔다. */
+    const stage = stageRef.current;
     return () => {
-      gsap.killTweensOf(stageRef.current);
+      if (stage) gsap.killTweensOf(stage);
     };
   }, []);
 

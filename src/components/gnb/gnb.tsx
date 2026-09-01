@@ -55,6 +55,13 @@ export function Gnb({ locale, messages }: GnbProps) {
 
   const [isHidden, setIsHidden] = useState(false);
   const [isMegaOpen, setIsMegaOpen] = useState(false);
+  /**
+   * ⚠️ 인라인 화살표로 넘기면 렌더마다 새 함수라, 전체메뉴의 포커스 트랩
+   * 이펙트(`[open, onClose]`)가 부모가 리렌더될 때마다 통째로 다시 돈다.
+   * 그때마다 포커스가 패널로 끌려가고, 정리 단계에서 트리거로 또 옮겨져
+   * 키보드로 이동 중이던 자리를 잃는다.
+   */
+  const closeMega = useCallback(() => setIsMegaOpen(false), []);
   const [openDepth1, setOpenDepth1] = useState<string | null>(null);
 
   const lastYRef = useRef(0);
@@ -238,7 +245,7 @@ export function Gnb({ locale, messages }: GnbProps) {
       <MegaMenu
         locale={locale}
         open={isMegaOpen}
-        onClose={() => setIsMegaOpen(false)}
+        onClose={closeMega}
         closeLabel={messages.menuClose}
         loginLabel={messages.login}
         signupLabel={messages.signup}

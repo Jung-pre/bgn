@@ -142,7 +142,6 @@ export function HeroSection({ messages }: HeroSectionProps) {
    * (매 프레임 setState 금지 규칙은 ref 가드로 지킨다)
    */
   const [towerMounted, setTowerMounted] = useState(false);
-  const [zoomedDoctor, setZoomedDoctor] = useState<number | null>(null);
 
   /**
    * 모바일에서는 타워 씬 의료진을 **아예 렌더하지 않는다** — 수정요청 6차 4p
@@ -684,20 +683,17 @@ export function HeroSection({ messages }: HeroSectionProps) {
               />
             </p>
             {/* 카피 바로 아래, 제목과 같은 폭. 호버는 카피(.inner) 위여야 먹는다. */}
+            {/**
+              * ⚠️ 여기 있던 탭-확대 핸들러는 **절대 실행될 수 없었다.**
+              * 블록 자체가 `!isMobileViewport`(> 768px)일 때만 렌더되는데
+              * 핸들러는 `(max-width: 768px)` 가 아니면 즉시 return 했다.
+              * 모바일 의료진 삭제(수정요청 6차 4p) 이후 남은 잔재라 걷어낸다.
+              * 딸려 있던 `zoomedDoctor` state 와 `.towerTeamZoomed` 도 같이 죽은 코드였다.
+              */}
             {towerMounted && !isMobileViewport ? (
               <div ref={towerTeamRef} className={styles.towerTeam} data-tower-fade>
-                {TOWER_DOCTORS.map((src, index) => (
-                  <div
-                    key={src}
-                    className={clsx(
-                      styles.towerTeamItem,
-                      zoomedDoctor === index && styles.towerTeamZoomed,
-                    )}
-                    onClick={() => {
-                      if (!window.matchMedia(MQ.mobile).matches) return;
-                      setZoomedDoctor((current) => (current === index ? null : index));
-                    }}
-                  >
+                {TOWER_DOCTORS.map((src) => (
+                  <div key={src} className={styles.towerTeamItem}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       className={styles.towerTeamImg}

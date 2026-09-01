@@ -67,9 +67,13 @@ export function isAppleTouchSync(): boolean {
   return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
 }
 
+/**
+ * `subscribe` 는 **모듈 스코프 상수**여야 한다.
+ * 인라인으로 두면 렌더마다 새 함수라 React 가 커밋 때마다 구독을 끊었다 다시 건다.
+ * (UA 는 안 바뀌므로 구독 자체는 빈 함수다)
+ */
+const subscribeNever = () => () => {};
+const getAppleTouchServer = () => false;
+
 export const useIsAppleTouch = () =>
-  useSyncExternalStore(
-    () => () => {},
-    isAppleTouchSync,
-    () => false,
-  );
+  useSyncExternalStore(subscribeNever, isAppleTouchSync, getAppleTouchServer);

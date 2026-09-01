@@ -144,7 +144,12 @@ export function AiStorySection({ messages }: AiStorySectionProps) {
     );
     io.observe(frame);
     return () => io.disconnect();
-  }, [playing, activeTab]);
+    /* ⚠️ `playKey` 가 있어야 한다. iframe 의 React key 에 `playKey` 가 들어 있어서
+       **같은 탭을 다시 누르면** 노드가 통째로 교체되는데, 그때 이 이펙트가 다시
+       돌지 않으면 옵저버가 떨어져 나간 옛 노드를 계속 본다 → 새 플레이어는
+       화면 밖으로 나가도 안 멈추고 소리가 계속 난다.
+       ESLint 는 이펙트 본문에 `playKey` 가 안 나와서 못 잡는다. */
+  }, [playing, activeTab, playKey]);
 
   /** WAI-ARIA Tabs 패턴 — 좌우 화살표로 탭 이동 */
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {

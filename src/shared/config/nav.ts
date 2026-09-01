@@ -49,9 +49,6 @@ export const NAV_TREE: NavItem[] = [
  */
 export const MOBILE_EXTRA_NAV: NavItem[] = [{ href: "/blog", label: ko("블로그") }];
 
-export const SNS_LINKS = [
-  { id: "youtube", label: "유튜브", href: "" },
-  { id: "instagram", label: "인스타그램", href: "" },
-  { id: "kakao", label: "카카오채널", href: "" },
-  { id: "facebook", label: "페이스북", href: "" },
-] as const;
+/* SNS 는 `gnb-nav.ts` 의 `GNB_SNS` 한 곳으로 모았다.
+   여기 있던 `SNS_LINKS` 는 네 항목 전부 `href: ""` 라 푸터 아이콘이
+   눌러도 아무 데도 안 갔다(= `#`). */

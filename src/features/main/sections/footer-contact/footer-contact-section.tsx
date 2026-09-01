@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { SNS_LINKS } from "@/shared/config/nav";
+import { GNB_SNS } from "@/components/gnb/gnb-nav";
 import type { FooterMessages } from "@/shared/i18n/messages";
 import { useSectionReveal } from "@/features/main/sections/common/use-section-reveal";
 import { useSceneActive } from "@/r3f/use-scene-active";
@@ -215,14 +215,17 @@ export function FooterContactSection({ messages }: FooterContactSectionProps) {
 
       <div className={styles.inner} ref={innerRef}>
         <ul className={styles.snsList} data-reveal-item>
-          {SNS_LINKS.map((s) => (
+          {/* 예전엔 `SNS_LINKS`(nav.ts)를 썼는데 네 항목 모두 `href: ""` 라
+              `href="#"` 로 떨어져 **아이콘을 누르면 페이지 맨 위로 점프**했다.
+              전체메뉴가 쓰는 `GNB_SNS` 에 실주소가 있어 그쪽으로 합친다. */}
+          {GNB_SNS.map((s) => (
             <li key={s.id}>
               <a
-                href={s.href || "#"}
+                href={s.href}
                 className={styles.snsItem}
                 aria-label={s.label}
-                target={s.href ? "_blank" : undefined}
-                rel={s.href ? "noreferrer" : undefined}
+                target="_blank"
+                rel="noreferrer"
               >
                 <SnsIcon id={s.id} />
               </a>

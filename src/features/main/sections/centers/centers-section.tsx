@@ -329,7 +329,6 @@ export function CentersSection({ messages }: CentersSectionProps) {
                       type="button"
                       className={styles.selectHit}
                       aria-label={`${center.name} 펼치기`}
-                      aria-expanded={false}
                       tabIndex={collapsed ? -1 : undefined}
                       onClick={() => select(i)}
                     />

@@ -501,28 +501,28 @@ function StepData({ index, step }: { index: number; step: AiStepMessages }) {
     case 0:
       return (
         <>
-          <p className={clsx(styles.badge, styles.badgeSph)} data-badge lang="en" aria-label={SPH_LABEL}>
+          {/**
+            * ⚠️ `aria-label` 을 `<p>` 에 걸면 안 된다.
+            * ARIA 는 `paragraph` 롤에 이름 붙이는 걸 금지해서 스크린리더가 무시한다.
+            * 여기 유일한 텍스트 노드는 `data-type`(타이핑 모션 대상)이고 `aria-hidden`
+            * 이라, 결과적으로 `SPH -3.25` 같은 값이 **아무것도 안 읽혔다.**
+            * 타이핑 대상은 그대로 두고 `sr-only` 형제로 이름만 따로 준다.
+            */}
+          <p className={clsx(styles.badge, styles.badgeSph)} data-badge lang="en">
+            <span className="sr-only">{SPH_LABEL}</span>
             <span className={styles.badgeText} data-type aria-hidden>
               {SPH_LABEL}
             </span>
           </p>
-          <p
-            className={clsx(styles.badge, styles.badgeAxis)}
-            data-badge
-            lang="en"
-            aria-label={AXIS_LABEL}
-          >
+          <p className={clsx(styles.badge, styles.badgeAxis)} data-badge lang="en">
+            <span className="sr-only">{AXIS_LABEL}</span>
             <span className={clsx(styles.badgeText, styles.badgeTextDeep)} data-type aria-hidden>
               {AXIS_LABEL}
             </span>
           </p>
           {step.dataLabel ? (
-            <p
-              className={clsx(styles.badge, styles.badgeOptical)}
-              data-badge
-              lang="en"
-              aria-label={step.dataLabel}
-            >
+            <p className={clsx(styles.badge, styles.badgeOptical)} data-badge lang="en">
+              <span className="sr-only">{step.dataLabel}</span>
               <span className={styles.badgeText} data-type aria-hidden>
                 {step.dataLabel}
               </span>
@@ -642,7 +642,9 @@ function RecommendPanel({ names }: { names: string[] }) {
         <li className={styles.recommendHead}>{RECOMMEND_HEAD}</li>
         {rows.map((name, i) => (
           <li
-            key={name}
+            /* 폴백(`names` 가 비면 "-" 3개)에서는 이름이 전부 같아 key 가 겹친다.
+               `[data-row]` 는 GSAP 대상이라 재조정이 흔들리면 안 된다. */
+            key={`${name}-${i}`}
             className={clsx(styles.recommendRow, i === 0 && styles.recommendRowTop)}
             data-row
           >
